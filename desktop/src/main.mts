@@ -55,9 +55,9 @@ interface WindowState {
 const stateFile = path.join(userData, "window.json");
 
 // The language picked in the web app, kept here so the splash screen (shown before the web app loads) uses it too.
-type Lang = "en" | "pt-BR" | "it";
+type Lang = "en" | "pt-BR" | "it" | "vi";
 const settingsFile = path.join(userData, "settings.json");
-const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR" || v === "it";
+const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR" || v === "it" || v === "vi";
 
 /**
  * `server`: the Musike server the app shows, instead of this computer's own library (Settings > Server);
@@ -119,6 +119,7 @@ const SERVER_DOWN: Record<Lang, (url: string) => string> = {
   en: (url) => `no Musike server answers at ${url}.`,
   "pt-BR": (url) => `nenhum servidor Musike responde em ${url}.`,
   it: (url) => `nessun server Musike risponde a ${url}.`,
+  vi: (url) => `không có máy chủ Musike nào trả lời tại ${url}.`,
 };
 
 // Asked before a server's own page connects the app to a server.
@@ -126,6 +127,7 @@ const CONNECT: Record<Lang, { buttons: string[]; message: (url: string) => strin
   en: { buttons: ["Connect", "Cancel"], message: (url) => `Connect Musike to ${url}?` },
   "pt-BR": { buttons: ["Conectar", "Cancelar"], message: (url) => `Conectar o Musike a ${url}?` },
   it: { buttons: ["Connetti", "Annulla"], message: (url) => `Connettere Musike a ${url}?` },
+  vi: { buttons: ["Kết nối", "Hủy"], message: (url) => `Kết nối Musike với ${url}?` },
 };
 
 function readWindowState(): WindowState {

@@ -3,7 +3,7 @@
  * They are kept as keys and translated when sent, so each device gets its own language.
  */
 
-export type Lang = "en" | "pt-BR" | "it";
+export type Lang = "en" | "pt-BR" | "it" | "vi";
 type Params = Record<string, string | number>;
 
 const en = {
@@ -221,7 +221,57 @@ const it: Record<MsgKey, string> = {
   ffmpegPackage: "Pacchetto FFmpeg imprevisto.",
 };
 
-const CATALOG: Record<Lang, Record<MsgKey, string>> = { en, "pt-BR": pt, it };
+// Not every message is translated yet: the missing ones are said in English.
+const vi: Partial<Record<MsgKey, string>> = {
+  invalidVideoId: "ID video không hợp lệ.",
+  emptyQuery: "Nhập gì đó để tìm.",
+  searchFailed: "Tính năng tìm kiếm đang không khả dụng ({detail}). Thử lại sau một lát.",
+  missingTitle: "Cho biết tên bài hát.",
+  notBackup: "Tập tin này không phải bản sao lưu Musike.",
+  newerBackup: "Bản sao lưu do một phiên bản Musike mới hơn tạo. Cập nhật ứng dụng để nhập.",
+  idMismatch: "ID không khớp.",
+  tracksRequired: "Gửi danh sách bài hát.",
+  invalidGenre: "Thể loại không hợp lệ.",
+  invalidOffset: "Vị trí không hợp lệ.",
+  invalidArtist: "Nghệ sĩ không hợp lệ.",
+  routeNotFound: "Không tìm thấy tuyến.",
+  noFreePort: "Không có cổng trống giữa {from} và {to}.",
+  invalidTrack: "Bài hát không hợp lệ.",
+  playlistNotFound: "Không tìm thấy danh sách phát.",
+  playlistNameRequired: "Đặt tên cho danh sách phát.",
+  genresUnavailable: "Chưa tải được các thể loại lúc này. Thử lại.",
+  genreUnavailable: "Chưa mở được thể loại này lúc này. Thử lại.",
+  genreEmpty: "Không tìm thấy gì cho thể loại này.",
+  artistUnavailable: "Chưa mở được nghệ sĩ này lúc này. Thử lại.",
+  artistNotFound: "Không tìm thấy nghệ sĩ.",
+  albumUnavailable: "Chưa mở được album này lúc này. Thử lại.",
+  albumNotFound: "Không tìm thấy album.",
+  invalidAlbum: "Album không hợp lệ.",
+  ytdlpMissing: "Không tìm thấy yt-dlp trên máy này. Mở Cài đặt trong Musike để cài.",
+  ytdlpTimeout: "yt-dlp trả lời quá chậm.",
+  ytdlpCantRun: "Không chạy được yt-dlp ({error}). Mở Cài đặt trong Musike.",
+  botCheck: "YouTube yêu cầu kết nối này chứng minh không phải robot. Nếu bạn dùng VPN, hãy tắt đi và thử lại.",
+  videoUnavailable: "Video này không khả dụng trên YouTube.",
+  ageRestricted: "Video giới hạn độ tuổi. Cần cookie từ tài khoản đã đăng nhập.",
+  ytdlpFailed: "yt-dlp thất bại.",
+  ytdlpOutdated: "{detail} YouTube có thể đã thay đổi: cập nhật yt-dlp trong Cài đặt.",
+  noAudio: "Không có định dạng âm thanh nào cho video này.",
+  noSdVideo: "Video này không có bản SD ghép sẵn. Dùng HD.",
+  streamRefused: "YouTube từ chối luồng phát (HTTP {status}). Thử cập nhật yt-dlp trong Cài đặt.",
+  noWinget: "Không tìm thấy yt-dlp và winget không khả dụng. Cài thủ công: https://github.com/yt-dlp/yt-dlp",
+  installingYtdlp: "Đang cài yt-dlp",
+  updatingYtdlp: "Đang cập nhật yt-dlp",
+  directUpdateFailed: "Cập nhật trực tiếp thất bại, đang thử qua winget",
+  downloadingTools: "Đang tải yt-dlp và Deno từ GitHub",
+  alreadyLatest: "Đã là phiên bản mới nhất ({version})",
+  ytdlpReady: "yt-dlp {version} sẵn sàng sử dụng",
+  updateFailed: "Không cập nhật được yt-dlp.",
+  toolMissing: "Không tìm thấy {tool} trên máy này.",
+  downloadFailed: "Tải {tool} thất bại (HTTP {status}).",
+  ffmpegPackage: "Gói FFmpeg không như mong đợi.",
+};
+
+const CATALOG: Record<Lang, Partial<Record<MsgKey, string>>> = { en, "pt-BR": pt, it, vi };
 
 /** A message translated when it is sent: a key plus the values for its {placeholders}. */
 export interface Msg {
@@ -236,10 +286,10 @@ export const msg = (key: MsgKey, params?: Params): Msg => ({ key, params });
 
 export function tr(lang: Lang, text: Text): string {
   if (typeof text === "string") return text;
-  return CATALOG[lang][text.key].replace(/\{(\w+)\}/g, (all, name: string) => String(text.params?.[name] ?? all));
+  return (CATALOG[lang][text.key] ?? en[text.key]).replace(/\{(\w+)\}/g, (all, name: string) => String(text.params?.[name] ?? all));
 }
 
-export const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR" || v === "it";
+export const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR" || v === "it" || v === "vi";
 
 /** The language a request asked for. The app always says; anything else (media elements, curl) gets English. */
 export function langOf(req: { headers: Record<string, string | string[] | undefined> }): Lang {
