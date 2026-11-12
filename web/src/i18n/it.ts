@@ -13,6 +13,7 @@ export const it: Messages = {
     loading: "Caricamento",
     play: "Riproduci",
     pause: "Pausa",
+    stopLoading: "Interrompi caricamento",
     playX: (title) => `Riproduci ${title}`,
     playAll: "Riproduci tutto",
     favorite: "Preferiti",

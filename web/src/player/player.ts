@@ -330,6 +330,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       toast(getT().player.radioContinuing(last.title));
       load(get().index + 1);
     } catch {
+      if (mine !== token) return;
       set({ status: "paused", statusText: null, position: 0 });
     }
   }
@@ -650,6 +651,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const s = get();
       const track = s.queue[s.index];
       if (!track) return;
+      // The spinner is a stop button: a track stuck loading (YouTube holding it back) can be let go.
+      if (s.status === "loading") return get().pause();
       const kind = kindFor(track);
       const stale =
         !loaded ||
@@ -673,7 +676,14 @@ export const usePlayer = create<PlayerState>((set, get) => {
         // Buffering mid-track: already counted as a play, resuming mustn't count it again. Still starting: the next
         // Play loads the track again, from here.
         if (started) recordedToken = token;
-        else loaded = null;
+        else {
+          loaded = null;
+          // Drop the request too, so the server stops waiting on YouTube for it.
+          for (const media of [audio, videoEl]) {
+            media.removeAttribute("src");
+            media.load();
+          }
+        }
       }
       audio.pause();
       videoEl.pause();
