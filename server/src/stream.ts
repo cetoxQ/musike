@@ -5,7 +5,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { msg } from "./i18n.js";
 import { HttpError } from "./types.js";
-import { invalidate, resolveAudio, resolveStreams, type StreamFormat } from "./ytdlp.js";
+import { directAudioStream, invalidate, resolveAudio, resolveStreams, type StreamFormat } from "./ytdlp.js";
 
 const PASS_HEADERS = ["content-length", "content-range", "accept-ranges", "last-modified"];
 
@@ -74,8 +74,19 @@ export async function proxyStream(req: FastifyRequest, reply: FastifyReply, id: 
 
   let fmt = await pick(false);
   let upstream = await fetchServed(fmt);
+  const refused = () => upstream.status === 403 || upstream.status === 410;
+  // Audio from yt-dlp still refused: on some connections (bot check, VPN) YouTube accepts the resolution and not
+  // the bytes. Asking it for the audio directly takes about half a second and isn't held back, so it goes first.
+  if (kind === "audio" && fmt.formatId !== "direct" && refused()) {
+    const direct = await directAudioStream(id);
+    if (direct) {
+      await upstream.body?.cancel();
+      fmt = direct;
+      upstream = await fetchServed(fmt);
+    }
+  }
   // Expired or rejected URL: resolve again once.
-  if (upstream.status === 403 || upstream.status === 410) {
+  if (refused()) {
     await upstream.body?.cancel();
     fmt = await pick(true);
     upstream = await fetchServed(fmt);
