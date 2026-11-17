@@ -74,7 +74,8 @@ export function SelectedCount({ n, total }: { n: number; total: number }) {
 
 /**
  * Sticky bar under the page header: select all, then play, favorite or add the selection to a playlist.
- * With nothing selected, "Play all" plays every track.
+ * With nothing selected, "Play all" plays every track, and the actions that need a selection stay hidden
+ * (greyed out, they looked like buttons that do nothing).
  */
 export function SelectionBar({
   chosen,
@@ -125,8 +126,12 @@ export function SelectionBar({
           disabled={!toPlay.length}
           onClick={() => playList(toPlay, 0)}
         />
-        <Action icon={<HeartIcon size={16} />} label={t.common.favorite} disabled={!chosen.length} onClick={() => void addFavorites(chosen)} />
-        <Action icon={<PlaylistIcon size={16} />} label={t.common.playlist} disabled={!chosen.length} onClick={() => openAddToPlaylist(chosen)} />
+        {chosen.length > 0 && (
+          <>
+            <Action icon={<HeartIcon size={16} />} label={t.common.favorite} onClick={() => void addFavorites(chosen)} />
+            <Action icon={<PlaylistIcon size={16} />} label={t.common.playlist} onClick={() => openAddToPlaylist(chosen)} />
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,11 @@
 import {
   ArrowRightIcon,
-  HeartIcon,
+  CheckCircleIcon,
   MusicNotesIcon,
   PauseIcon,
   PlayIcon,
   PlaylistIcon,
+  PlusCircleIcon,
   ShuffleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
@@ -119,7 +120,8 @@ export default function Album() {
             size="lg"
             onClick={() => void toggleAlbum(toLibraryEntry(album))}
           >
-            <HeartIcon size={24} weight={inLibrary ? "fill" : "regular"} />
+            {/* Not a heart: the heart in the bar below adds tracks to Favorites, this keeps the album itself. */}
+            {inLibrary ? <CheckCircleIcon size={26} weight="fill" /> : <PlusCircleIcon size={26} />}
           </IconButton>
           {saved ? (
             <Link
