@@ -35,7 +35,13 @@ export async function createBackup(): Promise<Backup> {
     version: 1,
     exportedAt: new Date().toISOString(),
     app: `Musike ${__APP_VERSION__}`,
-    library: { favorites: library.favorites, playlists: library.playlists, history: library.history },
+    library: {
+      favorites: library.favorites,
+      playlists: library.playlists,
+      history: library.history,
+      artists: library.artists ?? [],
+      albums: library.albums ?? [],
+    },
     settings: {
       theme: useUi.getState().theme,
       lang: getLang(),

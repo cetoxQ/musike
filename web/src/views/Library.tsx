@@ -1,6 +1,8 @@
 import { DatabaseIcon, PlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { AlbumGrid } from "../components/AlbumTiles";
+import { ArtistGrid } from "../components/ArtistTiles";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
 import { PageHeader } from "../components/Page";
@@ -34,7 +36,7 @@ function Entry({ to, name, kind, tracks, sub }: { to: string; name: string; kind
 }
 
 export default function Library() {
-  const { favorites, playlists, history, createPlaylist } = useLibrary();
+  const { favorites, playlists, history, artists, albums, createPlaylist } = useLibrary();
   const [creating, setCreating] = useState(false);
   const setSettingsOpen = useUi((s) => s.setSettingsOpen);
   const navigate = useNavigate();
@@ -80,6 +82,20 @@ export default function Library() {
         <p className="px-4 pt-6 text-sm text-fg-2 md:px-6">
           {t.library.noPlaylists}
         </p>
+      )}
+
+      {artists.length > 0 && (
+        <section className="flex flex-col gap-3 pt-8">
+          <h2 className="px-4 text-xl font-semibold tracking-tight md:px-6">{t.library.artists}</h2>
+          <ArtistGrid dense artists={artists.map((a) => ({ id: a.id, name: a.name, info: "", thumb: a.thumb, art: a.art }))} />
+        </section>
+      )}
+
+      {albums.length > 0 && (
+        <section className="flex flex-col gap-3 pt-8">
+          <h2 className="px-4 text-xl font-semibold tracking-tight md:px-6">{t.library.albums}</h2>
+          <AlbumGrid dense albums={albums.map((a) => ({ id: a.id, title: a.title, artist: a.artist, year: a.year, thumb: a.thumb, art: a.art }))} />
+        </section>
       )}
 
       <NamePlaylistDialog

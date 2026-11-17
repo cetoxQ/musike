@@ -180,6 +180,31 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   app.post("/api/history", async (req) => ({ history: await library.pushHistory(library.sanitizeTrack(req.body)) }));
 
+  /** Artists and albums kept in the library. */
+  app.put("/api/library/artists/:aid", async (req) => {
+    const saved = library.sanitizeArtist(req.body);
+    if (saved.id !== (req.params as { aid: string }).aid) throw new HttpError(400, msg("idMismatch"));
+    return { artists: await library.saveArtist(saved) };
+  });
+
+  app.delete("/api/library/artists/:aid", async (req) => {
+    const { aid } = req.params as { aid: string };
+    if (!ARTIST_ID.test(aid)) throw new HttpError(400, msg("invalidArtist"));
+    return { artists: await library.removeArtist(aid) };
+  });
+
+  app.put("/api/library/albums/:alid", async (req) => {
+    const saved = library.sanitizeAlbum(req.body);
+    if (saved.id !== (req.params as { alid: string }).alid) throw new HttpError(400, msg("idMismatch"));
+    return { albums: await library.saveAlbum(saved) };
+  });
+
+  app.delete("/api/library/albums/:alid", async (req) => {
+    const { alid } = req.params as { alid: string };
+    if (!ALBUM_ID.test(alid)) throw new HttpError(400, msg("invalidAlbum"));
+    return { albums: await library.removeAlbum(alid) };
+  });
+
   app.post("/api/playlists", async (req) => {
     const body = (req.body ?? {}) as { name?: unknown; tracks?: unknown };
     const tracks = Array.isArray(body.tracks) ? body.tracks.slice(0, 500).map(library.sanitizeTrack) : [];

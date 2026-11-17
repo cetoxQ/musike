@@ -1,9 +1,20 @@
 import { msg } from "./i18n.js";
-import { ARTIST_ID, HttpError, VIDEO_ID, type Library, type Playlist, type Track } from "./types.js";
+import {
+  ALBUM_ID,
+  ARTIST_ID,
+  HttpError,
+  VIDEO_ID,
+  type Library,
+  type Playlist,
+  type SavedAlbum,
+  type SavedArtist,
+  type Track,
+} from "./types.js";
 
 // No Node-only imports here: the Android app runs this same module, with its own storage.
 
 const HISTORY_LIMIT = 60;
+const SAVED_LIMIT = 2000;
 
 /** Where the library is kept: a file on the server and the desktop app, app storage on Android. */
 export interface LibraryStorage {
@@ -27,7 +38,15 @@ async function load(): Promise<Library> {
   if (state) return state;
   if (!storage) throw new Error("Library storage not configured");
   const json = await storage.read();
-  state = json ? (JSON.parse(json) as Library) : { favorites: [], playlists: [], history: [] };
+  const lib = (json ? JSON.parse(json) : {}) as Partial<Library>;
+  // Libraries saved by older versions lack the newer lists.
+  state = {
+    favorites: lib.favorites ?? [],
+    playlists: lib.playlists ?? [],
+    history: lib.history ?? [],
+    artists: lib.artists ?? [],
+    albums: lib.albums ?? [],
+  };
   return state;
 }
 
@@ -39,15 +58,16 @@ function persist(): Promise<void> {
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+const url = (v: unknown) => {
+  const s = str(v, 500);
+  return /^https:\/\//.test(s) ? s : "";
+};
+const time = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : Date.now());
 
 export function sanitizeTrack(input: unknown): Track {
   const t = (input ?? {}) as Record<string, unknown>;
   const id = str(t.id, 11);
   if (!VIDEO_ID.test(id)) throw new HttpError(400, msg("invalidTrack"));
-  const url = (v: unknown) => {
-    const s = str(v, 500);
-    return /^https:\/\//.test(s) ? s : "";
-  };
   return {
     id,
     title: str(t.title, 300) || "Untitled",
@@ -58,6 +78,30 @@ export function sanitizeTrack(input: unknown): Track {
     thumb: url(t.thumb),
     art: url(t.art),
     kind: t.kind === "video" ? "video" : "song",
+  };
+}
+
+export function sanitizeArtist(input: unknown): SavedArtist {
+  const a = (input ?? {}) as Record<string, unknown>;
+  const id = str(a.id, 30);
+  if (!ARTIST_ID.test(id)) throw new HttpError(400, msg("invalidArtist"));
+  return { id, name: str(a.name, 300) || "Artist", thumb: url(a.thumb), art: url(a.art), savedAt: time(a.savedAt) };
+}
+
+export function sanitizeAlbum(input: unknown): SavedAlbum {
+  const a = (input ?? {}) as Record<string, unknown>;
+  const id = str(a.id, 64);
+  if (!ALBUM_ID.test(id)) throw new HttpError(400, msg("invalidAlbum"));
+  const artistId = str(a.artistId, 30);
+  return {
+    id,
+    title: str(a.title, 300) || "Album",
+    artist: str(a.artist, 300),
+    artistId: ARTIST_ID.test(artistId) ? artistId : undefined,
+    year: str(a.year, 20),
+    thumb: url(a.thumb),
+    art: url(a.art),
+    savedAt: time(a.savedAt),
   };
 }
 
@@ -93,6 +137,35 @@ export async function removeFavorite(id: string): Promise<Track[]> {
   lib.favorites = lib.favorites.filter((t) => t.id !== id);
   await persist();
   return lib.favorites;
+}
+
+/** Puts it on top (saving again moves it there), stamped now. */
+export async function saveArtist(artist: SavedArtist): Promise<SavedArtist[]> {
+  const lib = await load();
+  lib.artists = [{ ...artist, savedAt: Date.now() }, ...lib.artists.filter((a) => a.id !== artist.id)].slice(0, SAVED_LIMIT);
+  await persist();
+  return lib.artists;
+}
+
+export async function removeArtist(id: string): Promise<SavedArtist[]> {
+  const lib = await load();
+  lib.artists = lib.artists.filter((a) => a.id !== id);
+  await persist();
+  return lib.artists;
+}
+
+export async function saveAlbum(album: SavedAlbum): Promise<SavedAlbum[]> {
+  const lib = await load();
+  lib.albums = [{ ...album, savedAt: Date.now() }, ...lib.albums.filter((a) => a.id !== album.id)].slice(0, SAVED_LIMIT);
+  await persist();
+  return lib.albums;
+}
+
+export async function removeAlbum(id: string): Promise<SavedAlbum[]> {
+  const lib = await load();
+  lib.albums = lib.albums.filter((a) => a.id !== id);
+  await persist();
+  return lib.albums;
 }
 
 export async function pushHistory(track: Track): Promise<Track[]> {
@@ -175,6 +248,25 @@ function cleanTracks(input: unknown, limit = MAX_TRACKS): Track[] {
   return out;
 }
 
+/** Keeps the valid entries of an untrusted list, without duplicates. */
+function cleanSaved<T extends { id: string }>(input: unknown, sanitize: (raw: unknown) => T): T[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const raw of input.slice(0, SAVED_LIMIT * 2)) {
+    try {
+      const item = sanitize(raw);
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      out.push(item);
+      if (out.length >= SAVED_LIMIT) break;
+    } catch {
+      // skip invalid entries instead of rejecting the whole backup
+    }
+  }
+  return out;
+}
+
 function cleanLibrary(input: unknown): Library {
   const lib = (input ?? {}) as Record<string, unknown>;
   const playlists = (Array.isArray(lib.playlists) ? lib.playlists : []).slice(0, MAX_PLAYLISTS).flatMap((raw): Playlist[] => {
@@ -186,7 +278,13 @@ function cleanLibrary(input: unknown): Library {
     const id = str(p.id, 64);
     return [{ id: /^[\w-]{8,64}$/.test(id) ? id : randomUUID(), name, createdAt: num(p.createdAt), updatedAt: num(p.updatedAt), tracks: cleanTracks(p.tracks) }];
   });
-  return { favorites: cleanTracks(lib.favorites), playlists, history: cleanTracks(lib.history, HISTORY_LIMIT) };
+  return {
+    favorites: cleanTracks(lib.favorites),
+    playlists,
+    history: cleanTracks(lib.history, HISTORY_LIMIT),
+    artists: cleanSaved(lib.artists, sanitizeArtist),
+    albums: cleanSaved(lib.albums, sanitizeAlbum),
+  };
 }
 
 export interface ImportResult {
@@ -194,6 +292,8 @@ export interface ImportResult {
   playlistsMerged: number;
   tracksAdded: number;
   favoritesAdded: number;
+  artistsAdded: number;
+  albumsAdded: number;
 }
 
 /**
@@ -203,18 +303,20 @@ export interface ImportResult {
 export async function importLibrary(input: unknown, mode: "merge" | "replace"): Promise<ImportResult> {
   const incoming = cleanLibrary(input);
   const lib = await load();
-  const result: ImportResult = { playlistsAdded: 0, playlistsMerged: 0, tracksAdded: 0, favoritesAdded: 0 };
+  const result: ImportResult = { playlistsAdded: 0, playlistsMerged: 0, tracksAdded: 0, favoritesAdded: 0, artistsAdded: 0, albumsAdded: 0 };
 
   if (mode === "replace") {
     state = incoming;
     result.playlistsAdded = incoming.playlists.length;
     result.favoritesAdded = incoming.favorites.length;
+    result.artistsAdded = incoming.artists.length;
+    result.albumsAdded = incoming.albums.length;
     result.tracksAdded = incoming.playlists.reduce((n, p) => n + p.tracks.length, 0);
     await persist();
     return result;
   }
 
-  const union = (mine: Track[], theirs: Track[]) => {
+  const union = <T extends { id: string }>(mine: T[], theirs: T[]) => {
     const have = new Set(mine.map((t) => t.id));
     const added = theirs.filter((t) => !have.has(t.id));
     return { list: [...mine, ...added], added: added.length };
@@ -241,6 +343,13 @@ export async function importLibrary(input: unknown, mode: "merge" | "replace"): 
       result.playlistsAdded++;
     }
   }
+
+  const artists = union(lib.artists, incoming.artists);
+  lib.artists = artists.list.slice(0, SAVED_LIMIT);
+  result.artistsAdded = artists.added;
+  const albums = union(lib.albums, incoming.albums);
+  lib.albums = albums.list.slice(0, SAVED_LIMIT);
+  result.albumsAdded = albums.added;
 
   lib.history = union(lib.history, incoming.history).list.slice(0, HISTORY_LIMIT);
   await persist();

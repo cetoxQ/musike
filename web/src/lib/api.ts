@@ -10,7 +10,20 @@ import {
   type SystemJob,
   type SystemMedia,
 } from "./apiTypes";
-import type { AlbumCard, AlbumPage, ArtistCard, ArtistPage, Genre, GenreArtist, GenrePage, Library, Playlist, Track } from "./types";
+import type {
+  AlbumCard,
+  AlbumPage,
+  ArtistCard,
+  ArtistPage,
+  Genre,
+  GenreArtist,
+  GenrePage,
+  Library,
+  Playlist,
+  SavedAlbum,
+  SavedArtist,
+  Track,
+} from "./types";
 
 // The HTTP backend: the Musike server (web app, desktop app). The Android build swaps this module for native/api.ts.
 export * from "./apiTypes";
@@ -67,6 +80,10 @@ export const api: MusikeApi = {
   addFavorites: (tracks: Track[]) => request<{ favorites: Track[] }>("/api/favorites", { method: "POST", json: { tracks } }),
   removeFavorite: (id: string) => request<{ favorites: Track[] }>(`/api/favorites/${id}`, { method: "DELETE" }),
   pushHistory: (t: Track) => request<{ history: Track[] }>("/api/history", { method: "POST", json: t }),
+  saveArtist: (a: SavedArtist) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${a.id}`, { method: "PUT", json: a }),
+  removeArtist: (id: string) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${id}`, { method: "DELETE" }),
+  saveAlbum: (a: SavedAlbum) => request<{ albums: SavedAlbum[] }>(`/api/library/albums/${a.id}`, { method: "PUT", json: a }),
+  removeAlbum: (id: string) => request<{ albums: SavedAlbum[] }>(`/api/library/albums/${id}`, { method: "DELETE" }),
   createPlaylist: (name: string, tracks: Track[] = []) =>
     request<Playlist>("/api/playlists", { method: "POST", json: { name, tracks } }),
   renamePlaylist: (id: string, name: string) => request<Playlist>(`/api/playlists/${id}`, { method: "PATCH", json: { name } }),

@@ -68,6 +68,8 @@ export const pt: Messages = {
     create: "Criar",
     playlistSub: (n) => `Playlist · ${count(n, "faixa", "faixas")}`,
     noPlaylists: "Você ainda não tem playlists. Crie uma aqui ou use o menu de qualquer faixa para começar uma.",
+    artists: "Artistas",
+    albums: "Álbuns",
   },
 
   collection: {
@@ -300,6 +302,10 @@ export const pt: Messages = {
     noHitsBody: "O YouTube Music não lista sucessos para este artista.",
     albums: "Álbuns",
     singles: "Singles e EPs",
+    follow: "Seguir",
+    following: "Seguindo",
+    followLabel: (name) => `Salvar ${name} na sua biblioteca`,
+    unfollowLabel: (name) => `Remover ${name} da sua biblioteca`,
   },
 
   album: {
@@ -308,6 +314,8 @@ export const pt: Messages = {
     play: (title) => `Tocar ${title}`,
     shuffle: "Tocar em ordem aleatória",
     saveAsPlaylist: "Salvar como playlist",
+    saveToLibrary: "Salvar na sua biblioteca",
+    removeFromLibrary: "Remover da sua biblioteca",
     openPlaylist: "Abrir playlist",
     noTracks: "Nenhuma faixa para tocar",
     noTracksBody: "O YouTube Music não oferece as faixas deste álbum aqui.",
@@ -406,6 +414,8 @@ export const pt: Messages = {
     updatedPlaylists: (n) => count(n, "playlist atualizada", "playlists atualizadas"),
     addedTracks: (n) => count(n, "faixa adicionada", "faixas adicionadas"),
     addedFavorites: (n) => count(n, "favorita", "favoritas"),
+    addedArtists: (n) => count(n, "artista", "artistas"),
+    addedAlbums: (n) => count(n, "álbum", "álbuns"),
     unreadable: "Não foi possível ler o arquivo. Ele precisa ser um backup .musike.json.",
     notBackup: "Este arquivo não é um backup do Musike.",
     newer: "Backup feito por uma versão mais nova do Musike. Atualize o app para importar.",
@@ -415,6 +425,8 @@ export const pt: Messages = {
     dismiss: (message) => `${message}. Fechar aviso`,
     addedFavorite: "Adicionada às Favoritas",
     removedFavorite: "Removida das Favoritas",
+    savedToLibrary: (name) => `${name} salvo na sua biblioteca`,
+    removedFromLibrary: (name) => `${name} removido da sua biblioteca`,
     allAlreadyFavorites: "Já estavam todas nas Favoritas",
     addedFavorites: (n) => `${n} faixas adicionadas às Favoritas`,
     playlistCreated: (name) => `Playlist "${name}" criada`,

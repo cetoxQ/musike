@@ -1,4 +1,17 @@
-import type { AlbumCard, AlbumPage, ArtistCard, ArtistPage, Genre, GenreArtist, GenrePage, Library, Playlist, Track } from "./types";
+import type {
+  AlbumCard,
+  AlbumPage,
+  ArtistCard,
+  ArtistPage,
+  Genre,
+  GenreArtist,
+  GenrePage,
+  Library,
+  Playlist,
+  SavedAlbum,
+  SavedArtist,
+  Track,
+} from "./types";
 
 /**
  * What the app needs from a backend. The web app and the desktop app talk to the Musike server over HTTP
@@ -20,6 +33,9 @@ export interface ImportResult {
   playlistsMerged: number;
   tracksAdded: number;
   favoritesAdded: number;
+  /** Missing when talking to an older server. */
+  artistsAdded?: number;
+  albumsAdded?: number;
 }
 
 export interface SystemJob {
@@ -85,6 +101,10 @@ export interface MusikeApi {
   addFavorites(tracks: Track[]): Promise<{ favorites: Track[] }>;
   removeFavorite(id: string): Promise<{ favorites: Track[] }>;
   pushHistory(t: Track): Promise<{ history: Track[] }>;
+  saveArtist(a: SavedArtist): Promise<{ artists: SavedArtist[] }>;
+  removeArtist(id: string): Promise<{ artists: SavedArtist[] }>;
+  saveAlbum(a: SavedAlbum): Promise<{ albums: SavedAlbum[] }>;
+  removeAlbum(id: string): Promise<{ albums: SavedAlbum[] }>;
   createPlaylist(name: string, tracks?: Track[]): Promise<Playlist>;
   renamePlaylist(id: string, name: string): Promise<Playlist>;
   deletePlaylist(id: string): Promise<void>;

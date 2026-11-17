@@ -40,10 +40,14 @@ export function AlbumRow({ title, albums }: { title: string; albums: AlbumCard[]
   );
 }
 
-/** Albums as a responsive grid (search results). */
-export function AlbumGrid({ albums }: { albums: AlbumCard[] }) {
+/** Three across on phones, aligned with the page's headings: shelves like the Library's. */
+export const DENSE_GRID =
+  "grid grid-cols-3 gap-x-3 gap-y-5 px-4 sm:grid-cols-4 md:px-6 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8";
+
+/** Albums as a responsive grid (search results); `dense` uses DENSE_GRID. */
+export function AlbumGrid({ albums, dense = false }: { albums: AlbumCard[]; dense?: boolean }) {
   return (
-    <ul className="grid grid-cols-2 gap-x-3 gap-y-5 px-2 sm:grid-cols-3 md:px-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+    <ul className={dense ? DENSE_GRID : "grid grid-cols-2 gap-x-3 gap-y-5 px-2 sm:grid-cols-3 md:px-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"}>
       {albums.map((a) => (
         <li key={a.id}>
           <AlbumTile album={a} />

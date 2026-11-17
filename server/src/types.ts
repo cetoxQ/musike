@@ -19,10 +19,34 @@ export interface Playlist {
   tracks: Track[];
 }
 
+/** An artist kept in the library. */
+export interface SavedArtist {
+  id: string;
+  name: string;
+  thumb: string;
+  art: string;
+  savedAt: number;
+}
+
+/** An album kept in the library. */
+export interface SavedAlbum {
+  id: string;
+  title: string;
+  artist: string;
+  artistId?: string;
+  year: string;
+  thumb: string;
+  art: string;
+  savedAt: number;
+}
+
 export interface Library {
   favorites: Track[];
   playlists: Playlist[];
   history: Track[];
+  /** Newest first. Missing in libraries saved before artists and albums could be kept. */
+  artists: SavedArtist[];
+  albums: SavedAlbum[];
 }
 
 import { tr, type Text } from "./i18n.js";
@@ -30,6 +54,8 @@ import { tr, type Text } from "./i18n.js";
 export const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 /** A YouTube Music artist page (a channel ID). */
 export const ARTIST_ID = /^UC[\w-]{22}$/;
+/** A YouTube Music album page. */
+export const ALBUM_ID = /^MPRE[\w-]{6,60}$/;
 
 /** Machine-readable reason so the web app can offer the right fix (e.g. "update yt-dlp"). */
 export type ErrorCode = "tool_missing" | "maybe_outdated" | "bot_check";

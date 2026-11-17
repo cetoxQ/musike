@@ -73,6 +73,8 @@ export const en = {
     create: "Create",
     playlistSub: (n: number) => `Playlist · ${count(n, "track", "tracks")}`,
     noPlaylists: "You don't have any playlists yet. Create one here or use any track's menu to start one.",
+    artists: "Artists",
+    albums: "Albums",
   },
 
   collection: {
@@ -306,6 +308,10 @@ export const en = {
     noHitsBody: "YouTube Music doesn't list hits for this artist.",
     albums: "Albums",
     singles: "Singles & EPs",
+    follow: "Follow",
+    following: "Following",
+    followLabel: (name: string) => `Save ${name} to your library`,
+    unfollowLabel: (name: string) => `Remove ${name} from your library`,
   },
 
   album: {
@@ -314,6 +320,8 @@ export const en = {
     play: (title: string) => `Play ${title}`,
     shuffle: "Shuffle play",
     saveAsPlaylist: "Save as playlist",
+    saveToLibrary: "Save to your library",
+    removeFromLibrary: "Remove from your library",
     openPlaylist: "Open playlist",
     noTracks: "No playable tracks",
     noTracksBody: "YouTube Music doesn't offer this album's tracks here.",
@@ -412,6 +420,8 @@ export const en = {
     updatedPlaylists: (n: number) => count(n, "updated playlist", "updated playlists"),
     addedTracks: (n: number) => count(n, "track added", "tracks added"),
     addedFavorites: (n: number) => count(n, "favorite", "favorites"),
+    addedArtists: (n: number) => count(n, "artist", "artists"),
+    addedAlbums: (n: number) => count(n, "album", "albums"),
     unreadable: "Couldn't read the file. It needs to be a .musike.json backup.",
     notBackup: "This file isn't a Musike backup.",
     newer: "This backup was made by a newer Musike. Update the app to import it.",
@@ -421,6 +431,8 @@ export const en = {
     dismiss: (message: string) => `${message}. Close notice`,
     addedFavorite: "Added to Favorites",
     removedFavorite: "Removed from Favorites",
+    savedToLibrary: (name: string) => `${name} saved to your library`,
+    removedFromLibrary: (name: string) => `${name} removed from your library`,
     allAlreadyFavorites: "They were all in Favorites already",
     addedFavorites: (n: number) => `${n} tracks added to Favorites`,
     playlistCreated: (name: string) => `Playlist "${name}" created`,

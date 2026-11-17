@@ -19,10 +19,34 @@ export interface Playlist {
   tracks: Track[];
 }
 
+/** An artist kept in the library. */
+export interface SavedArtist {
+  id: string;
+  name: string;
+  thumb: string;
+  art: string;
+  savedAt: number;
+}
+
+/** An album kept in the library. */
+export interface SavedAlbum {
+  id: string;
+  title: string;
+  artist: string;
+  artistId?: string;
+  year: string;
+  thumb: string;
+  art: string;
+  savedAt: number;
+}
+
 export interface Library {
   favorites: Track[];
   playlists: Playlist[];
   history: Track[];
+  /** Newest first. */
+  artists: SavedArtist[];
+  albums: SavedAlbum[];
 }
 
 export interface Genre {

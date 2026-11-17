@@ -1,15 +1,16 @@
 import { Link } from "react-router";
 import { paths } from "../lib/routes";
 import type { ArtistCard } from "../lib/types";
+import { DENSE_GRID } from "./AlbumTiles";
 import { Artwork } from "./Artwork";
 
-/** Artists as a responsive grid of round photos (search results); each opens the artist's page. */
-export function ArtistGrid({ artists }: { artists: ArtistCard[] }) {
+/** Artists as a responsive grid of round photos; each opens the artist's page. `dense` as in AlbumGrid. */
+export function ArtistGrid({ artists, dense = false }: { artists: ArtistCard[]; dense?: boolean }) {
   return (
-    <ul className="grid grid-cols-2 gap-x-3 gap-y-5 px-2 sm:grid-cols-3 md:px-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+    <ul className={dense ? DENSE_GRID : "grid grid-cols-2 gap-x-3 gap-y-5 px-2 sm:grid-cols-3 md:px-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"}>
       {artists.map((a) => (
         <li key={a.id}>
-          <Link to={paths.artist(a.id)} state={{ name: a.name }} className="group flex flex-col items-center gap-2 text-center">
+          <Link to={paths.artist(a.id)} state={{ name: a.name, art: a.art }} className="group flex flex-col items-center gap-2 text-center">
             <span className="block w-full overflow-hidden rounded-full">
               <Artwork
                 src={a.art}

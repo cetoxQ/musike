@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { getT } from "../i18n";
 import { api } from "../lib/api";
-import type { Library, Playlist, Track } from "../lib/types";
+import type { Library, Playlist, SavedAlbum, SavedArtist, Track } from "../lib/types";
 import { toast } from "./ui";
 
 interface LibraryState extends Library {
@@ -11,6 +11,8 @@ interface LibraryState extends Library {
   toggleFavorite: (t: Track) => Promise<void>;
   addFavorites: (tracks: Track[]) => Promise<void>;
   recordPlay: (t: Track) => void;
+  toggleArtist: (a: SavedArtist) => Promise<void>;
+  toggleAlbum: (a: SavedAlbum) => Promise<void>;
   createPlaylist: (name: string, tracks?: Track[]) => Promise<Playlist | null>;
   renamePlaylist: (id: string, name: string) => Promise<void>;
   deletePlaylist: (id: string) => Promise<void>;
@@ -24,13 +26,16 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   favorites: [],
   playlists: [],
   history: [],
+  artists: [],
+  albums: [],
   status: "idle",
 
   load: async () => {
     set({ status: "loading" });
     try {
       const lib = await api.library();
-      set({ ...lib, status: "ready" });
+      // An older server sends no artists or albums.
+      set({ ...lib, artists: lib.artists ?? [], albums: lib.albums ?? [], status: "ready" });
     } catch {
       set({ status: "error" });
     }
@@ -64,6 +69,34 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       toast(fresh.length === 1 ? getT().toasts.addedFavorite : getT().toasts.addedFavorites(fresh.length));
     } catch (e) {
       set({ favorites: prev });
+      toast((e as Error).message, "error");
+    }
+  },
+
+  toggleArtist: async (artist) => {
+    const prev = get().artists;
+    const on = !prev.some((a) => a.id === artist.id);
+    set({ artists: on ? [artist, ...prev] : prev.filter((a) => a.id !== artist.id) });
+    try {
+      const { artists } = on ? await api.saveArtist(artist) : await api.removeArtist(artist.id);
+      set({ artists });
+      toast(on ? getT().toasts.savedToLibrary(artist.name) : getT().toasts.removedFromLibrary(artist.name));
+    } catch (e) {
+      set({ artists: prev });
+      toast((e as Error).message, "error");
+    }
+  },
+
+  toggleAlbum: async (album) => {
+    const prev = get().albums;
+    const on = !prev.some((a) => a.id === album.id);
+    set({ albums: on ? [album, ...prev] : prev.filter((a) => a.id !== album.id) });
+    try {
+      const { albums } = on ? await api.saveAlbum(album) : await api.removeAlbum(album.id);
+      set({ albums });
+      toast(on ? getT().toasts.savedToLibrary(album.title) : getT().toasts.removedFromLibrary(album.title));
+    } catch (e) {
+      set({ albums: prev });
       toast((e as Error).message, "error");
     }
   },

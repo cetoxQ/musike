@@ -1,4 +1,13 @@
-import { ArrowRightIcon, MusicNotesIcon, PauseIcon, PlayIcon, PlaylistIcon, ShuffleIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import {
+  ArrowRightIcon,
+  HeartIcon,
+  MusicNotesIcon,
+  PauseIcon,
+  PlayIcon,
+  PlaylistIcon,
+  ShuffleIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
@@ -11,7 +20,7 @@ import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
 import { shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
-import type { AlbumPage } from "../lib/types";
+import type { AlbumPage, SavedAlbum } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 
@@ -27,6 +36,8 @@ export default function Album() {
   const queue = usePlayer((s) => s.queue);
   const status = usePlayer((s) => s.status);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
+  const inLibrary = useLibrary((s) => s.albums.some((a) => a.id === id));
+  const toggleAlbum = useLibrary((s) => s.toggleAlbum);
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -36,6 +47,18 @@ export default function Album() {
   // The queue holds exactly this album: the big button pauses and resumes instead of starting over.
   const isThisPlaying = tracks.length > 0 && queue.length === tracks.length && queue.every((q, i) => q.id === tracks[i]?.id);
   const playing = isThisPlaying && (status === "playing" || status === "loading");
+
+  const toLibraryEntry = (a: AlbumPage): SavedAlbum => ({
+    id: a.id,
+    title: a.title || title,
+    artist: a.artist,
+    artistId: a.artistId ?? undefined,
+    // YouTube Music words the year inside a translated line ("Album • 1991"); the number is the same in every language.
+    year: /\b(?:19|20)\d{2}\b/.exec(`${a.kind} ${a.info}`)?.[0] ?? "",
+    thumb: a.thumb,
+    art: a.art,
+    savedAt: Date.now(),
+  });
 
   const save = async () => {
     if (!album) return;
@@ -89,6 +112,14 @@ export default function Album() {
           </PlayDisc>
           <IconButton label={t.album.shuffle} size="lg" onClick={() => playList(shuffled(tracks), 0)}>
             <ShuffleIcon size={24} />
+          </IconButton>
+          <IconButton
+            label={inLibrary ? t.album.removeFromLibrary : t.album.saveToLibrary}
+            active={inLibrary}
+            size="lg"
+            onClick={() => void toggleAlbum(toLibraryEntry(album))}
+          >
+            <HeartIcon size={24} weight={inLibrary ? "fill" : "regular"} />
           </IconButton>
           {saved ? (
             <Link

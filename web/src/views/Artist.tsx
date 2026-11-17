@@ -12,6 +12,7 @@ import { api } from "../lib/api";
 import { paths } from "../lib/routes";
 import { cn } from "../lib/format";
 import type { ArtistPage } from "../lib/types";
+import { useLibrary } from "../stores/library";
 
 /** An artist's greatest hits, ready to pick from. */
 export default function Artist() {
@@ -22,7 +23,16 @@ export default function Artist() {
   // The bio comes from YouTube Music in the app language.
   const page = useRemote<ArtistPage>(`artist:${lang}:${id}`, (signal) => api.artist(id, signal));
   const [fullBio, setFullBio] = useState(false);
-  const name = (page.status === "ok" && page.data.name) || (location.state as { name?: string } | null)?.name || t.artist.fallbackName;
+  const state = location.state as { name?: string; art?: string } | null;
+  const name = (page.status === "ok" && page.data.name) || state?.name || t.artist.fallbackName;
+  const following = useLibrary((s) => s.artists.some((a) => a.id === id));
+  const toggleArtist = useLibrary((s) => s.toggleArtist);
+  const follow = () => {
+    if (page.status !== "ok") return;
+    // The page has only the wide banner; the round photo from search or the library looks better when there is one.
+    const art = state?.art || page.data.banner;
+    void toggleArtist({ id, name: page.data.name || name, thumb: art, art, savedAt: Date.now() });
+  };
 
   return (
     <div className="pb-8">
@@ -40,6 +50,22 @@ export default function Artist() {
           <span className="text-xs font-medium text-white/75">{t.artist.label}</span>
           <h1 className="text-[28px] leading-[1.1] font-bold tracking-tight break-words text-white md:text-5xl">{name}</h1>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 px-4 pt-4 md:px-6">
+        <button
+          type="button"
+          disabled={page.status !== "ok"}
+          onClick={follow}
+          aria-pressed={following}
+          aria-label={following ? t.artist.unfollowLabel(name) : t.artist.followLabel(name)}
+          className={cn(
+            "h-9 rounded-full px-5 text-sm font-semibold transition-[transform,background-color] active:scale-[0.97] disabled:opacity-50",
+            following ? "bg-accent-soft text-accent-text" : "bg-surface-3 hover:bg-surface-4",
+          )}
+        >
+          {following ? t.artist.following : t.artist.follow}
+        </button>
       </div>
 
       {page.status === "ok" && page.data.description && (
