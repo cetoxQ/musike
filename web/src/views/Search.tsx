@@ -290,9 +290,9 @@ export default function Search() {
           <div className="flex flex-wrap items-center gap-2">
             <div role="tablist" aria-label={t.search.resultType} className="no-scrollbar flex max-w-full gap-2 overflow-x-auto">
               {tab("song", t.search.songs)}
-              {tab("video", t.search.videos)}
-              {tab("album", t.search.albums)}
               {tab("artist", t.search.artists)}
+              {tab("album", t.search.albums)}
+              {tab("video", t.search.videos)}
             </div>
             <span className="flex-1" />
             <div className="flex items-center gap-1">
