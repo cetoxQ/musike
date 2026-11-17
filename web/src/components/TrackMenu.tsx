@@ -3,6 +3,7 @@ import {
   HeartIcon,
   ListPlusIcon,
   MicrophoneStageIcon,
+  VinylRecordIcon,
   PlayIcon,
   PlaylistIcon,
   QueueIcon,
@@ -120,6 +121,14 @@ export function TrackMenu() {
           )}
         >
           {t.trackMenu.goToArtist}
+        </Item>
+      )}
+      {menu.track.albumId && (
+        <Item
+          icon={<VinylRecordIcon size={18} />}
+          onClick={run(() => navigate(paths.album(menu.track.albumId!), { state: { name: menu.track.album } }))}
+        >
+          {t.trackMenu.goToAlbum}
         </Item>
       )}
       <Item

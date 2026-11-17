@@ -7,7 +7,7 @@ import { selectCurrent, usePlayer } from "../player/player";
 import { useAppearance } from "../stores/appearance";
 import { useLibrary } from "../stores/library";
 import { useUi } from "../stores/ui";
-import { ArtistLink } from "./ArtistLink";
+import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
 
@@ -76,7 +76,11 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
         </p>
       </div>
 
-      {showAlbum && <p className="pointer-events-none hidden truncate text-sm text-fg-2 lg:block">{track.album ?? ""}</p>}
+      {showAlbum && (
+        <p className="pointer-events-none hidden truncate text-sm text-fg-2 lg:block">
+          <AlbumLink track={track} className="pointer-events-auto relative z-10" />
+        </p>
+      )}
 
       <div className="relative z-10 hidden items-center gap-1 md:flex">
         <button

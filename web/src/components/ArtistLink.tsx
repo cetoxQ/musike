@@ -32,3 +32,20 @@ export function ArtistLink({ track, className, replace }: Props) {
     </Link>
   );
 }
+
+/** A track's album: a link to the album page when YouTube Music says which one, plain text otherwise. */
+export function AlbumLink({ track, className, replace }: Props) {
+  if (!track.album) return null;
+  if (!track.albumId) return <span className={className}>{track.album}</span>;
+  return (
+    <Link
+      to={paths.album(track.albumId)}
+      state={{ name: track.album }}
+      replace={replace}
+      onClick={(e: MouseEvent) => e.stopPropagation()}
+      className={cn("hover:text-fg hover:underline focus-visible:underline", className)}
+    >
+      {track.album}
+    </Link>
+  );
+}

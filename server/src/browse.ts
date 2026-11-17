@@ -384,6 +384,7 @@ const albumPage = cached(60 * MINUTE, async (key): Promise<AlbumPage> => {
         artist: (i.artists ?? []).map((a: { name?: string }) => text(a?.name)).filter(Boolean).join(", ") || artist,
         album: title,
         artistId: artistIdOf(i.artists) ?? artistId ?? undefined,
+        albumId: id,
         duration: i.duration?.seconds ?? 0,
         thumb: sized(cover.art, 120),
         art: cover.art,

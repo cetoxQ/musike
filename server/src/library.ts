@@ -74,6 +74,7 @@ export function sanitizeTrack(input: unknown): Track {
     artist: str(t.artist, 300),
     album: str(t.album, 300) || undefined,
     artistId: ARTIST_ID.test(str(t.artistId, 30)) ? str(t.artistId, 30) : undefined,
+    albumId: ALBUM_ID.test(str(t.albumId, 64)) ? str(t.albumId, 64) : undefined,
     duration: typeof t.duration === "number" && Number.isFinite(t.duration) ? Math.max(0, Math.round(t.duration)) : 0,
     thumb: url(t.thumb),
     art: url(t.art),

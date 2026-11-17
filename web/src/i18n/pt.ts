@@ -212,6 +212,7 @@ export const pt: Messages = {
     removeFromPlaylist: "Remover desta playlist",
     openYoutube: "Abrir no YouTube",
     goToArtist: "Ir para o artista",
+    goToAlbum: "Ir para o álbum",
   },
 
   trackList: {

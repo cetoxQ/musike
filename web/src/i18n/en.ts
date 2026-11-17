@@ -218,6 +218,7 @@ export const en = {
     removeFromPlaylist: "Remove from this playlist",
     openYoutube: "Open on YouTube",
     goToArtist: "Go to artist",
+    goToAlbum: "Go to album",
   },
 
   trackList: {

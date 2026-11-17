@@ -2,7 +2,7 @@ import { Innertube } from "youtubei.js";
 import { config } from "./config.js";
 import { msg, youtubeLang, type Lang } from "./i18n.js";
 import type { Track } from "./types.js";
-import { ARTIST_ID, HttpError, VIDEO_ID } from "./types.js";
+import { ALBUM_ID, ARTIST_ID, HttpError, VIDEO_ID } from "./types.js";
 import { ytdlpSearch } from "./ytdlp.js";
 
 // One session per language: YouTube Music words its own texts (genre names, artist bios) in the session's language.
@@ -77,6 +77,7 @@ export function toTrack(item: any, kind: Track["kind"]): Track | null {
     artist,
     album: item.album?.name || undefined,
     artistId: artistIdOf(item.artists ?? item.authors),
+    albumId: typeof item.album?.id === "string" && ALBUM_ID.test(item.album.id) ? item.album.id : undefined,
     duration: item.duration?.seconds ?? 0,
     ...images,
     kind: isSquare ? kind : "video",

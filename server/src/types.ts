@@ -5,6 +5,8 @@ export interface Track {
   album?: string;
   /** YouTube Music channel of the main artist, when known: opens their artist page. */
   artistId?: string;
+  /** YouTube Music album the track belongs to, when known: opens the album page. */
+  albumId?: string;
   duration: number;
   thumb: string;
   art: string;

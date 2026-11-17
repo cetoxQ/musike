@@ -14,7 +14,7 @@ import { cn } from "../lib/format";
 import type { Track } from "../lib/types";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi, type PanelTab } from "../stores/ui";
-import { ArtistLink } from "./ArtistLink";
+import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
 import { IconButton } from "./IconButton";
@@ -84,7 +84,12 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
             <>
               {/* `large` is the phone sheet: the artist page replaces it in history, so Back doesn't reopen it. */}
               <ArtistLink track={track} replace={large} />
-              {track.album && ` · ${track.album}`}
+              {track.album && (
+                <>
+                  {" · "}
+                  <AlbumLink track={track} replace={large} />
+                </>
+              )}
             </>
           )}
         </p>
