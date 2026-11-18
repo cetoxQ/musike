@@ -125,7 +125,8 @@ export function Scrubber({ touch = false, className }: { touch?: boolean; classN
   );
 }
 
-export function Volume({ className }: { className?: string }) {
+/** `wide`: the slider takes the room there is (the phone's Now Playing, controlling another device). */
+export function Volume({ className, wide = false }: { className?: string; wide?: boolean }) {
   const t = useT();
   // This device's volume, or the one of the device it controls.
   const volume = usePlayer((s) => s.remote?.volume ?? s.volume);
@@ -139,7 +140,16 @@ export function Volume({ className }: { className?: string }) {
       <IconButton label={muted ? t.player.unmute : t.player.mute} size="sm" onClick={toggleMute}>
         <Glyph size={18} />
       </IconButton>
-      <Slider label={t.player.volume} value={level} max={1} step={0.05} live onChange={setVolume} valueText={(v) => `${Math.round(v * 100)}%`} className="w-24" />
+      <Slider
+        label={t.player.volume}
+        value={level}
+        max={1}
+        step={0.05}
+        live
+        onChange={setVolume}
+        valueText={(v) => `${Math.round(v * 100)}%`}
+        className={wide ? "flex-1" : "w-24"}
+      />
     </div>
   );
 }

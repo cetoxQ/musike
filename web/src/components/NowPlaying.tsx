@@ -18,7 +18,7 @@ import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { DevicesButton, ElsewhereNote } from "./Devices";
 import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
+import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
 import { QueueList } from "./Queue";
 import { SLOT, VideoSlot } from "./Video";
@@ -250,6 +250,8 @@ export function PanelDrawer() {
 /** Full-screen Now Playing for phones. Drag down (or Back) to close. */
 export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const track = usePlayer(selectShown);
+  // On a phone the buttons on its side set its own volume; the other device's needs a slider.
+  const elsewhere = usePlayer((s) => !!s.remote);
   const reduce = useReducedMotion();
   const drag = useDragControls();
   const [view, setView] = useState<"player" | "queue">("player");
@@ -315,6 +317,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <TrackHeading track={track} large />
                   <Scrubber touch />
                   <Transport big />
+                  {elsewhere && <Volume wide className="w-full" />}
                   <ModeSwitch className="justify-center" />
                   <ElsewhereNote className="justify-center" />
                 </div>
