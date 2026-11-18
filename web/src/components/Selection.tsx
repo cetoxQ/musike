@@ -5,6 +5,7 @@ import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
 import { selectCurrent, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
+import { useRecent } from "../stores/recent";
 import { useUi } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
@@ -138,8 +139,8 @@ export function SelectionBar({
 }
 
 /**
- * A track row with a checkbox. The artwork plays; the title toggles the selection,
- * so picking many songs is a run of taps on the text.
+ * A track row with a checkbox. The checkbox toggles the selection; the rest of the row (artwork, title) plays the
+ * track, as in every other track list.
  */
 export function SelectableRow({
   track,
@@ -149,9 +150,12 @@ export function SelectableRow({
   position,
   note,
   trailing,
+  dimmed = !selected,
 }: {
   track: Track;
   selected: boolean;
+  /** Faded: left out of the selection. By default when not selected; lists that start empty fade only while picking. */
+  dimmed?: boolean;
   onToggle: () => void;
   onPlay: () => void;
   position?: number;
@@ -162,7 +166,12 @@ export function SelectableRow({
   const isCurrent = usePlayer((s) => selectCurrent(s)?.id === track.id);
   const isPlaying = usePlayer((s) => s.status === "playing" || s.status === "loading");
   const isFavorite = useLibrary((s) => s.favorites.some((f) => f.id === track.id));
+  const pushRecent = useRecent((s) => s.push);
   const t = useT();
+  const play = () => {
+    onPlay();
+    pushRecent({ kind: "track", track });
+  };
 
   return (
     <div className="group flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-surface-2 md:px-3">
@@ -181,7 +190,7 @@ export function SelectableRow({
         <span className="hidden w-6 shrink-0 text-center font-mono text-[13px] text-fg-3 tabular-nums md:block">{position}</span>
       )}
 
-      <button type="button" onClick={onPlay} aria-label={t.common.playX(track.title)} className="group/art relative shrink-0">
+      <button type="button" onClick={play} aria-label={t.common.playX(track.title)} className="group/art relative shrink-0">
         <Artwork src={track.thumb} className="size-11 rounded-[10px]" />
         <span
           className={cn(
@@ -193,7 +202,7 @@ export function SelectableRow({
         </span>
       </button>
 
-      <button type="button" onClick={onToggle} className={cn("min-w-0 flex-1 text-left", !selected && "opacity-60")}>
+      <button type="button" onClick={play} tabIndex={-1} className={cn("min-w-0 flex-1 text-left", dimmed && "opacity-60")}>
         <span className={cn("block truncate text-[15px] leading-tight font-medium", isCurrent && "text-accent-text")}>{track.title}</span>
         <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-fg-2">
           {track.kind === "video" && <VideoCameraIcon size={13} className="shrink-0 text-fg-3" aria-label={t.common.video} />}
@@ -246,6 +255,7 @@ export function SelectableTrackList({ tracks, numbered }: { tracks: Track[]; num
               track={t}
               position={numbered ? i + 1 : undefined}
               selected={selected.has(t.id)}
+              dimmed={chosen.length > 0 && !selected.has(t.id)}
               onToggle={() => toggle(t.id)}
               onPlay={() => playList(tracks, i)}
             />
