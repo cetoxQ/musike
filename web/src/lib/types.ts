@@ -76,6 +76,13 @@ export interface SavedYtPlaylist {
   savedAt: number;
 }
 
+/** How often a track was played here, and when last. */
+export interface PlayEntry {
+  track: Track;
+  count: number;
+  lastPlayed: number;
+}
+
 export interface Library {
   favorites: Track[];
   playlists: Playlist[];
@@ -84,6 +91,8 @@ export interface Library {
   artists: SavedArtist[];
   albums: SavedAlbum[];
   ytPlaylists: SavedYtPlaylist[];
+  /** Only in backups: the server sends the play log on its own (api.plays). */
+  plays?: PlayEntry[];
 }
 
 export interface Genre {

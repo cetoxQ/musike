@@ -175,7 +175,15 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   // Library
 
-  app.get("/api/library", () => library.getLibrary());
+  app.get("/api/library", () => library.getLibraryLite());
+
+  /** The play log: one artist's tracks (most played first), or all of it (for backups). */
+  app.get("/api/plays", async (req) => {
+    const { artist, name } = req.query as { artist?: string; name?: string };
+    if (artist === undefined) return { plays: await library.allPlays() };
+    if (!ARTIST_ID.test(artist)) throw new HttpError(400, msg("invalidArtist"));
+    return { plays: await library.playsFor(artist, String(name ?? "").slice(0, 300)) };
+  });
 
   /** Restores a backup file exported by any Musike instance. Big libraries need more than the 1 MB default body. */
   app.post("/api/library/import", { bodyLimit: 25 * 1024 * 1024 }, async (req) => {

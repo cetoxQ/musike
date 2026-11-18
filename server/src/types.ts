@@ -54,6 +54,13 @@ export interface SavedYtPlaylist {
   savedAt: number;
 }
 
+/** How often a track was played here, and when last. */
+export interface PlayEntry {
+  track: Track;
+  count: number;
+  lastPlayed: number;
+}
+
 export interface Library {
   favorites: Track[];
   playlists: Playlist[];
@@ -62,6 +69,8 @@ export interface Library {
   artists: SavedArtist[];
   albums: SavedAlbum[];
   ytPlaylists: SavedYtPlaylist[];
+  /** Play counts, most recently played first. Kept apart from the rest: GET /api/library leaves it out. */
+  plays: PlayEntry[];
 }
 
 import { tr, type Text } from "./i18n.js";

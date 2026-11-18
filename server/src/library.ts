@@ -5,6 +5,7 @@ import {
   HttpError,
   VIDEO_ID,
   type Library,
+  type PlayEntry,
   type Playlist,
   type SavedAlbum,
   type SavedArtist,
@@ -17,6 +18,8 @@ import {
 
 const HISTORY_LIMIT = 60;
 const SAVED_LIMIT = 2000;
+/** Tracks remembered in the play log; the least recently played go first. */
+const PLAYS_LIMIT = 3000;
 
 /** Where the library is kept: a file on the server and the desktop app, app storage on Android. */
 export interface LibraryStorage {
@@ -49,6 +52,7 @@ async function load(): Promise<Library> {
     artists: lib.artists ?? [],
     albums: lib.albums ?? [],
     ytPlaylists: lib.ytPlaylists ?? [],
+    plays: lib.plays ?? [],
   };
   return state;
 }
@@ -133,6 +137,32 @@ export async function getLibrary(): Promise<Library> {
   return load();
 }
 
+/** The library without the play log, which can be large and is fetched on its own (playsFor, allPlays). */
+export async function getLibraryLite(): Promise<Omit<Library, "plays">> {
+  const { plays: _plays, ...rest } = await load();
+  return rest;
+}
+
+/** Whether a track is by this artist: by artist page when the track knows it, by name otherwise. */
+function byArtist(track: Track, artistId: string, name: string): boolean {
+  if (track.artistId) return track.artistId === artistId;
+  const wanted = name.trim().toLocaleLowerCase();
+  return !!wanted && track.artist.split(",").some((a) => a.trim().toLocaleLowerCase() === wanted);
+}
+
+/** The tracks of one artist played here, most played first (then most recent). */
+export async function playsFor(artistId: string, name: string, limit = 20): Promise<PlayEntry[]> {
+  const lib = await load();
+  return lib.plays
+    .filter((p) => byArtist(p.track, artistId, name))
+    .sort((a, b) => b.count - a.count || b.lastPlayed - a.lastPlayed)
+    .slice(0, limit);
+}
+
+export async function allPlays(): Promise<PlayEntry[]> {
+  return (await load()).plays;
+}
+
 export async function addFavorite(track: Track): Promise<Track[]> {
   const lib = await load();
   lib.favorites = [track, ...lib.favorites.filter((t) => t.id !== track.id)];
@@ -203,6 +233,12 @@ export async function removeYtPlaylist(id: string): Promise<SavedYtPlaylist[]> {
 export async function pushHistory(track: Track): Promise<Track[]> {
   const lib = await load();
   lib.history = [track, ...lib.history.filter((t) => t.id !== track.id)].slice(0, HISTORY_LIMIT);
+  // Every start counts as a play, the same moment the track enters the history.
+  const before = lib.plays.find((p) => p.track.id === track.id);
+  lib.plays = [
+    { track, count: (before?.count ?? 0) + 1, lastPlayed: Date.now() },
+    ...lib.plays.filter((p) => p.track.id !== track.id),
+  ].slice(0, PLAYS_LIMIT);
   await persist();
   return lib.history;
 }
@@ -280,6 +316,19 @@ function cleanTracks(input: unknown, limit = MAX_TRACKS): Track[] {
   return out;
 }
 
+function sanitizePlay(input: unknown): PlayEntry & { id: string } {
+  const p = (input ?? {}) as Record<string, unknown>;
+  const track = sanitizeTrack(p.track);
+  const count = typeof p.count === "number" && Number.isFinite(p.count) && p.count >= 1 ? Math.min(Math.floor(p.count), 1e6) : 1;
+  return { id: track.id, track, count, lastPlayed: time(p.lastPlayed) };
+}
+
+function cleanPlays(input: unknown): PlayEntry[] {
+  return cleanSaved(input, sanitizePlay)
+    .slice(0, PLAYS_LIMIT)
+    .map(({ id: _id, ...entry }) => entry);
+}
+
 /** Keeps the valid entries of an untrusted list, without duplicates. */
 function cleanSaved<T extends { id: string }>(input: unknown, sanitize: (raw: unknown) => T): T[] {
   if (!Array.isArray(input)) return [];
@@ -317,6 +366,7 @@ function cleanLibrary(input: unknown): Library {
     artists: cleanSaved(lib.artists, sanitizeArtist),
     albums: cleanSaved(lib.albums, sanitizeAlbum),
     ytPlaylists: cleanSaved(lib.ytPlaylists, sanitizeYtPlaylist),
+    plays: cleanPlays(lib.plays),
   };
 }
 
@@ -328,6 +378,7 @@ export interface ImportResult {
   artistsAdded: number;
   albumsAdded: number;
   ytPlaylistsAdded: number;
+  playsAdded: number;
 }
 
 /**
@@ -337,7 +388,7 @@ export interface ImportResult {
 export async function importLibrary(input: unknown, mode: "merge" | "replace"): Promise<ImportResult> {
   const incoming = cleanLibrary(input);
   const lib = await load();
-  const result: ImportResult = { playlistsAdded: 0, playlistsMerged: 0, tracksAdded: 0, favoritesAdded: 0, artistsAdded: 0, albumsAdded: 0, ytPlaylistsAdded: 0 };
+  const result: ImportResult = { playlistsAdded: 0, playlistsMerged: 0, tracksAdded: 0, favoritesAdded: 0, artistsAdded: 0, albumsAdded: 0, ytPlaylistsAdded: 0, playsAdded: 0 };
 
   if (mode === "replace") {
     state = incoming;
@@ -346,6 +397,7 @@ export async function importLibrary(input: unknown, mode: "merge" | "replace"): 
     result.artistsAdded = incoming.artists.length;
     result.albumsAdded = incoming.albums.length;
     result.ytPlaylistsAdded = incoming.ytPlaylists.length;
+    result.playsAdded = incoming.plays.length;
     result.tracksAdded = incoming.playlists.reduce((n, p) => n + p.tracks.length, 0);
     await persist();
     return result;
@@ -388,6 +440,14 @@ export async function importLibrary(input: unknown, mode: "merge" | "replace"): 
   const ytPlaylists = union(lib.ytPlaylists, incoming.ytPlaylists);
   lib.ytPlaylists = ytPlaylists.list.slice(0, SAVED_LIMIT);
   result.ytPlaylistsAdded = ytPlaylists.added;
+  // Play counts: the higher count and the later play win, so importing the same backup twice changes nothing.
+  const plays = new Map(lib.plays.map((p) => [p.track.id, p]));
+  for (const p of incoming.plays) {
+    const mine = plays.get(p.track.id);
+    if (!mine) result.playsAdded++;
+    plays.set(p.track.id, mine ? { ...mine, count: Math.max(mine.count, p.count), lastPlayed: Math.max(mine.lastPlayed, p.lastPlayed) } : p);
+  }
+  lib.plays = [...plays.values()].sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, PLAYS_LIMIT);
 
   lib.history = union(lib.history, incoming.history).list.slice(0, HISTORY_LIMIT);
   await persist();

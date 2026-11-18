@@ -7,6 +7,7 @@ import type {
   GenreArtist,
   GenrePage,
   Library,
+  PlayEntry,
   Playlist,
   PlaylistCard,
   SavedAlbum,
@@ -40,6 +41,7 @@ export interface ImportResult {
   artistsAdded?: number;
   albumsAdded?: number;
   ytPlaylistsAdded?: number;
+  playsAdded?: number;
 }
 
 export interface SystemJob {
@@ -107,6 +109,8 @@ export interface MusikeApi {
   addFavorites(tracks: Track[]): Promise<{ favorites: Track[] }>;
   removeFavorite(id: string): Promise<{ favorites: Track[] }>;
   pushHistory(t: Track): Promise<{ history: Track[] }>;
+  /** One artist's tracks played here, most played first; without an artist, the whole play log. */
+  plays(artistId?: string, name?: string, signal?: AbortSignal): Promise<PlayEntry[]>;
   saveArtist(a: SavedArtist): Promise<{ artists: SavedArtist[] }>;
   removeArtist(id: string): Promise<{ artists: SavedArtist[] }>;
   saveAlbum(a: SavedAlbum): Promise<{ albums: SavedAlbum[] }>;

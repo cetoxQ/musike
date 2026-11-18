@@ -1,5 +1,5 @@
 import { CaretDownIcon, CaretUpIcon, MusicNotesIcon, PlayIcon, ShuffleIcon, WarningCircleIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router";
 import { AlbumRow } from "../components/AlbumTiles";
 import { Artwork } from "../components/Artwork";
@@ -12,13 +12,35 @@ import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
 import { cn, shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
-import type { ArtistPage } from "../lib/types";
+import type { ArtistPage, PlayEntry, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 
 /** Songs shown before "Show more", and after it. */
 const TOP_FEW = 5;
 const TOP_MORE = 20;
+
+/** A ranked list that shows TOP_FEW rows, or TOP_MORE after "Show more". Playing a row queues the whole list. */
+function RankedTracks({ tracks }: { tracks: Track[] }) {
+  const t = useT();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="px-2 md:px-3">
+      <TrackList tracks={tracks.slice(0, expanded ? TOP_MORE : TOP_FEW)} context={tracks} header={false} showAlbum />
+      {tracks.length > TOP_FEW && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-1 ml-2 flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-fg-2 hover:bg-surface-2 hover:text-fg"
+        >
+          {expanded ? <CaretUpIcon size={16} /> : <CaretDownIcon size={16} />}
+          {expanded ? t.artist.showLess : t.artist.showMore}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * An artist laid out as YouTube Music does: most played songs first (with their play counts and albums),
@@ -34,7 +56,7 @@ export default function Artist() {
   const page = useRemote<ArtistPage>(`artist:${lang}:${id}`, (signal) => api.artist(id, signal));
   const playList = usePlayer((s) => s.playList);
   const [fullBio, setFullBio] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [mine, setMine] = useState<PlayEntry[]>([]);
   const state = location.state as { name?: string; art?: string } | null;
   const name = (page.status === "ok" && page.data.name) || state?.name || t.artist.fallbackName;
   const following = useLibrary((s) => s.artists.some((a) => a.id === id));
@@ -48,7 +70,20 @@ export default function Artist() {
 
   const data = page.status === "ok" ? page.data : null;
   const tracks = data?.tracks ?? [];
-  const shown = tracks.slice(0, expanded ? TOP_MORE : TOP_FEW);
+
+  // Your own plays of this artist, fetched again whenever a new track starts (it may be one of theirs).
+  const lastPlayed = useLibrary((s) => s.history[0]?.id);
+  const artistName = data?.name ?? "";
+  useEffect(() => {
+    if (!artistName) return;
+    const ctrl = new AbortController();
+    api
+      .plays(id, artistName, ctrl.signal)
+      .then(setMine)
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [id, artistName, lastPlayed]);
+  const mineTracks = mine.map((p) => ({ ...p.track, plays: t.artist.yourPlays(p.count) }));
 
   return (
     <div className="pb-8">
@@ -117,24 +152,17 @@ export default function Artist() {
 
       {data &&
         (tracks.length ? (
-          <div className="px-2 md:px-3">
-            {/* Playing a row queues the whole ranking, not only the rows on screen. */}
-            <TrackList tracks={shown} context={tracks} header={false} showAlbum />
-            {tracks.length > TOP_FEW && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                aria-expanded={expanded}
-                className="mt-1 ml-2 flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-fg-2 hover:bg-surface-2 hover:text-fg"
-              >
-                {expanded ? <CaretUpIcon size={16} /> : <CaretDownIcon size={16} />}
-                {expanded ? t.artist.showLess : t.artist.showMore}
-              </button>
-            )}
-          </div>
+          <RankedTracks key={`top-${id}`} tracks={tracks} />
         ) : (
           <EmptyState icon={<MusicNotesIcon size={28} />} title={t.artist.noHits} body={t.artist.noHitsBody} />
         ))}
+
+      {data && mineTracks.length > 0 && (
+        <>
+          <h2 className="px-4 pt-6 pb-1 text-xl font-semibold tracking-tight md:px-6">{t.artist.yourListening}</h2>
+          <RankedTracks key={`mine-${id}`} tracks={mineTracks} />
+        </>
+      )}
 
       {data && data.albums.length > 0 && <AlbumRow title={t.artist.albums} albums={data.albums} />}
       {data && data.singles.length > 0 && <AlbumRow title={t.artist.singles} albums={data.singles} />}

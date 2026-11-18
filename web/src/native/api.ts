@@ -100,11 +100,17 @@ export const api: MusikeApi = {
       return { id, title: r.title, duration: r.duration, hasSdVideo: false };
     }, signal),
 
-  library: () => call(() => library.getLibrary()),
+  library: () => call(() => library.getLibraryLite()),
   addFavorite: (t) => call(async () => ({ favorites: await library.addFavorite(library.sanitizeTrack(t)) })),
   addFavorites: (list) => call(async () => ({ favorites: await library.addFavorites(tracks(list)) })),
   removeFavorite: (id) => call(async () => ({ favorites: await library.removeFavorite(id) })),
   pushHistory: (t) => call(async () => ({ history: await library.pushHistory(library.sanitizeTrack(t)) })),
+  plays: (artistId, name, signal) =>
+    call(async () => {
+      if (artistId === undefined) return library.allPlays();
+      if (!ARTIST_ID.test(artistId)) throw fail(400, "invalidArtist");
+      return library.playsFor(artistId, (name ?? "").slice(0, 300));
+    }, signal),
   saveArtist: (a) => call(async () => ({ artists: await library.saveArtist(library.sanitizeArtist(a)) })),
   removeArtist: (id) => call(async () => ({ artists: await library.removeArtist(id) })),
   saveAlbum: (a) => call(async () => ({ albums: await library.saveAlbum(library.sanitizeAlbum(a)) })),

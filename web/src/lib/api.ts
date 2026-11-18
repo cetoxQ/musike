@@ -19,6 +19,7 @@ import type {
   GenreArtist,
   GenrePage,
   Library,
+  PlayEntry,
   Playlist,
   PlaylistCard,
   SavedAlbum,
@@ -86,6 +87,11 @@ export const api: MusikeApi = {
   addFavorites: (tracks: Track[]) => request<{ favorites: Track[] }>("/api/favorites", { method: "POST", json: { tracks } }),
   removeFavorite: (id: string) => request<{ favorites: Track[] }>(`/api/favorites/${id}`, { method: "DELETE" }),
   pushHistory: (t: Track) => request<{ history: Track[] }>("/api/history", { method: "POST", json: t }),
+  plays: (artistId?: string, name?: string, signal?: AbortSignal) =>
+    request<{ plays: PlayEntry[] }>(
+      artistId ? `/api/plays?artist=${artistId}&name=${encodeURIComponent(name ?? "")}` : "/api/plays",
+      { signal },
+    ).then((r) => r.plays),
   saveArtist: (a: SavedArtist) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${a.id}`, { method: "PUT", json: a }),
   removeArtist: (id: string) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${id}`, { method: "DELETE" }),
   saveAlbum: (a: SavedAlbum) => request<{ albums: SavedAlbum[] }>(`/api/library/albums/${a.id}`, { method: "PUT", json: a }),

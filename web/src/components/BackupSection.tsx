@@ -58,6 +58,7 @@ export function BackupSection() {
         r.artistsAdded && t.backup.addedArtists(r.artistsAdded),
         r.albumsAdded && t.backup.addedAlbums(r.albumsAdded),
         r.ytPlaylistsAdded && t.backup.addedYtPlaylists(r.ytPlaylistsAdded),
+        r.playsAdded && t.backup.addedPlays(r.playsAdded),
       ].filter((p): p is string => !!p);
       toast(parts.length ? t.backup.imported(parts) : t.backup.nothingNew);
       setPending(null);
