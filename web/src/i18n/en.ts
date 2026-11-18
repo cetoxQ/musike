@@ -220,6 +220,8 @@ export const en = {
     openYoutube: "Open on YouTube",
     goToArtist: "Go to artist",
     goToAlbum: "Go to album",
+    select: "Select",
+    deselect: "Deselect",
   },
 
   trackList: {

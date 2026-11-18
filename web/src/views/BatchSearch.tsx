@@ -259,6 +259,7 @@ function EntryRow({ entry, index }: { entry: Entry; index: number }) {
         track={track}
         selected={entry.selected}
         selecting={selecting}
+        checks
         onToggle={() => update(index, { selected: !entry.selected })}
         onPlay={() => playTrack(track)}
         note={<span className="text-fg-3">{t.batch.searched(entry.query)}</span>}

@@ -214,6 +214,8 @@ export const pt: Messages = {
     openYoutube: "Abrir no YouTube",
     goToArtist: "Ir para o artista",
     goToAlbum: "Ir para o álbum",
+    select: "Selecionar",
+    deselect: "Desmarcar",
   },
 
   trackList: {

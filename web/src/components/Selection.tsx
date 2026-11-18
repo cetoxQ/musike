@@ -1,5 +1,5 @@
 import { CheckIcon, HeartIcon, PlayIcon, PlaylistIcon, VideoCameraIcon } from "@phosphor-icons/react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
@@ -9,6 +9,13 @@ import { useRecent } from "../stores/recent";
 import { useUi } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
+
+/** Was this right click or long press on `el`? (On a phone's long press the event carries the finger's position.) */
+export function pressedOn(el: Element | null, e: MouseEvent) {
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+}
 
 export function Check({ on }: { on: boolean }) {
   return (
@@ -146,9 +153,10 @@ export function SelectionBar({
 }
 
 /**
- * A track row with a checkbox, Spotify-style: with nothing selected, tapping the row plays the track; a long press
- * (or the checkbox) starts picking, and while picking, tapping rows picks more. The checkbox always toggles, the
- * artwork always plays.
+ * A track row you can pick, Spotify-style. With nothing selected there are no checkboxes and tapping the row plays
+ * the track. A long press on the artwork picks it, and so does "Select" in the menu that a long press (or right
+ * click) anywhere else opens; then the checkboxes show and tapping rows picks more, until nothing is picked again.
+ * The artwork always plays on a tap.
  */
 export function SelectableRow({
   track,
@@ -160,6 +168,7 @@ export function SelectableRow({
   trailing,
   dimmed = !selected,
   selecting = false,
+  checks = selecting,
 }: {
   track: Track;
   selected: boolean;
@@ -167,6 +176,8 @@ export function SelectableRow({
   dimmed?: boolean;
   /** Something is selected: taps on the row pick instead of playing. */
   selecting?: boolean;
+  /** Show the checkboxes: while picking, by default; always where the list starts out picked. */
+  checks?: boolean;
   onToggle: () => void;
   onPlay: () => void;
   position?: number;
@@ -178,6 +189,8 @@ export function SelectableRow({
   const isPlaying = usePlayer((s) => s.status === "playing" || s.status === "loading");
   const isFavorite = useLibrary((s) => s.favorites.some((f) => f.id === track.id));
   const pushRecent = useRecent((s) => s.push);
+  const openMenu = useUi((s) => s.openMenu);
+  const art = useRef<HTMLButtonElement>(null);
   const t = useT();
   const play = () => {
     onPlay();
@@ -187,28 +200,36 @@ export function SelectableRow({
   return (
     <div
       onContextMenu={(e) => {
-        // Long press on a phone (right click elsewhere): pick this one, which starts picking.
         e.preventDefault();
-        onToggle();
+        if (pressedOn(art.current, e)) onToggle();
+        else openMenu({ track, x: e.clientX, y: e.clientY, select: { selected, toggle: onToggle } });
       }}
       className="group flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-surface-2 md:px-3"
     >
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={selected}
-        aria-label={t.selection.select(track.title)}
-        onClick={onToggle}
-        className="-my-1.5 -ml-2 flex h-14 w-11 shrink-0 items-center justify-center"
-      >
-        <Check on={selected} />
-      </button>
+      {checks && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={t.selection.select(track.title)}
+          onClick={onToggle}
+          className="-my-1.5 -ml-2 flex h-14 w-11 shrink-0 items-center justify-center"
+        >
+          <Check on={selected} />
+        </button>
+      )}
 
       {position !== undefined && (
         <span className="hidden w-6 shrink-0 text-center font-mono text-[13px] text-fg-3 tabular-nums md:block">{position}</span>
       )}
 
-      <button type="button" onClick={play} aria-label={t.common.playX(track.title)} className="group/art relative shrink-0">
+      <button
+        ref={art}
+        type="button"
+        onClick={play}
+        aria-label={t.common.playX(track.title)}
+        className="group/art relative shrink-0 select-none [-webkit-touch-callout:none]"
+      >
         <Artwork src={track.thumb} className="size-11 rounded-[10px]" />
         <span
           className={cn(

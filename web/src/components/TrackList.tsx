@@ -1,5 +1,5 @@
 import { ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
-import { memo, useState, type MouseEvent, type ReactNode } from "react";
+import { memo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
@@ -11,7 +11,7 @@ import { useUi } from "../stores/ui";
 import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
-import { Check, SelectedCount, SelectionBar, Short } from "./Selection";
+import { Check, pressedOn, SelectedCount, SelectionBar, Short } from "./Selection";
 
 interface RowProps {
   track: Track;
@@ -19,16 +19,13 @@ interface RowProps {
   onPlay: () => void;
   playlistId?: string;
   showAlbum: boolean;
-  /** Lists you can pick tracks from: a checkbox, and Spotify-style taps (see TrackList). */
+  /** Lists you can pick tracks from (see TrackList). */
   selectable?: boolean;
   selected?: boolean;
+  /** Something is picked: checkboxes show, and taps pick instead of playing. */
   selecting?: boolean;
   onToggle?: () => void;
 }
-
-/** Is this a phone's long press (pick) rather than a mouse's right click (menu)? */
-const isTouch = (e: MouseEvent) =>
-  (e.nativeEvent as PointerEvent).pointerType === "touch" || window.matchMedia("(hover: none)").matches;
 
 const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, showAlbum, selectable, selected, selecting, onToggle }: RowProps) {
   const isCurrent = usePlayer((s) => selectCurrent(s)?.id === track.id);
@@ -36,21 +33,30 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
   const isFavorite = useLibrary((s) => s.favorites.some((t) => t.id === track.id));
   const toggleFavorite = useLibrary((s) => s.toggleFavorite);
   const openMenu = useUi((s) => s.openMenu);
+  const art = useRef<HTMLDivElement>(null);
   const t = useT();
+  const checks = !!(selectable && selecting);
 
   const menuAt = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const fromButton = e.type === "click";
-    openMenu({ track, playlistId, x: fromButton ? r.right - 256 : e.clientX, y: fromButton ? r.bottom + 6 : e.clientY });
+    openMenu({
+      track,
+      playlistId,
+      x: fromButton ? r.right - 256 : e.clientX,
+      y: fromButton ? r.bottom + 6 : e.clientY,
+      select: selectable && onToggle ? { selected: !!selected, toggle: onToggle } : undefined,
+    });
   };
 
   return (
     <li
       onContextMenu={(e) => {
-        // In a list you can pick from, a long press on a phone picks; a right click still opens the menu.
-        if (selectable && onToggle && isTouch(e)) {
+        // In a list you can pick from, a long press (or right click) on the artwork picks the track; anywhere else
+        // it opens the menu, which has "Select" too.
+        if (selectable && onToggle && pressedOn(art.current, e)) {
           e.preventDefault();
           onToggle();
           return;
@@ -59,7 +65,7 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
       }}
       className={cn(
         "group relative grid items-center gap-3 rounded-xl px-2 py-1.5 transition-colors duration-150 select-none hover:bg-surface-2 md:px-3 [-webkit-touch-callout:none]",
-        selectable
+        checks
           ? showAlbum
             ? "grid-cols-[auto_auto_1fr_auto] md:grid-cols-[auto_28px_auto_1fr_auto_auto] lg:grid-cols-[auto_28px_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
             : "grid-cols-[auto_auto_1fr_auto] md:grid-cols-[auto_28px_auto_1fr_auto_auto]"
@@ -75,7 +81,7 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
         className="absolute inset-0 rounded-xl focus-visible:outline-offset-[-2px]"
       />
 
-      {selectable && (
+      {checks && (
         <button
           type="button"
           role="checkbox"
@@ -92,7 +98,7 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
         {isCurrent ? <Equalizer live={isPlaying} /> : position + 1}
       </span>
 
-      <div className="pointer-events-none relative">
+      <div ref={art} className="pointer-events-none relative">
         <Artwork src={track.thumb} className="size-11 rounded-[10px]" />
         {isCurrent && (
           <span className="absolute inset-0 grid place-items-center rounded-[10px] bg-black/45 md:hidden">
@@ -166,8 +172,9 @@ interface ListProps {
   showAlbum?: boolean;
   header?: boolean;
   /**
-   * Tracks can be picked, Spotify-style: with nothing picked, tapping a row plays it; a long press (or the
-   * checkbox) picks it; while picking, taps pick. A selection bar plays, favorites or adds the picked tracks.
+   * Tracks can be picked, Spotify-style: with nothing picked there are no checkboxes and tapping a row plays it. A
+   * long press on the artwork picks it, and so does "Select" in the row's menu; then checkboxes show and taps pick,
+   * until nothing is picked again. A selection bar plays, favorites or adds the picked tracks.
    */
   selection?: ListSelection;
 }
@@ -205,7 +212,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
         <div
           className={cn(
             "mb-1 hidden items-center gap-3 border-b border-line px-3 pb-2 text-xs font-medium tracking-wide text-fg-3 md:grid",
-            selection
+            chosen.length > 0
               ? showAlbum
                 ? "md:grid-cols-[32px_28px_44px_1fr_auto_auto] lg:grid-cols-[32px_28px_44px_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
                 : "md:grid-cols-[32px_28px_44px_1fr_auto_auto]"
@@ -214,7 +221,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
                 : "md:grid-cols-[28px_44px_1fr_auto_auto]",
           )}
         >
-          {selection && <span />}
+          {chosen.length > 0 && <span />}
           <span className="text-center font-mono">#</span>
           <span />
           <span>{t.trackList.title}</span>
