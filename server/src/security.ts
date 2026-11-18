@@ -43,6 +43,12 @@ export function sameOriginWrites(app: FastifyInstance) {
   });
   // Only JSON bodies: a form on another site can post text/plain without asking the browser first.
   app.removeContentTypeParser("text/plain");
+  // An empty body is fine whatever its label: Android's HTTP stack (and curl -d '') label a POST without a body as a
+  // form. Anything else that isn't JSON is refused.
+  app.addContentTypeParser("*", { parseAs: "string", bodyLimit: 1024 }, (_req, body, done) => {
+    if (body === "") done(null, undefined);
+    else done(new HttpError(415, msg("jsonOnly")), undefined);
+  });
 }
 
 /** The inline scripts of the built index.html, as CSP hashes (recomputed when the file changes). */

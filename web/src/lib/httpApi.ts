@@ -52,7 +52,11 @@ export interface HttpBackendOptions {
 
 export function httpBackend(opts: HttpBackendOptions) {
   async function request<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
-    const { json, ...rest } = init ?? {};
+    const { json: given, ...rest } = init ?? {};
+    // Android's HTTP stack labels a request without a body as a form, which the server refuses: requests that
+    // change something always carry JSON, an empty object when there's nothing to send.
+    const method = (rest.method ?? "GET").toUpperCase();
+    const json = given !== undefined ? given : method !== "GET" && method !== "HEAD" && rest.body == null ? {} : undefined;
     const token = opts.token?.get();
     const res = await opts.fetch(opts.base + path, {
       ...rest,
