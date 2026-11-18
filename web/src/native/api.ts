@@ -168,8 +168,8 @@ export const api: MusikeApi = server ? server.api : onThePhone;
  * On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. Connected to a
  * server, it plays the server's stream proxy.
  */
-export const streamSource = (id: string): Promise<string> =>
-  server ? server.streamUrl(id) : resolveAudio(id).then((r) => r.url);
+export const streamSource = (id: string, kind: "audio" | "video" = "audio", quality: "sd" | "hd" = "sd"): Promise<string> =>
+  server ? server.streamUrl(id, kind, quality) : resolveAudio(id).then((r) => r.url);
 
 export async function explainStreamError(url: string, error?: MediaError | null): Promise<{ message: string }> {
   if (server) return server.explain(url, error);
@@ -188,4 +188,8 @@ export async function saveFile(name: string, text: string) {
 
 export const systemMedia = media;
 
-export const capabilities = { video: false, engineSettings: false, retryOnError: true };
+/**
+ * On the phone alone there's no video (videos play as audio). Connected to a server, the server streams the video
+ * too, as in the browser.
+ */
+export const capabilities = { video: !!server, engineSettings: false, retryOnError: true };

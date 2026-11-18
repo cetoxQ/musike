@@ -43,8 +43,10 @@ function Stage({ track, slot, className }: { track: Track; slot: number; classNa
       </div>
     );
   }
+  // A video's picture is a 16:9 frame: shown whole, not cropped to a square (on Android without a server, videos
+  // play as audio, so this is what shows).
   return (
-    <div className={cn("relative mx-auto aspect-square w-full", className)}>
+    <div className={cn("relative mx-auto w-full", track.kind === "video" ? "aspect-video" : "aspect-square", className)}>
       <img
         src={track.thumb}
         alt=""

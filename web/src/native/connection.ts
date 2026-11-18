@@ -86,9 +86,10 @@ export function serverBackend(url: string) {
 
   return {
     api: http.api,
-    async streamUrl(id: string): Promise<string> {
+    async streamUrl(id: string, kind: "audio" | "video" = "audio", quality: "sd" | "hd" = "sd"): Promise<string> {
       const st = await linkToken();
-      const direct = url + http.streamPath(id, "audio", "sd") + (st ? `?st=${encodeURIComponent(st)}` : "");
+      const path = http.streamPath(id, kind, quality);
+      const direct = url + path + (st ? `${path.includes("?") ? "&" : "?"}st=${encodeURIComponent(st)}` : "");
       // The app's page is https://localhost: the web view won't play audio from an http:// server itself. Android's
       // HTTP stack fetches it instead, through Capacitor's proxy on the app's own origin (Range requests included).
       return url.startsWith("http://") && Capacitor.isNativePlatform() ? `${PROXY}${encodeURIComponent(direct)}` : direct;
