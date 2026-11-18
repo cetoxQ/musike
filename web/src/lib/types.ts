@@ -42,6 +42,38 @@ export interface SavedAlbum {
   savedAt: number;
 }
 
+/** A YouTube Music playlist as a search result. */
+export interface PlaylistCard {
+  id: string;
+  title: string;
+  /** YouTube Music's own line, already in the app language: "Playlist • Someone • 1.2M views". */
+  info: string;
+  thumb: string;
+  art: string;
+}
+
+/** A YouTube Music playlist and its tracks. */
+export interface YtPlaylistPage {
+  id: string;
+  title: string;
+  author: string;
+  info: string;
+  description: string;
+  thumb: string;
+  art: string;
+  tracks: Track[];
+}
+
+/** A YouTube Music playlist kept in the library: a link, it shows whatever the playlist holds when opened. */
+export interface SavedYtPlaylist {
+  id: string;
+  title: string;
+  author: string;
+  thumb: string;
+  art: string;
+  savedAt: number;
+}
+
 export interface Library {
   favorites: Track[];
   playlists: Playlist[];
@@ -49,6 +81,7 @@ export interface Library {
   /** Newest first. */
   artists: SavedArtist[];
   albums: SavedAlbum[];
+  ytPlaylists: SavedYtPlaylist[];
 }
 
 export interface Genre {

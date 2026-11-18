@@ -11,6 +11,9 @@ import {
   genres,
   searchAlbums,
   searchArtists,
+  searchPlaylists,
+  ytPlaylist as ytPlaylistPage,
+  YT_PLAYLIST_ID,
 } from "../../../server/src/browse";
 import { msg, tr, type MsgKey } from "../../../server/src/i18n";
 import * as library from "../../../server/src/library";
@@ -83,6 +86,12 @@ export const api: MusikeApi = {
     }, signal),
   searchAlbums: (q, signal) => call(() => searchAlbums(q.trim().slice(0, 200), getLang()), signal),
   searchArtists: (q, signal) => call(() => searchArtists(q.trim().slice(0, 200), getLang()), signal),
+  searchPlaylists: (q, signal) => call(() => searchPlaylists(q.trim().slice(0, 200), getLang()), signal),
+  ytPlaylist: (id, signal) =>
+    call(async () => {
+      if (!YT_PLAYLIST_ID.test(id)) throw fail(400, "invalidYtPlaylist");
+      return ytPlaylistPage(id, getLang());
+    }, signal),
   videoFor: (t) => call(() => findVideoFor(t.id, t.title, t.artist, t.duration)),
   prepare: (id, signal) =>
     call(async () => {
@@ -100,6 +109,8 @@ export const api: MusikeApi = {
   removeArtist: (id) => call(async () => ({ artists: await library.removeArtist(id) })),
   saveAlbum: (a) => call(async () => ({ albums: await library.saveAlbum(library.sanitizeAlbum(a)) })),
   removeAlbum: (id) => call(async () => ({ albums: await library.removeAlbum(id) })),
+  saveYtPlaylist: (p) => call(async () => ({ ytPlaylists: await library.saveYtPlaylist(library.sanitizeYtPlaylist(p)) })),
+  removeYtPlaylist: (id) => call(async () => ({ ytPlaylists: await library.removeYtPlaylist(id) })),
   createPlaylist: (name, list = []) => call(() => library.createPlaylist(name, tracks(list))),
   renamePlaylist: (id, name) => call(() => library.renamePlaylist(id, name)),
   deletePlaylist: (id) => call(() => library.deletePlaylist(id)),

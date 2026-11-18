@@ -8,7 +8,9 @@ import {
   type Playlist,
   type SavedAlbum,
   type SavedArtist,
+  type SavedYtPlaylist,
   type Track,
+  YT_PLAYLIST_ID,
 } from "./types.js";
 
 // No Node-only imports here: the Android app runs this same module, with its own storage.
@@ -46,6 +48,7 @@ async function load(): Promise<Library> {
     history: lib.history ?? [],
     artists: lib.artists ?? [],
     albums: lib.albums ?? [],
+    ytPlaylists: lib.ytPlaylists ?? [],
   };
   return state;
 }
@@ -103,6 +106,20 @@ export function sanitizeAlbum(input: unknown): SavedAlbum {
     thumb: url(a.thumb),
     art: url(a.art),
     savedAt: time(a.savedAt),
+  };
+}
+
+export function sanitizeYtPlaylist(input: unknown): SavedYtPlaylist {
+  const p = (input ?? {}) as Record<string, unknown>;
+  const id = str(p.id, 90);
+  if (!YT_PLAYLIST_ID.test(id)) throw new HttpError(400, msg("invalidYtPlaylist"));
+  return {
+    id,
+    title: str(p.title, 300) || "Playlist",
+    author: str(p.author, 300),
+    thumb: url(p.thumb),
+    art: url(p.art),
+    savedAt: time(p.savedAt),
   };
 }
 
@@ -167,6 +184,20 @@ export async function removeAlbum(id: string): Promise<SavedAlbum[]> {
   lib.albums = lib.albums.filter((a) => a.id !== id);
   await persist();
   return lib.albums;
+}
+
+export async function saveYtPlaylist(playlist: SavedYtPlaylist): Promise<SavedYtPlaylist[]> {
+  const lib = await load();
+  lib.ytPlaylists = [{ ...playlist, savedAt: Date.now() }, ...lib.ytPlaylists.filter((p) => p.id !== playlist.id)].slice(0, SAVED_LIMIT);
+  await persist();
+  return lib.ytPlaylists;
+}
+
+export async function removeYtPlaylist(id: string): Promise<SavedYtPlaylist[]> {
+  const lib = await load();
+  lib.ytPlaylists = lib.ytPlaylists.filter((p) => p.id !== id);
+  await persist();
+  return lib.ytPlaylists;
 }
 
 export async function pushHistory(track: Track): Promise<Track[]> {
@@ -285,6 +316,7 @@ function cleanLibrary(input: unknown): Library {
     history: cleanTracks(lib.history, HISTORY_LIMIT),
     artists: cleanSaved(lib.artists, sanitizeArtist),
     albums: cleanSaved(lib.albums, sanitizeAlbum),
+    ytPlaylists: cleanSaved(lib.ytPlaylists, sanitizeYtPlaylist),
   };
 }
 
@@ -295,6 +327,7 @@ export interface ImportResult {
   favoritesAdded: number;
   artistsAdded: number;
   albumsAdded: number;
+  ytPlaylistsAdded: number;
 }
 
 /**
@@ -304,7 +337,7 @@ export interface ImportResult {
 export async function importLibrary(input: unknown, mode: "merge" | "replace"): Promise<ImportResult> {
   const incoming = cleanLibrary(input);
   const lib = await load();
-  const result: ImportResult = { playlistsAdded: 0, playlistsMerged: 0, tracksAdded: 0, favoritesAdded: 0, artistsAdded: 0, albumsAdded: 0 };
+  const result: ImportResult = { playlistsAdded: 0, playlistsMerged: 0, tracksAdded: 0, favoritesAdded: 0, artistsAdded: 0, albumsAdded: 0, ytPlaylistsAdded: 0 };
 
   if (mode === "replace") {
     state = incoming;
@@ -312,6 +345,7 @@ export async function importLibrary(input: unknown, mode: "merge" | "replace"): 
     result.favoritesAdded = incoming.favorites.length;
     result.artistsAdded = incoming.artists.length;
     result.albumsAdded = incoming.albums.length;
+    result.ytPlaylistsAdded = incoming.ytPlaylists.length;
     result.tracksAdded = incoming.playlists.reduce((n, p) => n + p.tracks.length, 0);
     await persist();
     return result;
@@ -351,6 +385,9 @@ export async function importLibrary(input: unknown, mode: "merge" | "replace"): 
   const albums = union(lib.albums, incoming.albums);
   lib.albums = albums.list.slice(0, SAVED_LIMIT);
   result.albumsAdded = albums.added;
+  const ytPlaylists = union(lib.ytPlaylists, incoming.ytPlaylists);
+  lib.ytPlaylists = ytPlaylists.list.slice(0, SAVED_LIMIT);
+  result.ytPlaylistsAdded = ytPlaylists.added;
 
   lib.history = union(lib.history, incoming.history).list.slice(0, HISTORY_LIMIT);
   await persist();

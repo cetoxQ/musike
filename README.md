@@ -370,6 +370,7 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `GET` | `/api/search?q=&type=song\|video` | Search YouTube Music |
 | `GET` | `/api/search/albums?q=` | Search albums |
 | `GET` | `/api/search/artists?q=` | Search artists |
+| `GET` | `/api/search/playlists?q=` | Search playlists |
 | `GET` | `/api/suggest?q=` | Search suggestions |
 | `GET` | `/api/radio/:id` | Related tracks (radio) |
 | `GET` | `/api/genres` | YouTube Music genres |
@@ -377,6 +378,7 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `GET` | `/api/genres/:gid/artists?offset=` | More of a genre's artists ("Load more") |
 | `GET` | `/api/artists/:aid` | An artist's greatest hits, albums and singles |
 | `GET` | `/api/albums/:alid` | An album's tracks in order |
+| `GET` | `/api/yt-playlists/:pid` | A YouTube Music playlist and its tracks (`pid` is the `VL…` browse ID) |
 | `GET` | `/api/video-for/:id?title=&artist=&duration=` | A song's official music video |
 | `POST` | `/api/prepare/:id` | Resolves a stream before playing |
 | `GET` | `/api/stream/:id/audio` | Audio with HTTP Range |
@@ -388,6 +390,9 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `POST` | `/api/playlists` | Creates a playlist |
 | `PATCH` / `DELETE` | `/api/playlists/:pid` | Renames / deletes |
 | `POST` / `DELETE` | `/api/playlists/:pid/tracks[/:id]` | Adds (one track or `{ tracks }`) / removes a track |
+| `PUT` / `DELETE` | `/api/library/artists/:aid` | Saves / removes an artist in the library |
+| `PUT` / `DELETE` | `/api/library/albums/:alid` | Saves / removes an album in the library |
+| `PUT` / `DELETE` | `/api/library/yt-playlists/:pid` | Saves / removes a YouTube Music playlist (a link) in the library |
 | `POST` | `/api/library/import` | Imports a backup (`{ backup, mode: "merge" \| "replace" }`) |
 | `GET` | `/api/system` | yt-dlp, Deno and FFmpeg versions and downloads |
 | `POST` | `/api/system/ytdlp` | Updates or installs yt-dlp (`{ channel: "stable" \| "nightly" }`) |

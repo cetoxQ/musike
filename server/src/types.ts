@@ -42,6 +42,16 @@ export interface SavedAlbum {
   savedAt: number;
 }
 
+/** A YouTube Music playlist kept in the library: a link, it shows whatever the playlist holds when opened. */
+export interface SavedYtPlaylist {
+  id: string;
+  title: string;
+  author: string;
+  thumb: string;
+  art: string;
+  savedAt: number;
+}
+
 export interface Library {
   favorites: Track[];
   playlists: Playlist[];
@@ -49,6 +59,7 @@ export interface Library {
   /** Newest first. Missing in libraries saved before artists and albums could be kept. */
   artists: SavedArtist[];
   albums: SavedAlbum[];
+  ytPlaylists: SavedYtPlaylist[];
 }
 
 import { tr, type Text } from "./i18n.js";
@@ -58,6 +69,8 @@ export const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 export const ARTIST_ID = /^UC[\w-]{22}$/;
 /** A YouTube Music album page. */
 export const ALBUM_ID = /^MPRE[\w-]{6,60}$/;
+/** A YouTube (Music) playlist page, as its browse ID: "VL" and the playlist ID. */
+export const YT_PLAYLIST_ID = /^VL[\w-]{10,80}$/;
 
 /** Machine-readable reason so the web app can offer the right fix (e.g. "update yt-dlp"). */
 export type ErrorCode = "tool_missing" | "maybe_outdated" | "bot_check";

@@ -20,9 +20,12 @@ import type {
   GenrePage,
   Library,
   Playlist,
+  PlaylistCard,
   SavedAlbum,
   SavedArtist,
+  SavedYtPlaylist,
   Track,
+  YtPlaylistPage,
 } from "./types";
 
 // The HTTP backend: the Musike server (web app, desktop app). The Android build swaps this module for native/api.ts.
@@ -62,6 +65,9 @@ export const api: MusikeApi = {
   album: (id: string, signal?: AbortSignal) => request<AlbumPage>(`/api/albums/${encodeURIComponent(id)}`, { signal }),
   searchAlbums: (q: string, signal?: AbortSignal) =>
     request<{ albums: AlbumCard[] }>(`/api/search/albums?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.albums),
+  searchPlaylists: (q: string, signal?: AbortSignal) =>
+    request<{ playlists: PlaylistCard[] }>(`/api/search/playlists?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.playlists),
+  ytPlaylist: (id: string, signal?: AbortSignal) => request<YtPlaylistPage>(`/api/yt-playlists/${encodeURIComponent(id)}`, { signal }),
   searchArtists: (q: string, signal?: AbortSignal) =>
     request<{ artists: ArtistCard[] }>(`/api/search/artists?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.artists),
   /** The music video matching a song, or null when YouTube has none. */
@@ -84,6 +90,9 @@ export const api: MusikeApi = {
   removeArtist: (id: string) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${id}`, { method: "DELETE" }),
   saveAlbum: (a: SavedAlbum) => request<{ albums: SavedAlbum[] }>(`/api/library/albums/${a.id}`, { method: "PUT", json: a }),
   removeAlbum: (id: string) => request<{ albums: SavedAlbum[] }>(`/api/library/albums/${id}`, { method: "DELETE" }),
+  saveYtPlaylist: (p: SavedYtPlaylist) =>
+    request<{ ytPlaylists: SavedYtPlaylist[] }>(`/api/library/yt-playlists/${p.id}`, { method: "PUT", json: p }),
+  removeYtPlaylist: (id: string) => request<{ ytPlaylists: SavedYtPlaylist[] }>(`/api/library/yt-playlists/${id}`, { method: "DELETE" }),
   createPlaylist: (name: string, tracks: Track[] = []) =>
     request<Playlist>("/api/playlists", { method: "POST", json: { name, tracks } }),
   renamePlaylist: (id: string, name: string) => request<Playlist>(`/api/playlists/${id}`, { method: "PATCH", json: { name } }),

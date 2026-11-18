@@ -22,6 +22,7 @@ import { useLibrary } from "./stores/library";
 import { openSettings, useSystem } from "./stores/system";
 import { toast, useUi } from "./stores/ui";
 import Album from "./views/Album";
+import YtPlaylist from "./views/YtPlaylist";
 import Artist from "./views/Artist";
 import BatchSearch from "./views/BatchSearch";
 import Collection from "./views/Collection";
@@ -128,6 +129,7 @@ export default function App() {
               <Route path="/search/genre/:id" element={<Genre />} />
               <Route path="/search/artist/:id" element={<Artist />} />
               <Route path="/search/album/:id" element={<Album />} />
+              <Route path="/search/playlist/:id" element={<YtPlaylist />} />
               <Route path={paths.library} element={<Library />} />
               <Route path={paths.favorites} element={<Collection kind="favorites" />} />
               <Route path={paths.history} element={<Collection kind="history" />} />

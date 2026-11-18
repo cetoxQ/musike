@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { getT } from "../i18n";
 import { api } from "../lib/api";
-import type { Library, Playlist, SavedAlbum, SavedArtist, Track } from "../lib/types";
+import type { Library, Playlist, SavedAlbum, SavedArtist, SavedYtPlaylist, Track } from "../lib/types";
 import { toast } from "./ui";
 
 interface LibraryState extends Library {
@@ -13,6 +13,7 @@ interface LibraryState extends Library {
   recordPlay: (t: Track) => void;
   toggleArtist: (a: SavedArtist) => Promise<void>;
   toggleAlbum: (a: SavedAlbum) => Promise<void>;
+  toggleYtPlaylist: (p: SavedYtPlaylist) => Promise<void>;
   createPlaylist: (name: string, tracks?: Track[]) => Promise<Playlist | null>;
   renamePlaylist: (id: string, name: string) => Promise<void>;
   deletePlaylist: (id: string) => Promise<void>;
@@ -28,6 +29,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   history: [],
   artists: [],
   albums: [],
+  ytPlaylists: [],
   status: "idle",
 
   load: async () => {
@@ -35,7 +37,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     try {
       const lib = await api.library();
       // An older server sends no artists or albums.
-      set({ ...lib, artists: lib.artists ?? [], albums: lib.albums ?? [], status: "ready" });
+      set({ ...lib, artists: lib.artists ?? [], albums: lib.albums ?? [], ytPlaylists: lib.ytPlaylists ?? [], status: "ready" });
     } catch {
       set({ status: "error" });
     }
@@ -97,6 +99,20 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       toast(on ? getT().toasts.savedToLibrary(album.title) : getT().toasts.removedFromLibrary(album.title));
     } catch (e) {
       set({ albums: prev });
+      toast((e as Error).message, "error");
+    }
+  },
+
+  toggleYtPlaylist: async (playlist) => {
+    const prev = get().ytPlaylists;
+    const on = !prev.some((p) => p.id === playlist.id);
+    set({ ytPlaylists: on ? [playlist, ...prev] : prev.filter((p) => p.id !== playlist.id) });
+    try {
+      const { ytPlaylists } = on ? await api.saveYtPlaylist(playlist) : await api.removeYtPlaylist(playlist.id);
+      set({ ytPlaylists });
+      toast(on ? getT().toasts.savedToLibrary(playlist.title) : getT().toasts.removedFromLibrary(playlist.title));
+    } catch (e) {
+      set({ ytPlaylists: prev });
       toast((e as Error).message, "error");
     }
   },

@@ -2,9 +2,9 @@ import type { Innertube } from "youtubei.js";
 import { isLang, msg, type Lang } from "./i18n.js";
 import { artistIdOf, sized, text, toTrack, withClient } from "./search.js";
 import type { Track } from "./types.js";
-import { ALBUM_ID, ARTIST_ID, HttpError, VIDEO_ID } from "./types.js";
+import { ALBUM_ID, ARTIST_ID, HttpError, VIDEO_ID, YT_PLAYLIST_ID } from "./types.js";
 
-export { ALBUM_ID, ARTIST_ID };
+export { ALBUM_ID, ARTIST_ID, YT_PLAYLIST_ID };
 
 export interface Genre {
   /** YouTube Music's opaque "params" for the genre page. */
@@ -62,6 +62,28 @@ export interface ArtistPage {
   singles: AlbumCard[];
 }
 
+/** A YouTube Music playlist as a search result. */
+export interface PlaylistCard {
+  id: string;
+  title: string;
+  /** YouTube Music's own line, in the request's language: "Playlist • Someone • 1.2M views". */
+  info: string;
+  thumb: string;
+  art: string;
+}
+
+/** A YouTube Music playlist and its tracks (the first page, up to MAX_PLAYLIST_TRACKS). */
+export interface YtPlaylistPage {
+  id: string;
+  title: string;
+  author: string;
+  info: string;
+  description: string;
+  thumb: string;
+  art: string;
+  tracks: Track[];
+}
+
 export interface AlbumPage {
   id: string;
   title: string;
@@ -85,6 +107,7 @@ const MAX_ARTISTS = 600;
 const PLAYLISTS_PER_ROUND = 4;
 const MAX_GENRE_TRACKS = 150;
 const MAX_HITS = 50;
+const MAX_PLAYLIST_TRACKS = 200;
 
 /** Time-boxed memo: these pages change slowly, and going back and forth between them should be instant. */
 function cached<T>(ttl: number, load: (key: string) => Promise<T>): (key: string) => Promise<T> {
@@ -439,3 +462,51 @@ export function artistCards(result: any): ArtistCard[] {
 export async function searchArtists(query: string, lang: Lang): Promise<ArtistCard[]> {
   return artistCards(await withClient((yt) => yt.music.search(query, { type: "artist" }), lang));
 }
+
+/** The playlists in a search response, from every shelf, each once. */
+export function playlistResults(result: any): PlaylistCard[] {
+  const seen = new Set<string>();
+  const cards: PlaylistCard[] = [];
+  for (const item of (Array.isArray(result?.contents) ? result.contents : []).flatMap(itemsOf)) {
+    const id = item?.id;
+    if (item?.item_type !== "playlist" || typeof id !== "string" || !YT_PLAYLIST_ID.test(id) || seen.has(id)) continue;
+    const title = text(item.title);
+    if (!title) continue;
+    seen.add(id);
+    // youtubei.js gives playlists no subtitle of their own: it's the row's second column.
+    cards.push({ id, title, info: text(item.subtitle) || text(item.flex_columns?.[1]?.title), ...imagesOf(item) });
+  }
+  return cards;
+}
+
+export async function searchPlaylists(query: string, lang: Lang): Promise<PlaylistCard[]> {
+  return playlistResults(await withClient((yt) => yt.music.search(query, { type: "playlist" }), lang));
+}
+
+/** A playlist's header and tracks, as YouTube Music lists them (songs and videos alike). */
+export function ytPlaylistOf(id: string, list: any): YtPlaylistPage {
+  const header = list?.header;
+  const items: any[] = (list?.items ?? list?.contents ?? []).slice(0, MAX_PLAYLIST_TRACKS);
+  const tracks = uniqueTracks(items.map((i) => toTrack(i, i?.item_type === "video" ? "video" : "song")));
+  const title = text(header?.title);
+  if (!title && !tracks.length) throw new HttpError(404, msg("playlistNotFound"));
+  return {
+    id,
+    title,
+    author: text(header?.strapline_text_one) || text(header?.author?.name),
+    info: text(header?.second_subtitle) || text(header?.subtitle),
+    description: text(header?.description?.description ?? header?.description),
+    ...imagesOf(header),
+    tracks,
+  };
+}
+
+const ytPlaylistPage = cached(30 * MINUTE, async (key): Promise<YtPlaylistPage> => {
+  const { lang, id } = parseKey(key);
+  const list = await withClient((yt) => yt.music.getPlaylist(id), lang).catch(() => {
+    throw new HttpError(502, msg("ytPlaylistUnavailable"));
+  });
+  return ytPlaylistOf(id, list);
+});
+
+export const ytPlaylist = (id: string, lang: Lang) => ytPlaylistPage(keyOf(lang, id));

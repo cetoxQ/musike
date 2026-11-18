@@ -75,6 +75,7 @@ export const en = {
     noPlaylists: "You don't have any playlists yet. Create one here or use any track's menu to start one.",
     artists: "Artists",
     albums: "Albums",
+    savedPlaylists: "Saved playlists",
   },
 
   collection: {
@@ -253,6 +254,7 @@ export const en = {
     exploreGenres: "Browse by genre",
     albums: "Albums",
     artists: "Artists",
+    playlists: "Playlists",
   },
 
   batch: {
@@ -313,6 +315,14 @@ export const en = {
     following: "Following",
     followLabel: (name: string) => `Save ${name} to your library`,
     unfollowLabel: (name: string) => `Remove ${name} from your library`,
+  },
+
+  ytPlaylist: {
+    fallbackName: "Playlist",
+    openFailed: "Couldn't open this playlist",
+    noTracks: "No playable tracks",
+    noTracksBody: "YouTube Music doesn't offer this playlist's tracks here.",
+    saveCopy: "Save a copy",
   },
 
   album: {
@@ -423,6 +433,7 @@ export const en = {
     addedFavorites: (n: number) => count(n, "favorite", "favorites"),
     addedArtists: (n: number) => count(n, "artist", "artists"),
     addedAlbums: (n: number) => count(n, "album", "albums"),
+    addedYtPlaylists: (n: number) => count(n, "saved playlist", "saved playlists"),
     unreadable: "Couldn't read the file. It needs to be a .musike.json backup.",
     notBackup: "This file isn't a Musike backup.",
     newer: "This backup was made by a newer Musike. Update the app to import it.",

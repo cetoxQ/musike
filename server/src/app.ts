@@ -2,7 +2,21 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
-import { ALBUM_ID, album, ARTIST_ID, artist, GENRE_ID, genre, genreArtists, genres, searchAlbums, searchArtists } from "./browse.js";
+import {
+  ALBUM_ID,
+  album,
+  ARTIST_ID,
+  artist,
+  GENRE_ID,
+  genre,
+  genreArtists,
+  genres,
+  searchAlbums,
+  searchArtists,
+  searchPlaylists,
+  ytPlaylist,
+  YT_PLAYLIST_ID,
+} from "./browse.js";
 import { config } from "./config.js";
 import * as library from "./library.js";
 import { fileStorage } from "./libraryFile.js";
@@ -116,6 +130,17 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return { albums: await searchAlbums(query(q), langOf(req)) };
   });
 
+  app.get("/api/search/playlists", async (req) => {
+    const { q } = req.query as { q?: string };
+    return { playlists: await searchPlaylists(query(q), langOf(req)) };
+  });
+
+  app.get("/api/yt-playlists/:pid", async (req) => {
+    const { pid } = req.params as { pid: string };
+    if (!YT_PLAYLIST_ID.test(pid)) throw new HttpError(400, msg("invalidYtPlaylist"));
+    return ytPlaylist(pid, langOf(req));
+  });
+
   app.get("/api/search/artists", async (req) => {
     const { q } = req.query as { q?: string };
     return { artists: await searchArtists(query(q), langOf(req)) };
@@ -197,6 +222,18 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const saved = library.sanitizeAlbum(req.body);
     if (saved.id !== (req.params as { alid: string }).alid) throw new HttpError(400, msg("idMismatch"));
     return { albums: await library.saveAlbum(saved) };
+  });
+
+  app.put("/api/library/yt-playlists/:pid", async (req) => {
+    const saved = library.sanitizeYtPlaylist(req.body);
+    if (saved.id !== (req.params as { pid: string }).pid) throw new HttpError(400, msg("idMismatch"));
+    return { ytPlaylists: await library.saveYtPlaylist(saved) };
+  });
+
+  app.delete("/api/library/yt-playlists/:pid", async (req) => {
+    const { pid } = req.params as { pid: string };
+    if (!YT_PLAYLIST_ID.test(pid)) throw new HttpError(400, msg("invalidYtPlaylist"));
+    return { ytPlaylists: await library.removeYtPlaylist(pid) };
   });
 
   app.delete("/api/library/albums/:alid", async (req) => {

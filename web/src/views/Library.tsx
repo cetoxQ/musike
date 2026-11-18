@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AlbumGrid } from "../components/AlbumTiles";
 import { ArtistGrid } from "../components/ArtistTiles";
+import { PlaylistGrid } from "../components/PlaylistTiles";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
 import { PageHeader } from "../components/Page";
@@ -36,7 +37,7 @@ function Entry({ to, name, kind, tracks, sub }: { to: string; name: string; kind
 }
 
 export default function Library() {
-  const { favorites, playlists, history, artists, albums, createPlaylist } = useLibrary();
+  const { favorites, playlists, history, artists, albums, ytPlaylists, createPlaylist } = useLibrary();
   const [creating, setCreating] = useState(false);
   const setSettingsOpen = useUi((s) => s.setSettingsOpen);
   const navigate = useNavigate();
@@ -95,6 +96,13 @@ export default function Library() {
         <section className="flex flex-col gap-3 pt-8">
           <h2 className="px-4 text-xl font-semibold tracking-tight md:px-6">{t.library.albums}</h2>
           <AlbumGrid dense albums={albums.map((a) => ({ id: a.id, title: a.title, artist: a.artist, year: a.year, thumb: a.thumb, art: a.art }))} />
+        </section>
+      )}
+
+      {ytPlaylists.length > 0 && (
+        <section className="flex flex-col gap-3 pt-8">
+          <h2 className="px-4 text-xl font-semibold tracking-tight md:px-6">{t.library.savedPlaylists}</h2>
+          <PlaylistGrid dense playlists={ytPlaylists.map((p) => ({ id: p.id, title: p.title, info: p.author, thumb: p.thumb, art: p.art }))} />
         </section>
       )}
 

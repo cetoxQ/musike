@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { AlbumGrid } from "../components/AlbumTiles";
 import { ArtistGrid } from "../components/ArtistTiles";
+import { PlaylistGrid } from "../components/PlaylistTiles";
 import { Artwork } from "../components/Artwork";
 import { GenrePanel } from "../components/GenrePanel";
 import { EmptyState, PageHeader } from "../components/Page";
@@ -22,7 +23,7 @@ import { api } from "../lib/api";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
-import type { AlbumCard, ArtistCard, Track } from "../lib/types";
+import type { AlbumCard, ArtistCard, PlaylistCard, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { parseList } from "./BatchSearch";
 
@@ -56,8 +57,14 @@ function videoIdFromUrl(text: string): string | null {
   }
 }
 
-type Kind = "song" | "video" | "album" | "artist";
-const KIND_PARAM: Record<Kind, string | null> = { song: null, video: "videos", album: "albums", artist: "artists" };
+type Kind = "song" | "video" | "album" | "artist" | "playlist";
+const KIND_PARAM: Record<Kind, string | null> = {
+  song: null,
+  video: "videos",
+  album: "albums",
+  artist: "artists",
+  playlist: "playlists",
+};
 const kindOf = (param: string | null): Kind =>
   (Object.keys(KIND_PARAM) as Kind[]).find((k) => KIND_PARAM[k] !== null && KIND_PARAM[k] === param) ?? "song";
 
@@ -73,6 +80,7 @@ export default function Search() {
   const [results, setResults] = useState<Track[] | null>(null);
   const [albums, setAlbums] = useState<AlbumCard[] | null>(null);
   const [artists, setArtists] = useState<ArtistCard[] | null>(null);
+  const [playlists, setPlaylists] = useState<PlaylistCard[] | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [error, setError] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -116,23 +124,27 @@ export default function Search() {
       setResults(null);
       setAlbums(null);
       setArtists(null);
+      setPlaylists(null);
       setState("idle");
       return;
     }
     const ctrl = new AbortController();
     setState("loading");
     // Only the list for the current tab is kept, so switching tabs never shows another tab's results.
-    const show = (next: { tracks?: Track[]; albums?: AlbumCard[]; artists?: ArtistCard[] }) => {
+    const show = (next: { tracks?: Track[]; albums?: AlbumCard[]; artists?: ArtistCard[]; playlists?: PlaylistCard[] }) => {
       setResults(next.tracks ?? null);
       setAlbums(next.albums ?? null);
       setArtists(next.artists ?? null);
+      setPlaylists(next.playlists ?? null);
     };
     const found: Promise<unknown> =
       kind === "album"
         ? api.searchAlbums(q, ctrl.signal).then((list) => show({ albums: list }))
         : kind === "artist"
           ? api.searchArtists(q, ctrl.signal).then((list) => show({ artists: list }))
-          : api.search(q, kind, ctrl.signal).then((list) => show({ tracks: list }));
+          : kind === "playlist"
+            ? api.searchPlaylists(q, ctrl.signal).then((list) => show({ playlists: list }))
+            : api.search(q, kind, ctrl.signal).then((list) => show({ tracks: list }));
     found
       .then(() => {
         setState("ok");
@@ -292,6 +304,7 @@ export default function Search() {
               {tab("song", t.search.songs)}
               {tab("artist", t.search.artists)}
               {tab("album", t.search.albums)}
+              {tab("playlist", t.search.playlists)}
               {tab("video", t.search.videos)}
             </div>
             <span className="flex-1" />
@@ -378,6 +391,12 @@ export default function Search() {
 
         {!linkId && state === "ok" && artists && (artists.length ? (
           <ArtistGrid artists={artists} />
+        ) : (
+          <EmptyState icon={<MagnifyingGlassIcon size={28} />} title={t.search.nothingFound} body={t.search.nothingFoundBody(q, t.search.songs)} />
+        ))}
+
+        {!linkId && state === "ok" && playlists && (playlists.length ? (
+          <PlaylistGrid playlists={playlists} />
         ) : (
           <EmptyState icon={<MagnifyingGlassIcon size={28} />} title={t.search.nothingFound} body={t.search.nothingFoundBody(q, t.search.songs)} />
         ))}

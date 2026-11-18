@@ -70,6 +70,7 @@ export const pt: Messages = {
     noPlaylists: "Você ainda não tem playlists. Crie uma aqui ou use o menu de qualquer faixa para começar uma.",
     artists: "Artistas",
     albums: "Álbuns",
+    savedPlaylists: "Playlists salvas",
   },
 
   collection: {
@@ -247,6 +248,7 @@ export const pt: Messages = {
     exploreGenres: "Explorar por gênero",
     albums: "Álbuns",
     artists: "Artistas",
+    playlists: "Playlists",
   },
 
   batch: {
@@ -307,6 +309,14 @@ export const pt: Messages = {
     following: "Seguindo",
     followLabel: (name) => `Salvar ${name} na sua biblioteca`,
     unfollowLabel: (name) => `Remover ${name} da sua biblioteca`,
+  },
+
+  ytPlaylist: {
+    fallbackName: "Playlist",
+    openFailed: "Não foi possível abrir esta playlist",
+    noTracks: "Nenhuma faixa disponível",
+    noTracksBody: "O YouTube Music não oferece as faixas desta playlist aqui.",
+    saveCopy: "Salvar uma cópia",
   },
 
   album: {
@@ -417,6 +427,7 @@ export const pt: Messages = {
     addedFavorites: (n) => count(n, "favorita", "favoritas"),
     addedArtists: (n) => count(n, "artista", "artistas"),
     addedAlbums: (n) => count(n, "álbum", "álbuns"),
+    addedYtPlaylists: (n) => count(n, "playlist salva", "playlists salvas"),
     unreadable: "Não foi possível ler o arquivo. Ele precisa ser um backup .musike.json.",
     notBackup: "Este arquivo não é um backup do Musike.",
     newer: "Backup feito por uma versão mais nova do Musike. Atualize o app para importar.",

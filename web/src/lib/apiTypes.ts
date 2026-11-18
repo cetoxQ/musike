@@ -8,9 +8,12 @@ import type {
   GenrePage,
   Library,
   Playlist,
+  PlaylistCard,
   SavedAlbum,
   SavedArtist,
+  SavedYtPlaylist,
   Track,
+  YtPlaylistPage,
 } from "./types";
 
 /**
@@ -36,6 +39,7 @@ export interface ImportResult {
   /** Missing when talking to an older server. */
   artistsAdded?: number;
   albumsAdded?: number;
+  ytPlaylistsAdded?: number;
 }
 
 export interface SystemJob {
@@ -92,6 +96,8 @@ export interface MusikeApi {
   album(id: string, signal?: AbortSignal): Promise<AlbumPage>;
   searchAlbums(q: string, signal?: AbortSignal): Promise<AlbumCard[]>;
   searchArtists(q: string, signal?: AbortSignal): Promise<ArtistCard[]>;
+  searchPlaylists(q: string, signal?: AbortSignal): Promise<PlaylistCard[]>;
+  ytPlaylist(id: string, signal?: AbortSignal): Promise<YtPlaylistPage>;
   /** The music video matching a song, or null when YouTube has none. */
   videoFor(t: Track): Promise<Track | null>;
   prepare(id: string, signal?: AbortSignal): Promise<Prepared>;
@@ -105,6 +111,8 @@ export interface MusikeApi {
   removeArtist(id: string): Promise<{ artists: SavedArtist[] }>;
   saveAlbum(a: SavedAlbum): Promise<{ albums: SavedAlbum[] }>;
   removeAlbum(id: string): Promise<{ albums: SavedAlbum[] }>;
+  saveYtPlaylist(p: SavedYtPlaylist): Promise<{ ytPlaylists: SavedYtPlaylist[] }>;
+  removeYtPlaylist(id: string): Promise<{ ytPlaylists: SavedYtPlaylist[] }>;
   createPlaylist(name: string, tracks?: Track[]): Promise<Playlist>;
   renamePlaylist(id: string, name: string): Promise<Playlist>;
   deletePlaylist(id: string): Promise<void>;

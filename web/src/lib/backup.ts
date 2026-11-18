@@ -41,6 +41,7 @@ export async function createBackup(): Promise<Backup> {
       history: library.history,
       artists: library.artists ?? [],
       albums: library.albums ?? [],
+      ytPlaylists: library.ytPlaylists ?? [],
     },
     settings: {
       theme: useUi.getState().theme,
