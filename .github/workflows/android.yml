@@ -1,0 +1,68 @@
+# The Android APK alone, for this fork: on every push to the "local" branch that touches the app, or by hand
+# (Actions > Android APK > Run workflow). The APK is in the run's artifacts.
+#
+# Signed with this fork's own key, in the repository secrets (the same names release.yml uses):
+#   MUSIKE_KEYSTORE_BASE64  MUSIKE_KEYSTORE_PASSWORD  MUSIKE_KEY_ALIAS  MUSIKE_KEY_PASSWORD
+# Always the same key: Android only installs an update signed like the version already on the phone.
+name: Android APK
+
+on:
+  push:
+    branches: [local]
+    paths: ["web/**", "server/src/**", "mobile/**", "pnpm-lock.yaml", ".github/workflows/android.yml"]
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: "Android app ID (app.musike.android replaces the official app; any other installs next to it)"
+        required: true
+        default: app.musike.android.fork
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      MUSIKE_APP_ID: ${{ inputs.app_id || 'app.musike.android.fork' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MUSIKE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Set the MUSIKE_KEYSTORE_* secrets: an unsigned APK doesn't install."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/musike-release.jks"
+          echo "MUSIKE_KEYSTORE=$RUNNER_TEMP/musike-release.jks" >> "$GITHUB_ENV"
+      - run: pnpm --filter @musike/mobile apk
+        env:
+          MUSIKE_KEYSTORE_PASSWORD: ${{ secrets.MUSIKE_KEYSTORE_PASSWORD }}
+          MUSIKE_KEY_ALIAS: ${{ secrets.MUSIKE_KEY_ALIAS }}
+          MUSIKE_KEY_PASSWORD: ${{ secrets.MUSIKE_KEY_PASSWORD }}
+      - name: Summary
+        run: |
+          apk=$(ls release/*-Android.apk)
+          { echo "### Android"; echo "- $(basename "$apk")"; echo "- app ID: $MUSIKE_APP_ID"; echo "- commit: ${GITHUB_SHA::7}"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musike-android-${{ github.run_number }}
+          path: release/*-Android.apk
+          if-no-files-found: error
+          retention-days: 14
