@@ -79,7 +79,9 @@ export default function Artist() {
     const ctrl = new AbortController();
     api
       .plays(id, artistName, ctrl.signal)
-      .then(setMine)
+      .then((plays) => {
+        if (!ctrl.signal.aborted) setMine(Array.isArray(plays) ? plays : []);
+      })
       .catch(() => {});
     return () => ctrl.abort();
   }, [id, artistName, lastPlayed]);

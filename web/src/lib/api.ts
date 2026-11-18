@@ -47,7 +47,11 @@ async function request<T>(path: string, init?: RequestInit & { json?: unknown })
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
   if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => ({}));
+  const body = await res.json().catch((e) => {
+    // Cancelled while the answer was arriving: the caller gave up, it must not get an empty answer instead.
+    if (rest.signal?.aborted) throw e;
+    return {};
+  });
   if (!res.ok) throw new ApiError(res.status, body.error ?? getT().player.httpError(res.status), body.code);
   return body as T;
 }
