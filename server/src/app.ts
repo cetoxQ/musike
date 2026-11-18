@@ -21,6 +21,7 @@ import {
 import { config } from "./config.js";
 import * as library from "./library.js";
 import { findVideoFor, radio, search, suggestions } from "./search.js";
+import { passwordGate, sameOriginWrites, securityHeaders } from "./security.js";
 import { openServerLibrary } from "./storage.js";
 import { proxyStream, serveFile } from "./stream.js";
 import { langOf, msg, tr } from "./i18n.js";
@@ -107,6 +108,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   const users = config.auth && store.db ? accounts(store.db) : null;
   users?.pruneSessions();
   const throttle = loginThrottle();
+  const checkingPassword = passwordGate();
   /** Each signed-in user's own library; the one library when accounts are off. */
   const libOf = (req: FastifyRequest) => (req.user ? store.forUser(req.user.id) : store.library);
 
@@ -114,6 +116,8 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "warn" }, trustProxy: config.trustProxy });
   app.decorateRequest("user", null);
   app.decorateRequest("sessionId", null);
+  securityHeaders(app, config.webDist);
+  sameOriginWrites(app);
 
   app.setErrorHandler((err, req, reply) => {
     const e = err as Error & { statusCode?: number };
@@ -175,8 +179,13 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   /** First visit: the admin chooses a username and a password. Works once, while nobody has a password. */
   app.post("/api/auth/setup", async (req, reply) => {
+    const accounts = enabled();
+    // Checked before hashing anything: once set up, this costs nothing to ask.
+    if (!accounts.needsSetup()) throw new HttpError(409, msg("setupDone"));
     const body = (req.body ?? {}) as { username?: unknown; password?: unknown };
-    const user = await enabled().setup(checkUsername(body.username ?? "admin"), checkPassword(body.password));
+    const username = checkUsername(body.username ?? "admin");
+    const password = checkPassword(body.password);
+    const user = await checkingPassword(() => accounts.setup(username, password));
     app.log.warn({ event: "setup", user: user.username, ip: req.ip }, "admin account set up");
     return signIn(req, reply, user, "web");
   });
@@ -189,9 +198,12 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const keys = [`user:${name.toLowerCase()}`, `ip:${req.ip}`];
     const wait = throttle.wait(keys);
     if (wait) throw new HttpError(429, msg("tooManyAttempts", { seconds: wait }));
-    const user = name && typeof body.password === "string" ? await accounts.login(name, body.password) : null;
+    const password = body.password;
+    // Counted as a failure before checking (a success clears it): many attempts sent at once can't all slip in
+    // before the first one fails.
+    throttle.fail(keys);
+    const user = name && typeof password === "string" ? await checkingPassword(() => accounts.login(name, password)) : null;
     if (!user) {
-      throttle.fail(keys);
       // One line per failure, with the address: what fail2ban and the like watch for.
       app.log.warn({ event: "login_failed", user: name, ip: req.ip }, "login failed");
       throw new HttpError(401, msg("wrongLogin"));
@@ -214,15 +226,16 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const keys = [`password:${me.id}`];
     const wait = throttle.wait(keys);
     if (wait) throw new HttpError(429, msg("tooManyAttempts", { seconds: wait }));
-    if (typeof body.current !== "string" || !(await accounts.checkCurrent(me.id, body.current))) {
-      throttle.fail(keys);
+    const current = body.current;
+    throttle.fail(keys);
+    if (typeof current !== "string" || !(await checkingPassword(() => accounts.checkCurrent(me.id, current)))) {
       app.log.warn({ event: "password_change_failed", user: me.username, ip: req.ip }, "wrong current password");
       throw new HttpError(400, msg("wrongPassword"));
     }
     throttle.succeed(keys);
     const password = checkPassword(body.password);
-    if (password === body.current) throw new HttpError(400, msg("samePassword"));
-    const user = await accounts.changePassword(me.id, password);
+    if (password === current) throw new HttpError(400, msg("samePassword"));
+    const user = await checkingPassword(() => accounts.changePassword(me.id, password));
     accounts.endOtherSessions(me.id, req.sessionId!);
     return { user };
   });

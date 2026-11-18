@@ -32,6 +32,11 @@ export const config = {
    * "true" (any), or addresses and ranges (e.g. "127.0.0.1,172.16.0.0/12"). Unset: none.
    */
   trustProxy: trustProxy(process.env.MUSIKE_TRUST_PROXY ?? ""),
+  /**
+   * Other addresses Musike's pages are opened from (e.g. "https://musike.example.com"), for proxies that don't
+   * pass the original Host on: requests that change something are refused from any other origin.
+   */
+  allowedOrigins: (process.env.MUSIKE_ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   /** Where the library lives: "sqlite" (data/musike.db) or "json" (data/library.json). Unset: SQLite when Node has it. */
   library: (["sqlite", "json"].includes(process.env.MUSIKE_LIBRARY ?? "") ? process.env.MUSIKE_LIBRARY : "auto") as "sqlite" | "json" | "auto",
   cacheDir: process.env.MUSIKE_CACHE_DIR ?? path.join(root, "cache"),

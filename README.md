@@ -347,9 +347,14 @@ pnpm --filter @musike/server start reset-password <username>          # Node ser
 
 - Sessions last 30 days from the last use. The web app keeps the session in an `HttpOnly` cookie; apps can sign in with `{ "client": "app" }` and send `Authorization: Bearer <token>`.
 - Passwords are stored as scrypt hashes, session tokens as SHA-256 hashes.
-- After 5 wrong passwords in a row for a username or an address, each attempt waits longer (30 seconds, doubling, up to 15 minutes). Every failure is logged at `warn` with the address (`"event":"login_failed"`), for tools like fail2ban.
+- After 5 wrong passwords in a row for a username or an address, each attempt waits longer (30 seconds, doubling, up to 15 minutes); attempts sent at once count before they're checked, and at most 8 password checks run at a time. Every failure is logged at `warn` with the address (`"event":"login_failed"`), for tools like fail2ban.
 - Behind a reverse proxy, set `MUSIKE_TRUST_PROXY` so the addresses in the logs and the limits are the clients', not the proxy's. Outside your home network, use HTTPS: the cookie is marked `Secure` when the request came over HTTPS.
 - Accounts need the library in SQLite. The desktop and Android apps have no accounts: their library is on the device.
+
+With or without accounts, the server also:
+
+- refuses requests that change something (`POST`, `PUT`, `PATCH`, `DELETE`) when the browser says they come from another origin, other ports of the same address included (`"event":"cross_origin_refused"` in the log), and accepts only JSON bodies. Requests without `Origin` (curl, scripts) and apps using `Authorization: Bearer` aren't affected. Behind a proxy, pass the original `Host` on (or set `MUSIKE_TRUST_PROXY`, which reads `X-Forwarded-Host`), or list the public address in `MUSIKE_ALLOWED_ORIGINS`;
+- sends a Content-Security-Policy with its pages (scripts only from Musike, artwork from `https:`, no framing by other sites), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, and `Cache-Control: no-store` on API answers.
 
 ## Keyboard shortcuts
 
@@ -384,6 +389,7 @@ Server environment variables (all optional):
 | `MUSIKE_DATA_DIR` | `server/data` (`/data` in Docker) | Where the library lives (`musike.db`) |
 | `MUSIKE_AUTH` | | `on`: [accounts](#accounts), each with its own library |
 | `MUSIKE_TRUST_PROXY` | | Behind a reverse proxy: `true`, or the proxy's addresses or ranges (`172.16.0.0/12`). Client addresses and HTTPS are then read from `X-Forwarded-*` |
+| `MUSIKE_ALLOWED_ORIGINS` | | Other addresses Musike is opened from (`https://musike.example.com`), for proxies that rewrite `Host`: changes from any other origin are refused |
 | `MUSIKE_LIBRARY` | automatic | `sqlite`: require the database. `json`: keep `library.json` (what the desktop app does). Unset: SQLite when Node has it (22.13 or later), `library.json` otherwise |
 | `MUSIKE_CACHE_DIR` | `server/cache` (`/cache` in Docker) | Downloaded HD videos |
 | `MUSIKE_CACHE_MAX_MB` | `2048` | Video cache limit (least recently played go first) |
@@ -454,6 +460,7 @@ musike/
 │     ├─ librarySqlite.ts the same library in SQLite (the server)
 │     ├─ db.ts          the database file and its schema migrations
 │     ├─ auth.ts        accounts: passwords, sessions, sign-in limits
+│     ├─ security.ts    same-origin writes, security headers and CSP, the password-check limit
 │     ├─ storage.ts     picks the store at startup, moves library.json into the database
 │     ├─ i18n.ts        server messages in each language
 │     ├─ tools.ts       finds yt-dlp, Deno, FFmpeg (Windows registry, winget, PATH)
