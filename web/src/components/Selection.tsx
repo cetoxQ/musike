@@ -23,7 +23,7 @@ export function Check({ on }: { on: boolean }) {
   );
 }
 
-function Action({
+export function Action({
   icon,
   label,
   phoneLabel,
@@ -85,6 +85,8 @@ export function SelectionBar({
   onToggleAll,
   label,
   className,
+  extra,
+  noFavorite,
 }: {
   chosen: Track[];
   all: Track[];
@@ -92,6 +94,10 @@ export function SelectionBar({
   onToggleAll: () => void;
   label: ReactNode;
   className?: string;
+  /** More actions for the picked tracks (e.g. remove them from this playlist). */
+  extra?: ReactNode;
+  /** No "Favorite" (on the Favorites page itself). */
+  noFavorite?: boolean;
 }) {
   const playList = usePlayer((s) => s.playList);
   const addFavorites = useLibrary((s) => s.addFavorites);
@@ -129,8 +135,9 @@ export function SelectionBar({
         />
         {chosen.length > 0 && (
           <>
-            <Action icon={<HeartIcon size={16} />} label={t.common.favorite} onClick={() => void addFavorites(chosen)} />
+            {!noFavorite && <Action icon={<HeartIcon size={16} />} label={t.common.favorite} onClick={() => void addFavorites(chosen)} />}
             <Action icon={<PlaylistIcon size={16} />} label={t.common.playlist} onClick={() => openAddToPlaylist(chosen)} />
+            {extra}
           </>
         )}
       </div>
