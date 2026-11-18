@@ -9,6 +9,9 @@ import { Field, PasswordForm } from "./AuthScreens";
 
 const action =
   "flex h-11 items-center justify-center gap-2 rounded-full bg-surface-1 px-4 text-sm font-medium ring-1 ring-line transition-[transform,background-color] hover:bg-surface-3 active:scale-[0.98] disabled:opacity-50";
+// Its own class list, not `action` plus overrides: `cn` only joins, so two background colours would fight over the cascade.
+const createButton =
+  "mt-1 flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-50";
 const small = "h-8 rounded-full px-3 text-xs font-medium ring-1 ring-line hover:bg-surface-3 disabled:opacity-50";
 
 /** Copies text, also on plain HTTP (where navigator.clipboard doesn't exist). */
@@ -203,7 +206,7 @@ function UsersAdmin({ me }: { me: number }) {
             </button>
           ))}
         </div>
-        <button type="submit" disabled={!name.trim() || busy === "new"} className={cn(action, "mt-1 bg-accent text-accent-ink ring-0 hover:bg-accent")}>
+        <button type="submit" disabled={!name.trim() || busy === "new"} className={createButton}>
           <UserPlusIcon size={18} /> {busy === "new" ? t.account.working : t.account.create}
         </button>
       </form>
