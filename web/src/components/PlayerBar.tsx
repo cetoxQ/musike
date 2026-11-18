@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi } from "../stores/ui";
 import { ArtistLink } from "./ArtistLink";
+import { DevicesButton, ElsewhereNote } from "./Devices";
 import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume } from "./Controls";
@@ -60,6 +61,7 @@ export function PlayerBar() {
 
         <div className="flex items-center justify-end gap-1">
           <ModeSwitch className="max-2xl:hidden" />
+          <DevicesButton />
           <IconButton
             label={t.player.queue}
             size="sm"
@@ -82,6 +84,7 @@ export function PlayerBar() {
           </IconButton>
         </div>
       </div>
+      <ElsewhereNote className="pt-1.5 pb-0.5" />
     </div>
   );
 }

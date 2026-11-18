@@ -49,6 +49,8 @@ interface PlayerState {
   clearUpcoming: () => void;
   startRadio: (track: Track) => Promise<void>;
   toggle: () => void;
+  /** Stops, without toggling: another device of the account took over. A track still loading won't start. */
+  pause: () => void;
   next: () => void;
   prev: () => void;
   seek: (seconds: number) => void;
@@ -223,9 +225,11 @@ export const usePlayer = create<PlayerState>((set, get) => {
     const last = s.queue[s.index];
     if (!last) return;
     set({ status: "loading", statusText: "fetchingRadio" });
+    const mine = token;
     try {
       const known = new Set(get().queue.map((t) => t.id));
       const more = (await api.radio(last.id)).filter((t) => !known.has(t.id)).slice(0, 25);
+      if (mine !== token) return; // paused (or another track started) meanwhile
       if (!more.length) throw new Error("empty");
       set((st) => ({
         queue: [...st.queue, ...more],
@@ -496,6 +500,24 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const media = mediaFor(kind);
       if (media.paused) play(media);
       else media.pause();
+    },
+
+    pause: () => {
+      const s = get();
+      if (s.status !== "playing" && s.status !== "loading") return;
+      if (s.status === "loading") {
+        // Whatever is on its way (a stream, a music video lookup, more radio) must not start playing when it arrives.
+        const started = recordedToken === token;
+        token++;
+        // Buffering mid-track: already counted as a play, resuming mustn't count it again. Still starting: the next
+        // Play loads the track again, from here.
+        if (started) recordedToken = token;
+        else loaded = null;
+      }
+      audio.pause();
+      videoEl.pause();
+      set({ status: "paused", statusText: null });
+      syncPlaybackState();
     },
 
     next: () => {

@@ -1,0 +1,116 @@
+import { DesktopIcon, DeviceMobileIcon, DevicesIcon, SpeakerHighIcon } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
+import { useT } from "../i18n";
+import { cn, formatTime } from "../lib/format";
+import { positionOf, useDevices, useElsewhere, type Device } from "../stores/devices";
+import { Artwork } from "./Artwork";
+import { IconButton } from "./IconButton";
+import { Modal } from "./Modal";
+
+/** Opens the devices list. Only where devices are in step (https); accent while another device plays. */
+export function DevicesButton({ size = "sm", className }: { size?: "sm" | "md"; className?: string }) {
+  const status = useDevices((s) => s.status);
+  const setOpen = useDevices((s) => s.setOpen);
+  const elsewhere = useElsewhere();
+  const t = useT();
+  if (status === "off") return null;
+  return (
+    <IconButton label={t.devices.title} size={size} active={!!elsewhere} onClick={() => setOpen(true)} className={className}>
+      <DevicesIcon size={size === "sm" ? 18 : 22} />
+    </IconButton>
+  );
+}
+
+/** "Playing on Pixel 7", under the player, while another device of the account plays. */
+export function ElsewhereNote({ className }: { className?: string }) {
+  const elsewhere = useElsewhere();
+  const setOpen = useDevices((s) => s.setOpen);
+  const t = useT();
+  if (!elsewhere) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className={cn("flex w-full min-w-0 items-center gap-1.5 px-3 text-xs font-medium text-accent", className)}
+    >
+      <SpeakerHighIcon size={14} weight="fill" className="shrink-0" />
+      <span className="truncate">{t.devices.playingOn(elsewhere.name)}</span>
+    </button>
+  );
+}
+
+/** Re-renders every second while something plays, for the positions. */
+function useTick(on: boolean) {
+  const [, setNow] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [on]);
+}
+
+function DeviceRow({ device, me, active }: { device: Device; me: boolean; active: boolean }) {
+  const t = useT();
+  const s = device.state;
+  const Icon = device.form === "phone" ? DeviceMobileIcon : DesktopIcon;
+  const playing = !!s?.playing && !!s.track;
+  return (
+    <li className={cn("flex items-center gap-3 rounded-xl px-2 py-2", active && "bg-surface-3")}>
+      <span className={cn("grid size-10 shrink-0 place-items-center rounded-full bg-surface-1 ring-1 ring-line", active ? "text-accent" : "text-fg-2")}>
+        {playing ? <SpeakerHighIcon size={20} weight="fill" /> : <Icon size={20} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={cn("truncate text-sm font-medium", active && "text-accent")}>
+          {device.name}
+          {me && <span className="font-normal text-fg-3"> ({t.devices.thisDevice})</span>}
+        </p>
+        <p className="truncate text-xs text-fg-2">
+          {s?.track
+            ? `${playing ? "" : `${t.devices.paused}: `}${s.track.title}${s.track.artist ? ` - ${s.track.artist}` : ""}`
+            : t.devices.idle}
+        </p>
+      </div>
+      {s?.track && (
+        <span className="shrink-0 font-mono text-xs text-fg-3 tabular-nums">
+          {formatTime(positionOf(s))}
+          {s.duration > 0 && ` / ${formatTime(s.duration)}`}
+        </span>
+      )}
+    </li>
+  );
+}
+
+export function DevicesDialog() {
+  const open = useDevices((s) => s.open);
+  const setOpen = useDevices((s) => s.setOpen);
+  const status = useDevices((s) => s.status);
+  const devices = useDevices((s) => s.devices);
+  const me = useDevices((s) => s.me);
+  const active = useDevices((s) => s.active);
+  const elsewhere = useElsewhere();
+  const t = useT();
+  useTick(open && devices.some((d) => d.state?.playing));
+  // This device first, then the others as they came.
+  const list = [...devices].sort((a, b) => Number(b.id === me) - Number(a.id === me));
+
+  return (
+    <Modal open={open} onClose={() => setOpen(false)} title={t.devices.title}>
+      {elsewhere?.state?.track && (
+        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-surface-1 p-2 ring-1 ring-line">
+          <Artwork src={elsewhere.state.track.thumb} className="size-12 rounded-[10px]" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{elsewhere.state.track.title}</p>
+            <p className="truncate text-xs text-accent">{t.devices.playingOn(elsewhere.name)}</p>
+          </div>
+        </div>
+      )}
+      {status === "connecting" && <p className="mb-2 text-sm text-fg-2">{t.devices.connecting}</p>}
+      <ul className="flex flex-col gap-1">
+        {list.map((d) => (
+          <DeviceRow key={d.id} device={d} me={d.id === me} active={d.id === active} />
+        ))}
+      </ul>
+      <p className="mt-3 text-xs leading-relaxed text-fg-3">{t.devices.note}</p>
+    </Modal>
+  );
+}

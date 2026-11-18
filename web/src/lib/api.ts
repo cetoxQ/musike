@@ -34,3 +34,15 @@ export const explainStreamError = (url: string, _error?: MediaError | null) => h
 
 /** Only the Android app chooses where its library lives (the phone, or a Musike server). */
 export const connection: Connection | null = null;
+
+/**
+ * Devices in step (see stores/devices.ts): the WebSocket address, with a fresh single-use ticket. Only over https:
+ * on plain http the app works as it always did, on its own. (The desktop app is http://localhost: never.)
+ */
+export const syncAddress: (() => Promise<string>) | null =
+  location.protocol === "https:"
+    ? async () => {
+        const { ticket } = await http.request<{ ticket: string }>("/api/sync/ticket", { method: "POST" });
+        return `wss://${location.host}/api/sync?ticket=${encodeURIComponent(ticket)}`;
+      }
+    : null;

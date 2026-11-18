@@ -19,11 +19,13 @@ import {
   YT_PLAYLIST_ID,
 } from "./browse.js";
 import { config } from "./config.js";
+import { DEFAULT_USER } from "./db.js";
 import * as library from "./library.js";
 import { findVideoFor, radio, search, suggestions } from "./search.js";
 import { passwordGate, sameOriginWrites, securityHeaders } from "./security.js";
 import { openServerLibrary } from "./storage.js";
 import { proxyStream, serveFile } from "./stream.js";
+import { syncHub } from "./sync.js";
 import { langOf, msg, tr } from "./i18n.js";
 import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./system.js";
 import { refreshTools, type Tools } from "./tools.js";
@@ -107,6 +109,8 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   }
   const users = config.auth && store.db ? accounts(store.db) : null;
   users?.pruneSessions();
+  /** Devices of one account playing in step (see sync.ts). */
+  const sync = syncHub({ sessionAlive: users ? (id) => users.sessionAlive(id) : undefined });
   const throttle = loginThrottle();
   const checkingPassword = passwordGate();
   /** Each signed-in user's own library; the one library when accounts are off. */
@@ -216,6 +220,13 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   /** For apps: a token to put in stream URLs (?st=), valid for hours, ended with the session. */
   app.post("/api/auth/stream-link", async (req) => enabled().streamLink(req.sessionId!));
+
+  /** A single-use ticket to open the device connection with (WebSocket on /api/sync, see sync.ts). */
+  app.post("/api/sync/ticket", async (req) => sync.ticket(req.user?.id ?? DEFAULT_USER, req.sessionId));
+  // WebSocket connections skip Fastify's routes and hooks: the ticket is the check. Anything else is hung up on.
+  app.server.on("upgrade", (req, socket, head) => {
+    if (!sync.upgrade(req, socket, head)) socket.destroy();
+  });
 
   app.post("/api/auth/logout", async (req, reply) => {
     if (req.sessionId) users?.endSession(req.sessionId);
@@ -511,6 +522,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   try {
     await app.listen({ port, host });
   } catch (e) {
+    sync.close();
     store.close();
     throw e;
   }
@@ -524,6 +536,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     accounts: !users ? "off" : users.needsSetup() ? "setup" : "on",
     close: async () => {
       stopChannel();
+      sync.close();
       await app.close();
       store.close();
     },

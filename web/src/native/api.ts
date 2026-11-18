@@ -193,3 +193,6 @@ export const systemMedia = media;
  * too, as in the browser.
  */
 export const capabilities = { video: !!server, engineSettings: false, retryOnError: true };
+
+/** Devices in step: only connected to a Musike server over https (see native/connection.ts). */
+export const syncAddress: (() => Promise<string>) | null = server?.syncAddress ?? null;

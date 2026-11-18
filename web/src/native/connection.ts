@@ -86,6 +86,13 @@ export function serverBackend(url: string) {
 
   return {
     api: http.api,
+    /** Devices in step (stores/devices.ts), only with an https server: the web view refuses ws:// from its page. */
+    syncAddress: url.startsWith("https://")
+      ? async () => {
+          const { ticket } = await http.request<{ ticket: string }>("/api/sync/ticket", { method: "POST" });
+          return `${url.replace(/^https:/, "wss:")}/api/sync?ticket=${encodeURIComponent(ticket)}`;
+        }
+      : null,
     async streamUrl(id: string, kind: "audio" | "video" = "audio", quality: "sd" | "hd" = "sd"): Promise<string> {
       const st = await linkToken();
       const path = http.streamPath(id, kind, quality);

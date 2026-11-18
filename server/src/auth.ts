@@ -276,6 +276,12 @@ export function accounts(db: Db) {
 
     endSession: (id: string) => void sessionDelete.run(id),
 
+    /** Is this session still on (not signed out, reset or expired)? For connections that outlive a request. */
+    sessionAlive(id: string): boolean {
+      const r = sessionById.get(id) as Row | undefined;
+      return !!r && Number(r.expires_at) >= Date.now();
+    },
+
     /**
      * A link token for the audio of this session: a media element can't send "Authorization", so apps put this in
      * the stream URL (?st=). Signed, expiring, and tied to the session: signing out or a reset ends it too.

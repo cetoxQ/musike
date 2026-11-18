@@ -526,6 +526,16 @@ export const en = {
     role: "Role",
   },
 
+  devices: {
+    title: "Devices",
+    thisDevice: "this device",
+    playingOn: (name: string) => `Playing on ${name}`,
+    paused: "Paused",
+    idle: "Not playing",
+    connecting: "Connecting...",
+    note: "Musike open with your account on another device shows up here. One device plays at a time: playing something here pauses the others.",
+  },
+
   toasts: {
     dismiss: (message: string) => `${message}. Close notice`,
     addedFavorite: "Added to Favorites",

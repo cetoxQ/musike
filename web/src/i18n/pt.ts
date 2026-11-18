@@ -520,6 +520,16 @@ export const pt: Messages = {
     role: "Função",
   },
 
+  devices: {
+    title: "Dispositivos",
+    thisDevice: "este dispositivo",
+    playingOn: (name: string) => `Tocando em ${name}`,
+    paused: "Pausado",
+    idle: "Parado",
+    connecting: "Conectando...",
+    note: "O Musike aberto com a sua conta em outro dispositivo aparece aqui. Um dispositivo toca por vez: tocar algo aqui pausa os outros.",
+  },
+
   toasts: {
     dismiss: (message) => `${message}. Fechar aviso`,
     addedFavorite: "Adicionada às Favoritas",
