@@ -15,6 +15,7 @@ import type { Track } from "../lib/types";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi, type PanelTab } from "../stores/ui";
 import { AlbumLink, ArtistLink } from "./ArtistLink";
+import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
 import { IconButton } from "./IconButton";
@@ -81,9 +82,12 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
     <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
         <h2 className={cn("truncate font-semibold tracking-tight", large ? "text-[22px] leading-tight" : "text-lg")}>{track.title}</h2>
-        <p className={cn("truncate", large ? "text-base" : "text-sm", status === "error" ? "text-danger" : "text-fg-2")}>
-          {statusText ?? (
-            <>
+        <div className={cn(large ? "text-base" : "text-sm", status === "error" ? "text-danger" : "text-fg-2")}>
+          {statusText ? (
+            <p className="truncate">{statusText}</p>
+          ) : (
+            // Long credits slide along, and can be dragged, so every name stays readable and clickable.
+            <Marquee key={track.id}>
               {/* `large` is the phone sheet: the artist page replaces it in history, so Back doesn't reopen it. */}
               <ArtistLink track={track} replace={large} />
               {track.album && (
@@ -92,9 +96,9 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
                   <AlbumLink track={track} replace={large} />
                 </>
               )}
-            </>
+            </Marquee>
           )}
-        </p>
+        </div>
       </div>
       <FavoriteButton track={track} size={large ? "lg" : "md"} />
     </div>

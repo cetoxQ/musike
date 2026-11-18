@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi } from "../stores/ui";
 import { ArtistLink } from "./ArtistLink";
+import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
@@ -35,9 +36,15 @@ export function PlayerBar() {
               </button>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{track.title}</p>
-                <p className={cn("truncate text-[13px]", status === "error" ? "text-danger" : "text-fg-2")}>
-                  {statusText ?? <ArtistLink track={track} />}
-                </p>
+                <div className={cn("text-[13px]", status === "error" ? "text-danger" : "text-fg-2")}>
+                  {statusText ? (
+                    <p className="truncate">{statusText}</p>
+                  ) : (
+                    <Marquee key={track.id}>
+                      <ArtistLink track={track} />
+                    </Marquee>
+                  )}
+                </div>
               </div>
               <FavoriteButton track={track} size="sm" />
             </>
