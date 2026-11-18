@@ -440,6 +440,27 @@ export const pt: Messages = {
     newer: "Backup feito por uma versão mais nova do Musike. Atualize o app para importar.",
   },
 
+  server: {
+    title: "Servidor",
+    body: "Sua biblioteca e suas músicas neste celular, ou em um servidor Musike: aí buscas, biblioteca e músicas passam todas por ele, com a sua conta.",
+    thisPhone: "Este celular",
+    musikeServer: "Servidor Musike",
+    address: "Endereço do servidor",
+    placeholder: "http://192.168.1.10:4180",
+    connect: "Conectar",
+    connecting: "Conectando",
+    connectedTo: (url) => `Conectado a ${url}`,
+    onThisPhone: "A biblioteca e as músicas estão neste celular.",
+    insecure: "Sem criptografia (http): sua senha e o que você ouve passam abertos pela rede. Fora da sua rede de casa, use https://.",
+    unreachable: "Nenhum servidor Musike responde neste endereço.",
+    invalidAddress: "Escreva um endereço como http://192.168.1.10:4180.",
+    useThisPhone: "Usar este celular",
+    switchBack: "Voltar para este celular",
+    phoneKept: "A biblioteca do celular continua como está, pronta para quando você voltar.",
+    copyLibrary: "Copiar a biblioteca deste celular para o servidor",
+    copying: "Copiando",
+  },
+
   account: {
     title: "Conta",
     signInTitle: "Entrar",

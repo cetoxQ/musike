@@ -446,6 +446,27 @@ export const en = {
     newer: "This backup was made by a newer Musike. Update the app to import it.",
   },
 
+  server: {
+    title: "Server",
+    body: "Your library and music on this phone, or on a Musike server: then searches, your library and the music all go through it, with your account.",
+    thisPhone: "This phone",
+    musikeServer: "Musike server",
+    address: "Server address",
+    placeholder: "http://192.168.1.10:4180",
+    connect: "Connect",
+    connecting: "Connecting",
+    connectedTo: (url: string) => `Connected to ${url}`,
+    onThisPhone: "The library and the music are on this phone.",
+    insecure: "Not encrypted (http): your password and what you play travel in the clear. Outside your home network, use https://.",
+    unreachable: "No Musike server answers at this address.",
+    invalidAddress: "Write an address like http://192.168.1.10:4180.",
+    useThisPhone: "Use this phone instead",
+    switchBack: "Back to this phone",
+    phoneKept: "The phone's own library stays as it is, ready for when you switch back.",
+    copyLibrary: "Copy this phone's library to the server",
+    copying: "Copying",
+  },
+
   account: {
     title: "Account",
     signInTitle: "Sign in",

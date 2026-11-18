@@ -117,6 +117,22 @@ export interface SystemMedia {
   onAction(handler: (action: "play" | "pause" | "next" | "previous" | "seek", position?: number) => void): void;
 }
 
+/**
+ * The Android app: where its library and music come from. "device": the phone itself (YouTube straight from the
+ * phone, the library in the app's storage). "server": a Musike server, with an account; every request goes there.
+ */
+export interface Connection {
+  mode: "device" | "server";
+  /** The server's address (kept when switching back to the phone, to reconnect easily). */
+  url: string;
+  /** Checks that a Musike server answers at the address, then switches to it (the app restarts). */
+  connect(url: string): Promise<void>;
+  /** Back to the phone's own library (signs out of the server; the app restarts). */
+  useDevice(): Promise<void>;
+  /** The phone's own library, merged into the account on the server (like importing a backup). */
+  uploadLocalLibrary(): Promise<ImportResult>;
+}
+
 export interface MusikeApi {
   search(q: string, type: "song" | "video", signal?: AbortSignal): Promise<Track[]>;
   suggest(q: string, signal?: AbortSignal): Promise<string[]>;

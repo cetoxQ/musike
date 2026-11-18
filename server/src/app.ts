@@ -134,7 +134,9 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     app.addHook("onRequest", async (req) => {
       const path = req.url.split("?")[0];
       if (!path.startsWith("/api/")) return;
-      const s = users.session(tokenOf(req));
+      // Stream URLs carry their own signed token (apps' media elements can't send a header).
+      const link = path.startsWith("/api/stream/") ? (req.query as { st?: unknown }).st : undefined;
+      const s = typeof link === "string" ? users.streamSession(link) : users.session(tokenOf(req));
       if (s) {
         req.user = s.user;
         req.sessionId = s.id;
@@ -211,6 +213,9 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     throttle.succeed(keys);
     return signIn(req, reply, user, body.client === "app" ? "app" : "web");
   });
+
+  /** For apps: a token to put in stream URLs (?st=), valid for hours, ended with the session. */
+  app.post("/api/auth/stream-link", async (req) => enabled().streamLink(req.sessionId!));
 
   app.post("/api/auth/logout", async (req, reply) => {
     if (req.sessionId) users?.endSession(req.sessionId);

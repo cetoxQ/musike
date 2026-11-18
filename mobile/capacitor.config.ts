@@ -11,8 +11,9 @@ const config: CapacitorConfig = {
   webDir: "../web/dist-native",
   backgroundColor: "#0B0C0F",
   android: {
-    // Music keeps loading while the screen is off or another app is in front.
-    allowMixedContent: false,
+    // Connected to a Musike server at an http:// address (Settings > Server), the page (https://localhost) plays the
+    // server's audio over http: allowed, with a warning in the app. The phone's own mode only uses https.
+    allowMixedContent: true,
   },
   ios: {
     // The status bar area is padded by the app itself, like on Android.

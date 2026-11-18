@@ -15,6 +15,7 @@ import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
 import { useUi } from "../stores/ui";
 import { AccountSection } from "./AccountSection";
+import { ServerSection } from "./ServerSection";
 import { BackupSection } from "./BackupSection";
 import { AccentPicker, LayoutSection } from "./CustomizeSection";
 import { Modal } from "./Modal";
@@ -129,6 +130,8 @@ export function SettingsDialog() {
     <Modal open={open} onClose={() => setOpen(false)} title={t.settings.title}>
       {/* Side padding keeps outset rings and the scrollbar from clipping the cards' edges. */}
       <div className="scroll-area -mx-2 flex max-h-[70dvh] flex-col gap-5 overflow-y-auto px-2 pb-1">
+
+        <ServerSection />
 
         <AccountSection />
 

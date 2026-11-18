@@ -150,6 +150,13 @@ const MIGRATIONS: string[] = [
   ALTER TABLE users ADD COLUMN owner INTEGER NOT NULL DEFAULT 0;
   UPDATE users SET owner = 1, role = 'admin' WHERE id = 1;
   `,
+  `
+  -- Server-wide values that must survive restarts (e.g. the key that signs stream links).
+  CREATE TABLE settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  `,
 ];
 
 /** node:sqlite, loaded only when used. Its one-time "experimental feature" warning stays out of the logs. */

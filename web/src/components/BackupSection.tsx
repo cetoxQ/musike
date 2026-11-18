@@ -1,11 +1,27 @@
 import { ArrowsMergeIcon, DownloadSimpleIcon, SwapIcon, UploadSimpleIcon } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import { createBackup, downloadBackup, readBackup, restoreBackup, summarize, type Backup } from "../lib/backup";
-import { useT } from "../i18n";
+import { useT, type Messages } from "../i18n";
+import type { ImportResult } from "../lib/api";
 import { cn } from "../lib/format";
 import { toast } from "../stores/ui";
 
 type Mode = "merge" | "replace";
+
+/** What an import added, in a sentence (also used when copying the phone's library to a server). */
+export function describeImport(t: Messages, r: ImportResult): string {
+  const parts = [
+    r.playlistsAdded && t.backup.newPlaylists(r.playlistsAdded),
+    r.playlistsMerged && t.backup.updatedPlaylists(r.playlistsMerged),
+    r.tracksAdded && t.backup.addedTracks(r.tracksAdded),
+    r.favoritesAdded && t.backup.addedFavorites(r.favoritesAdded),
+    r.artistsAdded && t.backup.addedArtists(r.artistsAdded),
+    r.albumsAdded && t.backup.addedAlbums(r.albumsAdded),
+    r.ytPlaylistsAdded && t.backup.addedYtPlaylists(r.ytPlaylistsAdded),
+    r.playsAdded && t.backup.addedPlays(r.playsAdded),
+  ].filter((p): p is string => !!p);
+  return parts.length ? t.backup.imported(parts) : t.backup.nothingNew;
+}
 
 /** Export the library to a file and import it in any other Musike (web, desktop, another computer). */
 export function BackupSection() {
@@ -50,17 +66,7 @@ export function BackupSection() {
     setBusy("import");
     try {
       const r = await restoreBackup(pending.backup, mode, withSettings);
-      const parts = [
-        r.playlistsAdded && t.backup.newPlaylists(r.playlistsAdded),
-        r.playlistsMerged && t.backup.updatedPlaylists(r.playlistsMerged),
-        r.tracksAdded && t.backup.addedTracks(r.tracksAdded),
-        r.favoritesAdded && t.backup.addedFavorites(r.favoritesAdded),
-        r.artistsAdded && t.backup.addedArtists(r.artistsAdded),
-        r.albumsAdded && t.backup.addedAlbums(r.albumsAdded),
-        r.ytPlaylistsAdded && t.backup.addedYtPlaylists(r.ytPlaylistsAdded),
-        r.playsAdded && t.backup.addedPlays(r.playsAdded),
-      ].filter((p): p is string => !!p);
-      toast(parts.length ? t.backup.imported(parts) : t.backup.nothingNew);
+      toast(describeImport(t, r));
       setPending(null);
     } catch (e) {
       toast((e as Error).message, "error");

@@ -217,11 +217,12 @@ On the phone, download `Musike-Setup-<version>-Android.apk` from the [latest rel
 
 - It works on its own: no computer and no Musike server needed, only an internet connection.
 - Your playlists and favorites live on the phone. To move them to or from a computer, use [backup to a file](#moving-your-library-backup) (on Android, Export opens the share sheet: save to Files or Drive, or send it to yourself).
+- **Or connect it to your Musike server:** **Settings > Server > Musike server**, the server's address (`http://192.168.1.10:4180`, or `https://` through a reverse proxy), then sign in if the server has [accounts](#accounts). Searches, your library, play counts and the music itself then all go through the server: the phone only talks to it, and the library is the same as in the browser. **Copy this phone's library to the server** merges the phone's own library into your account. **Back to this phone** returns to the phone's library, untouched. On `http://` the app warns that the password and what you play travel unencrypted.
 - **To update,** install the new APK over the old one. Your library stays.
 - Audio only for now: the video mode is available on the desktop app and in the browser.
 - **Android TV:** install the same APK on the TV (for example with a file manager app, or `adb install`). Musike shows up in the TV launcher and switches to a remote-friendly interface by itself.
 
-To build the APK yourself you need JDK 21 and the Android SDK (Android Studio installs both): `pnpm install && pnpm --filter @musike/mobile apk` (creates `release/Musike-Setup-<version>-Android.apk`; unsigned unless `mobile/android/keystore.properties` points to your signing key).
+To build the APK yourself you need JDK 21 and the Android SDK (Android Studio installs both): `pnpm install && pnpm --filter @musike/mobile apk` (creates `release/Musike-Setup-<version>-Android.apk`; unsigned unless `mobile/android/keystore.properties` points to your signing key). With `MUSIKE_APP_ID=<another id>` the APK installs next to the official app instead of replacing it (an APK signed with another key can't update it).
 
 ### Option 5: iPhone app
 
@@ -439,11 +440,12 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `POST` | `/api/auth/login` | `{ username, password, client?: "app" }`: sets the session cookie, or returns `{ token }` for apps |
 | `POST` | `/api/auth/logout` | Ends this session |
 | `POST` | `/api/auth/password` | Changes your password (`{ current, password }`) and signs out your other devices |
+| `POST` | `/api/auth/stream-link` | Apps: a signed token for stream URLs (`?st=`), 12 hours, ends with the session |
 | `GET` / `POST` | `/api/users` | Admins: the accounts / creates one (`{ username, role }`, answers its temporary password) |
 | `PATCH` / `DELETE` | `/api/users/:uid` | Admins: changes the role (`{ role }`) / deletes the account and its library |
 | `POST` | `/api/users/:uid/password` | Admins: a new temporary password; the user's devices are signed out |
 
-With accounts on, every route except `/api/health` and `/api/auth/*` needs a session, and answers `401` (`code: "auth_required"`) without one, or `403` (`code: "password_change_required"`) while a temporary password is still in use.
+With accounts on, every route except `/api/health`, `/api/auth/status`, `/api/auth/setup`, `/api/auth/login` and `/api/auth/logout` needs a session, and answers `401` (`code: "auth_required"`) without one, or `403` (`code: "password_change_required"`) while a temporary password is still in use. Apps can't put their token in a media element's request: `POST /api/auth/stream-link` gives them a signed token for stream URLs (`/api/stream/...?st=<token>`), valid 12 hours, which only opens streams and ends with the session.
 
 ## Project structure
 

@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { type Db, type Row, transaction } from "./db.js";
 import { msg } from "./i18n.js";
 import { HttpError } from "./types.js";
@@ -32,6 +32,8 @@ export const SESSION_DAYS = 30;
 const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
 /** last_seen is written at most this often, not on every request. */
 const TOUCH_MS = 60 * 60 * 1000;
+/** How long a stream link works (an app asks for a new one before it runs out). */
+export const STREAM_LINK_MS = 12 * 60 * 60 * 1000;
 
 // Passwords: scrypt (memory-hard, in Node itself). Stored as scrypt$log2N$r$p$salt$hash, so the cost can
 // change later without breaking existing hashes.
@@ -112,6 +114,18 @@ export function accounts(db: Db) {
   const sessionDelete = q("DELETE FROM sessions WHERE id = ?");
   const sessionsOfUser = q("DELETE FROM sessions WHERE user_id = ? AND id <> ?");
   const sessionsPrune = q("DELETE FROM sessions WHERE expires_at < ?");
+  const sessionById = q(`SELECT s.id AS sid, s.expires_at, u.id, u.username, u.role, u.owner, u.must_change_password
+    FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`);
+
+  /** The key that signs stream links: made once, kept in the database. */
+  const streamKey = (() => {
+    const row = q("SELECT value FROM settings WHERE key = 'stream_key'").get() as Row | undefined;
+    if (row) return Buffer.from(String(row.value), "base64");
+    const key = randomBytes(32);
+    q("INSERT OR IGNORE INTO settings (key, value) VALUES ('stream_key', ?)").run(key.toString("base64"));
+    return Buffer.from(String((q("SELECT value FROM settings WHERE key = 'stream_key'").get() as Row).value), "base64");
+  })();
+  const sign = (data: string) => createHmac("sha256", streamKey).update(data).digest("base64url");
 
   const get = (id: number) => byId.get(id) as Row | undefined;
   const mustGet = (id: number) => {
@@ -261,6 +275,28 @@ export function accounts(db: Db) {
     },
 
     endSession: (id: string) => void sessionDelete.run(id),
+
+    /**
+     * A link token for the audio of this session: a media element can't send "Authorization", so apps put this in
+     * the stream URL (?st=). Signed, expiring, and tied to the session: signing out or a reset ends it too.
+     */
+    streamLink(sessionId: string): { token: string; expiresAt: number } {
+      const expiresAt = Date.now() + STREAM_LINK_MS;
+      const data = `${sessionId}.${expiresAt}`;
+      return { token: `${data}.${sign(data)}`, expiresAt };
+    },
+
+    /** The session a stream link token belongs to, if the token is genuine, unexpired and the session still on. */
+    streamSession(token: string): { id: string; user: PublicUser } | null {
+      const [sid, exp, sig] = token.split(".");
+      if (!sid || !exp || !sig || sid.length !== 64 || Number(exp) < Date.now()) return null;
+      const want = Buffer.from(sign(`${sid}.${exp}`));
+      const got = Buffer.from(sig);
+      if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
+      const r = sessionById.get(sid) as Row | undefined;
+      if (!r || Number(r.expires_at) < Date.now()) return null;
+      return { id: String(r.sid), user: toUser(r) };
+    },
 
     /** Signs out every other device of this user. */
     endOtherSessions: (userId: number, keepId: string) => void sessionsOfUser.run(userId, keepId),

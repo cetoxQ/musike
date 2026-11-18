@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useT } from "../i18n";
+import { connection } from "../lib/api";
 import { useAuth } from "../stores/auth";
 import { Logo } from "./Brand";
 
@@ -125,7 +126,24 @@ function SignInScreen({ setup }: { setup: boolean }) {
           {busy ? t.account.working : setup ? t.account.createAdmin : t.account.signIn}
         </button>
       </form>
+      <ServerNote />
     </Screen>
+  );
+}
+
+/** Android, connected to a server: which one, a warning on http, and the way back to the phone's own library. */
+function ServerNote() {
+  const t = useT();
+  if (connection?.mode !== "server") return null;
+  const c = connection;
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-4">
+      <p className="text-xs text-fg-2">{t.server.connectedTo(c.url)}</p>
+      {c.url.startsWith("http://") && <p className="text-xs text-danger">{t.server.insecure}</p>}
+      <button type="button" onClick={() => void c.useDevice()} className="h-10 text-sm font-medium text-fg-2 hover:text-fg">
+        {t.server.useThisPhone}
+      </button>
+    </div>
   );
 }
 

@@ -20,15 +20,20 @@ import * as library from "../../../server/src/library";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
-import { ApiError, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
+import { ApiError, type Connection, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
 import "./android";
+import { makeConnection, savedConnection, serverBackend } from "./connection";
 import { media } from "./media";
 import { nativeStorage } from "./storage";
 import { forgetUrl, resolveAudio } from "./streams";
 
 // The Android backend: the Musike server's own code (search, genres, artists, albums, library), running on the
 // phone instead of behind HTTP. The build swaps lib/api.ts for this module (see vite.config.ts).
+// Connected to a Musike server instead (Settings > Server), every request goes to that server (connection.ts).
 export * from "../lib/apiTypes";
+
+const saved = savedConnection();
+const server = saved.mode === "server" ? serverBackend(saved.url) : null;
 
 // On the phone the library is one JSON document in the app's storage.
 const lib = library.jsonLibrary(nativeStorage);
@@ -64,7 +69,7 @@ const SYSTEM: SystemInfo = {
   job: null,
 };
 
-export const api: MusikeApi = {
+const onThePhone: MusikeApi = {
   search: (q, type, signal) =>
     call(async () => {
       if (!q.trim()) throw fail(400, "emptyQuery");
@@ -153,13 +158,23 @@ export const api: MusikeApi = {
   deleteUser: noAccounts,
 };
 
-/** On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. */
-export const streamSource = (id: string): Promise<string> => resolveAudio(id).then((r) => r.url);
+export const api: MusikeApi = server ? server.api : onThePhone;
+
+/**
+ * On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. Connected to a
+ * server, it plays the server's stream proxy.
+ */
+export const streamSource = (id: string): Promise<string> =>
+  server ? server.streamUrl(id) : resolveAudio(id).then((r) => r.url);
 
 export async function explainStreamError(url: string): Promise<{ message: string }> {
+  if (server) return server.explain(url);
   forgetUrl(url);
   return { message: navigator.onLine ? getT().player.streamFailed : getT().player.offline };
 }
+
+/** Where the library and the music come from: this phone, or a Musike server (Settings > Server). */
+export const connection: Connection = makeConnection(saved, api, () => lib.getLibrary());
 
 /** Backups are shared through Android's share sheet (save to Files, Drive, send to the computer…). */
 export async function saveFile(name: string, text: string) {
