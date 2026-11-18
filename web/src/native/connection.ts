@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { getT } from "../i18n";
 import { ApiError, type Connection, type ErrorCode, type MusikeApi } from "../lib/apiTypes";
 import { httpBackend } from "../lib/httpApi";
@@ -52,6 +53,15 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
 }
 
+/** Capacitor's proxy for web view requests (Android's HTTP stack, answered from the app's origin). */
+const PROXY = "/_capacitor_http_interceptor_?u=";
+
+/** The server URL inside a proxied one. */
+function unproxied(src: string): string {
+  const at = src.indexOf(PROXY);
+  return at === -1 ? src : decodeURIComponent(src.slice(at + PROXY.length));
+}
+
 /** The Musike server as the app's backend: its API with the app's token, and its stream proxy for the audio. */
 export function serverBackend(url: string) {
   const http = httpBackend({ base: url, fetch: nativeFetch, token, headers: HEADERS });
@@ -78,12 +88,20 @@ export function serverBackend(url: string) {
     api: http.api,
     async streamUrl(id: string): Promise<string> {
       const st = await linkToken();
-      return url + http.streamPath(id, "audio", "sd") + (st ? `?st=${encodeURIComponent(st)}` : "");
+      const direct = url + http.streamPath(id, "audio", "sd") + (st ? `?st=${encodeURIComponent(st)}` : "");
+      // The app's page is https://localhost: the web view won't play audio from an http:// server itself. Android's
+      // HTTP stack fetches it instead, through Capacitor's proxy on the app's own origin (Range requests included).
+      return url.startsWith("http://") && Capacitor.isNativePlatform() ? `${PROXY}${encodeURIComponent(direct)}` : direct;
     },
     /** Why a stream failed, from the server itself. The next stream gets a fresh link token. */
-    explain(streamUrl: string): Promise<{ message: string; code?: ErrorCode }> {
+    async explain(streamUrl: string, error?: MediaError | null): Promise<{ message: string; code?: ErrorCode }> {
       link = null;
-      return http.explain(streamUrl);
+      const r = await http.explain(unproxied(streamUrl));
+      // The server served it, yet the player failed: say what the player said, to tell a format from a load problem.
+      if (error && r.message === getT().player.browserCantPlay) {
+        return { ...r, message: `${r.message} (${error.code}${error.message ? `: ${error.message}` : ""})` };
+      }
+      return r;
     },
   };
 }

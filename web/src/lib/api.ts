@@ -30,7 +30,7 @@ export const systemMedia: SystemMedia | null = null;
 export const capabilities = { video: true, engineSettings: true, retryOnError: false };
 
 /** Media elements hide the HTTP error body; fetch it to show the real reason. */
-export const explainStreamError = http.explain;
+export const explainStreamError = (url: string, _error?: MediaError | null) => http.explain(url);
 
 /** Only the Android app chooses where its library lives (the phone, or a Musike server). */
 export const connection: Connection | null = null;

@@ -11,9 +11,8 @@ const config: CapacitorConfig = {
   webDir: "../web/dist-native",
   backgroundColor: "#0B0C0F",
   android: {
-    // Connected to a Musike server at an http:// address (Settings > Server), the page (https://localhost) plays the
-    // server's audio over http: allowed, with a warning in the app. The phone's own mode only uses https.
-    allowMixedContent: true,
+    // Music keeps loading while the screen is off or another app is in front.
+    allowMixedContent: false,
   },
   ios: {
     // The status bar area is padded by the app itself, like on Android.
@@ -23,6 +22,12 @@ const config: CapacitorConfig = {
   },
   ...(serverUrl ? { server: { url: serverUrl, cleartext: false } } : {}),
   plugins: {
+    // Android's own HTTP stack for fetch, and its proxy at https://localhost/_capacitor_http_interceptor_: connected
+    // to a Musike server at an http:// address (Settings > Server), the audio comes through it, from the app's own
+    // https origin, so the web view never loads http content itself.
+    CapacitorHttp: {
+      enabled: true,
+    },
     Keyboard: {
       // iOS: the web view shrinks with the keyboard, so the search box and its results stay in view. (Android already
       // makes room through SystemBars; its resizeOnFullScreen workaround would shrink the page a second time.)

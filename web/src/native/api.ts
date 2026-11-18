@@ -167,8 +167,8 @@ export const api: MusikeApi = server ? server.api : onThePhone;
 export const streamSource = (id: string): Promise<string> =>
   server ? server.streamUrl(id) : resolveAudio(id).then((r) => r.url);
 
-export async function explainStreamError(url: string): Promise<{ message: string }> {
-  if (server) return server.explain(url);
+export async function explainStreamError(url: string, error?: MediaError | null): Promise<{ message: string }> {
+  if (server) return server.explain(url, error);
   forgetUrl(url);
   return { message: navigator.onLine ? getT().player.streamFailed : getT().player.offline };
 }

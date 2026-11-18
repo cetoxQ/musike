@@ -303,7 +303,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       return;
     }
     set({ status: "error" });
-    explainStreamError(url).then(({ message, code }) => {
+    explainStreamError(url, media.error).then(({ message, code }) => {
       if (mine === token) report(message, code);
     });
   }
