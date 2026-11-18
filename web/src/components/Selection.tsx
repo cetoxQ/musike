@@ -139,8 +139,9 @@ export function SelectionBar({
 }
 
 /**
- * A track row with a checkbox. The checkbox toggles the selection; the rest of the row (artwork, title) plays the
- * track, as in every other track list.
+ * A track row with a checkbox, Spotify-style: with nothing selected, tapping the row plays the track; a long press
+ * (or the checkbox) starts picking, and while picking, tapping rows picks more. The checkbox always toggles, the
+ * artwork always plays.
  */
 export function SelectableRow({
   track,
@@ -151,11 +152,14 @@ export function SelectableRow({
   note,
   trailing,
   dimmed = !selected,
+  selecting = false,
 }: {
   track: Track;
   selected: boolean;
   /** Faded: left out of the selection. By default when not selected; lists that start empty fade only while picking. */
   dimmed?: boolean;
+  /** Something is selected: taps on the row pick instead of playing. */
+  selecting?: boolean;
   onToggle: () => void;
   onPlay: () => void;
   position?: number;
@@ -174,14 +178,21 @@ export function SelectableRow({
   };
 
   return (
-    <div className="group flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-surface-2 md:px-3">
+    <div
+      onContextMenu={(e) => {
+        // Long press on a phone (right click elsewhere): pick this one, which starts picking.
+        e.preventDefault();
+        onToggle();
+      }}
+      className="group flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-surface-2 md:px-3"
+    >
       <button
         type="button"
         role="checkbox"
         aria-checked={selected}
         aria-label={t.selection.select(track.title)}
         onClick={onToggle}
-        className="-m-2 p-2"
+        className="-my-1.5 -ml-2 flex h-14 w-11 shrink-0 items-center justify-center"
       >
         <Check on={selected} />
       </button>
@@ -202,7 +213,12 @@ export function SelectableRow({
         </span>
       </button>
 
-      <button type="button" onClick={play} tabIndex={-1} className={cn("min-w-0 flex-1 text-left", dimmed && "opacity-60")}>
+      <button
+        type="button"
+        onClick={selecting ? onToggle : play}
+        tabIndex={-1}
+        className={cn("min-w-0 flex-1 select-none text-left [-webkit-touch-callout:none]", dimmed && "opacity-60")}
+      >
         <span className={cn("block truncate text-[15px] leading-tight font-medium", isCurrent && "text-accent-text")}>{track.title}</span>
         <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-fg-2">
           {track.kind === "video" && <VideoCameraIcon size={13} className="shrink-0 text-fg-3" aria-label={t.common.video} />}
@@ -256,6 +272,7 @@ export function SelectableTrackList({ tracks, numbered }: { tracks: Track[]; num
               position={numbered ? i + 1 : undefined}
               selected={selected.has(t.id)}
               dimmed={chosen.length > 0 && !selected.has(t.id)}
+              selecting={chosen.length > 0}
               onToggle={() => toggle(t.id)}
               onPlay={() => playList(tracks, i)}
             />
