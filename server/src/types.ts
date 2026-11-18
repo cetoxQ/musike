@@ -7,6 +7,8 @@ export interface Track {
   artistId?: string;
   /** YouTube Music album the track belongs to, when known: opens the album page. */
   albumId?: string;
+  /** YouTube Music's play count as it words it ("235M plays"), on an artist's top songs. Not saved. */
+  plays?: string;
   duration: number;
   thumb: string;
   art: string;

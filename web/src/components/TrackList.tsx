@@ -73,6 +73,7 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
           {track.kind === "video" && <VideoCameraIcon size={13} className="shrink-0 text-fg-3" aria-label={t.common.video} />}
           {/* On phones the whole row plays; there the artist is one tap away in the row's menu. */}
           <ArtistLink track={track} className="relative z-10 truncate md:pointer-events-auto" />
+          {track.plays && <span className="shrink-0 text-fg-3">· {track.plays}</span>}
         </p>
       </div>
 

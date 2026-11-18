@@ -41,7 +41,7 @@ export function sized(url: string | undefined, px: number): string {
   return url;
 }
 
-function videoThumbs(id: string) {
+export function videoThumbs(id: string) {
   // mqdefault and hq720 are true 16:9 (hqdefault is letterboxed 4:3). The web app falls back to mqdefault if hq720 is missing.
   return { thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`, art: `https://i.ytimg.com/vi/${id}/hq720.jpg` };
 }
@@ -61,6 +61,21 @@ export function artistIdOf(credits: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * The album of a row: youtubei.js finds it in search results, where it shares the second column with the artist.
+ * In playlist-style rows (an artist's top songs, playlists) the album has a column of its own, found by its link.
+ */
+function albumOf(item: any): { name?: string; id?: string } {
+  if (item?.album?.name) return { name: text(item.album.name), id: item.album.id };
+  for (const col of item?.flex_columns ?? []) {
+    for (const run of col?.title?.runs ?? []) {
+      const id = run?.endpoint?.payload?.browseId;
+      if (typeof id === "string" && ALBUM_ID.test(id)) return { name: text(run.text), id };
+    }
+  }
+  return {};
+}
+
 // youtubei.js node shapes differ between item types, so read them defensively.
 export function toTrack(item: any, kind: Track["kind"]): Track | null {
   const id: string | undefined = item.id ?? item.video_id;
@@ -71,13 +86,14 @@ export function toTrack(item: any, kind: Track["kind"]): Track | null {
   const best = Array.isArray(thumbs) ? thumbs[0]?.url : undefined;
   const isSquare = typeof best === "string" && /googleusercontent\.com|ggpht\.com/.test(best);
   const images = isSquare ? { thumb: sized(best, 120), art: sized(best, 544) } : videoThumbs(id);
+  const album = albumOf(item);
   return {
     id,
     title: text(item.title) || text(item.name),
     artist,
-    album: item.album?.name || undefined,
+    album: album.name || undefined,
     artistId: artistIdOf(item.artists ?? item.authors),
-    albumId: typeof item.album?.id === "string" && ALBUM_ID.test(item.album.id) ? item.album.id : undefined,
+    albumId: typeof album.id === "string" && ALBUM_ID.test(album.id) ? album.id : undefined,
     duration: item.duration?.seconds ?? 0,
     ...images,
     kind: isSquare ? kind : "video",

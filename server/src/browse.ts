@@ -1,6 +1,6 @@
 import type { Innertube } from "youtubei.js";
 import { isLang, msg, type Lang } from "./i18n.js";
-import { artistIdOf, sized, text, toTrack, withClient } from "./search.js";
+import { artistIdOf, sized, text, toTrack, videoThumbs, withClient } from "./search.js";
 import type { Track } from "./types.js";
 import { ALBUM_ID, ARTIST_ID, HttpError, VIDEO_ID, YT_PLAYLIST_ID } from "./types.js";
 
@@ -57,10 +57,19 @@ export interface ArtistPage {
   name: string;
   description: string;
   banner: string;
+  /** Top songs, most played first (YouTube Music's play counts), up to MAX_HITS. */
   tracks: Track[];
   albums: AlbumCard[];
   singles: AlbumCard[];
+  /** The page's other shelves, in YouTube Music's order and with its (translated) titles. */
+  shelves: ArtistShelf[];
 }
+
+/** A shelf of an artist page: videos (live performances too), playlists (featured on, by the artist) or artists. */
+export type ArtistShelf =
+  | { kind: "videos"; title: string; tracks: Track[] }
+  | { kind: "playlists"; title: string; playlists: PlaylistCard[] }
+  | { kind: "artists"; title: string; artists: ArtistCard[] };
 
 /** A YouTube Music playlist as a search result. */
 export interface PlaylistCard {
@@ -352,6 +361,98 @@ async function allAlbums(shelf: any, lang: Lang): Promise<AlbumCard[]> {
   }
 }
 
+/**
+ * A count as YouTube Music words it, in English or Portuguese: "235M plays", "1.2K", "1,2 mi de reproduções",
+ * "3,4 mil", "1,234 plays". Undefined when there is no number.
+ */
+export function parseCount(s: string): number | undefined {
+  const m = /(\d+(?:[.,]\d+)*)\s*(mld|mln|mil|mi|bi|k|m|b)?(?![\p{L}])/iu.exec(s);
+  if (!m) return undefined;
+  const scale: Record<string, number> = { k: 1e3, mil: 1e3, m: 1e6, mi: 1e6, mln: 1e6, b: 1e9, bi: 1e9, mld: 1e9 };
+  const unit = m[2]?.toLowerCase();
+  // With a unit the separator is a decimal point ("1.2M", "1,2 mi"); without one it groups thousands ("1,234").
+  const n = unit ? Number(m[1].replace(",", ".")) * scale[unit] : Number(m[1].replace(/[.,]/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** The play count column of a top-songs row: the one that starts with a number and links nowhere. */
+function playsOf(item: any): string | undefined {
+  for (const col of (item?.flex_columns ?? []).slice(1)) {
+    const runs: any[] = col?.title?.runs ?? [];
+    const words = text(col?.title).trim();
+    if (/^\d/.test(words) && !runs.some((r) => r?.endpoint)) return words;
+  }
+  return undefined;
+}
+
+/** Most played first; tracks without a count keep their place after the counted ones. */
+export function byPlays(tracks: Track[]): Track[] {
+  return tracks
+    .map((t, i) => ({ t, i, n: t.plays ? (parseCount(t.plays) ?? -1) : -1 }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .map((x) => x.t);
+}
+
+function videoTrack(item: any): Track | null {
+  const id = item?.id;
+  if (typeof id !== "string" || !VIDEO_ID.test(id)) return null;
+  const title = text(item.title);
+  if (!title) return null;
+  const subtitle = text(item.subtitle);
+  return {
+    id,
+    title,
+    artist: text(item.author?.name) || subtitle.split(" • ")[0] || "",
+    artistId: ARTIST_ID.test(item.author?.channel_id ?? "") ? item.author.channel_id : undefined,
+    duration: 0,
+    ...videoThumbs(id),
+    kind: "video",
+  };
+}
+
+function playlistCard(item: any): PlaylistCard | null {
+  const raw = typeof item?.id === "string" ? item.id : "";
+  const id = raw.startsWith("VL") ? raw : `VL${raw}`;
+  const title = text(item?.title);
+  if (!YT_PLAYLIST_ID.test(id) || !title) return null;
+  return { id, title, info: text(item.subtitle), ...imagesOf(item) };
+}
+
+function artistCard(item: any): ArtistCard | null {
+  const id = item?.id;
+  const name = text(item?.title ?? item?.name);
+  if (typeof id !== "string" || !ARTIST_ID.test(id) || !name) return null;
+  return { id, name, info: text(item.subtitle), ...imagesOf(item) };
+}
+
+/**
+ * The carousels of an artist page other than its releases, told apart by what they hold (titles are translated).
+ * Podcasts, episodes and anything else are left out.
+ */
+export function artistShelves(sections: any[]): ArtistShelf[] {
+  const shelves: ArtistShelf[] = [];
+  for (const s of sections ?? []) {
+    if (s?.type !== "MusicCarouselShelf") continue;
+    const items = itemsOf(s);
+    const title = text(s.header?.title);
+    if (!items.length || !title) continue;
+    const types = new Set(items.map((i: any) => i?.item_type));
+    const only = (t: string) => types.size === 1 && types.has(t);
+    if (only("album")) continue;
+    if (only("playlist")) {
+      const playlists = items.map(playlistCard).filter((p): p is PlaylistCard => !!p);
+      if (playlists.length) shelves.push({ kind: "playlists", title, playlists });
+    } else if (only("artist")) {
+      const artists = items.map(artistCard).filter((a): a is ArtistCard => !!a);
+      if (artists.length) shelves.push({ kind: "artists", title, artists });
+    } else if ([...types].every((t) => t === "video" || t === "song")) {
+      const tracks = items.map(videoTrack).filter((t): t is Track => !!t);
+      if (tracks.length) shelves.push({ kind: "videos", title, tracks });
+    }
+  }
+  return shelves;
+}
+
 const artistPage = cached(30 * MINUTE, async (key): Promise<ArtistPage> => {
   const { lang, id } = parseKey(key);
   const page = await withClient((yt) => yt.music.getArtist(id), lang).catch(() => {
@@ -371,7 +472,15 @@ const artistPage = cached(30 * MINUTE, async (key): Promise<ArtistPage> => {
   if (more.length) items = more;
   const banner = (header?.thumbnail?.contents ?? header?.thumbnail ?? [])[0]?.url;
   const name = text(header?.title);
-  const tracks = uniqueTracks(items.map((i) => toTrack(i, "song"))).slice(0, MAX_HITS);
+  const tracks = byPlays(
+    uniqueTracks(
+      items.map((i) => {
+        const track = toTrack(i, "song");
+        const plays = playsOf(i);
+        return track && plays ? { ...track, plays } : track;
+      }),
+    ),
+  ).slice(0, MAX_HITS);
   if (!name && !tracks.length) throw new HttpError(404, msg("artistNotFound"));
   return {
     id,
@@ -381,6 +490,7 @@ const artistPage = cached(30 * MINUTE, async (key): Promise<ArtistPage> => {
     tracks,
     albums,
     singles: releaseShelves[1] ? albumCards(itemsOf(releaseShelves[1])) : [],
+    shelves: artistShelves(page.sections),
   };
 });
 

@@ -7,6 +7,8 @@ export interface Track {
   artistId?: string;
   /** YouTube Music album the track belongs to, when known: opens the album page. */
   albumId?: string;
+  /** YouTube Music's play count as it words it ("235M plays"), on an artist's top songs. Not saved. */
+  plays?: string;
   duration: number;
   thumb: string;
   art: string;
@@ -134,10 +136,19 @@ export interface ArtistPage {
   name: string;
   description: string;
   banner: string;
+  /** Top songs, most played first. */
   tracks: Track[];
   albums: AlbumCard[];
   singles: AlbumCard[];
+  /** The page's other shelves, in YouTube Music's order and with its titles. Missing from older servers. */
+  shelves?: ArtistShelf[];
 }
+
+/** A shelf of an artist page: videos (live performances too), playlists or artists. */
+export type ArtistShelf =
+  | { kind: "videos"; title: string; tracks: Track[] }
+  | { kind: "playlists"; title: string; playlists: PlaylistCard[] }
+  | { kind: "artists"; title: string; artists: ArtistCard[] };
 
 export interface AlbumPage {
   id: string;

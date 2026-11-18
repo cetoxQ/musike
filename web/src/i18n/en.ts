@@ -305,7 +305,11 @@ export const en = {
   artist: {
     fallbackName: "Artist",
     label: "Artist",
-    hits: "Greatest hits",
+    hits: "Most played",
+    showMore: "Show more",
+    showLess: "Show less",
+    about: "About",
+    playAll: (name: string) => `Play ${name}'s most played`,
     openFailed: "Couldn't open this artist",
     noHits: "No songs found",
     noHitsBody: "YouTube Music doesn't list hits for this artist.",

@@ -1,28 +1,40 @@
-import { MusicNotesIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CaretUpIcon, MusicNotesIcon, PlayIcon, ShuffleIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useLocation, useParams } from "react-router";
 import { AlbumRow } from "../components/AlbumTiles";
 import { Artwork } from "../components/Artwork";
+import { IconButton, PlayDisc } from "../components/IconButton";
 import { BackButton, EmptyState, PageHeader } from "../components/Page";
-import { SelectableTrackList } from "../components/Selection";
-import { TrackListSkeleton } from "../components/TrackList";
+import { ArtistShelf, PlaylistShelf, VideoShelf } from "../components/Shelves";
+import { TrackList, TrackListSkeleton } from "../components/TrackList";
 import { useRemote } from "../hooks/useRemote";
 import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
+import { cn, shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
-import { cn } from "../lib/format";
 import type { ArtistPage } from "../lib/types";
+import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 
-/** An artist's greatest hits, ready to pick from. */
+/** Songs shown before "Show more", and after it. */
+const TOP_FEW = 5;
+const TOP_MORE = 20;
+
+/**
+ * An artist laid out as YouTube Music does: most played songs first (with their play counts and albums),
+ * then albums, singles and the page's other shelves (videos, live performances, playlists, similar artists),
+ * and the bio at the end.
+ */
 export default function Artist() {
   const { id = "" } = useParams();
   const location = useLocation();
   const lang = useI18n((s) => s.lang);
   const t = useT();
-  // The bio comes from YouTube Music in the app language.
+  // Shelf titles, play counts and the bio come from YouTube Music in the app language.
   const page = useRemote<ArtistPage>(`artist:${lang}:${id}`, (signal) => api.artist(id, signal));
+  const playList = usePlayer((s) => s.playList);
   const [fullBio, setFullBio] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const state = location.state as { name?: string; art?: string } | null;
   const name = (page.status === "ok" && page.data.name) || state?.name || t.artist.fallbackName;
   const following = useLibrary((s) => s.artists.some((a) => a.id === id));
@@ -34,14 +46,18 @@ export default function Artist() {
     void toggleArtist({ id, name: page.data.name || name, thumb: art, art, savedAt: Date.now() });
   };
 
+  const data = page.status === "ok" ? page.data : null;
+  const tracks = data?.tracks ?? [];
+  const shown = tracks.slice(0, expanded ? TOP_MORE : TOP_FEW);
+
   return (
     <div className="pb-8">
       <PageHeader title={name} actions={<BackButton fallback={paths.search} />} />
 
       <div className="relative mx-4 overflow-hidden rounded-[20px] bg-surface-2 ring-1 ring-line md:mx-6">
-        {page.status === "ok" && page.data.banner && (
+        {data?.banner && (
           <div className="absolute inset-0">
-            <Artwork src={page.data.banner} className="size-full" />
+            <Artwork src={data.banner} className="size-full" />
           </div>
         )}
         {page.status === "loading" && <div className="skeleton absolute inset-0" />}
@@ -53,6 +69,16 @@ export default function Artist() {
       </div>
 
       <div className="flex items-center gap-2 px-4 pt-4 md:px-6">
+        {tracks.length > 0 && (
+          <>
+            <PlayDisc label={t.artist.playAll(name)} onClick={() => playList(tracks, 0)}>
+              <PlayIcon size={22} weight="fill" />
+            </PlayDisc>
+            <IconButton label={t.album.shuffle} onClick={() => playList(shuffled(tracks), 0)}>
+              <ShuffleIcon size={22} />
+            </IconButton>
+          </>
+        )}
         <button
           type="button"
           disabled={page.status !== "ok"}
@@ -68,23 +94,9 @@ export default function Artist() {
         </button>
       </div>
 
-      {page.status === "ok" && page.data.description && (
-        <button
-          type="button"
-          onClick={() => setFullBio((v) => !v)}
-          aria-expanded={fullBio}
-          className={cn("mx-4 mt-4 max-w-[75ch] text-left text-sm text-fg-2 hover:text-fg md:mx-6", !fullBio && "line-clamp-3")}
-        >
-          {page.data.description}
-        </button>
-      )}
-
-      {page.status === "ok" && page.data.albums.length > 0 && <AlbumRow title={t.artist.albums} albums={page.data.albums} />}
-      {page.status === "ok" && page.data.singles.length > 0 && <AlbumRow title={t.artist.singles} albums={page.data.singles} />}
-
       <h2 className="px-4 pt-6 pb-1 text-xl font-semibold tracking-tight md:px-6">{t.artist.hits}</h2>
 
-      {page.status === "loading" && <TrackListSkeleton />}
+      {page.status === "loading" && <TrackListSkeleton rows={TOP_FEW} />}
 
       {page.status === "error" && (
         <EmptyState
@@ -103,12 +115,53 @@ export default function Artist() {
         />
       )}
 
-      {page.status === "ok" &&
-        (page.data.tracks.length ? (
-          <SelectableTrackList key={id} tracks={page.data.tracks} numbered />
+      {data &&
+        (tracks.length ? (
+          <div className="px-2 md:px-3">
+            {/* Playing a row queues the whole ranking, not only the rows on screen. */}
+            <TrackList tracks={shown} context={tracks} header={false} showAlbum />
+            {tracks.length > TOP_FEW && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                className="mt-1 ml-2 flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-fg-2 hover:bg-surface-2 hover:text-fg"
+              >
+                {expanded ? <CaretUpIcon size={16} /> : <CaretDownIcon size={16} />}
+                {expanded ? t.artist.showLess : t.artist.showMore}
+              </button>
+            )}
+          </div>
         ) : (
           <EmptyState icon={<MusicNotesIcon size={28} />} title={t.artist.noHits} body={t.artist.noHitsBody} />
         ))}
+
+      {data && data.albums.length > 0 && <AlbumRow title={t.artist.albums} albums={data.albums} />}
+      {data && data.singles.length > 0 && <AlbumRow title={t.artist.singles} albums={data.singles} />}
+
+      {data?.shelves?.map((s, i) =>
+        s.kind === "videos" ? (
+          <VideoShelf key={i} title={s.title} tracks={s.tracks} />
+        ) : s.kind === "playlists" ? (
+          <PlaylistShelf key={i} title={s.title} playlists={s.playlists} />
+        ) : (
+          <ArtistShelf key={i} title={s.title} artists={s.artists} />
+        ),
+      )}
+
+      {data?.description && (
+        <section className="flex flex-col gap-2 px-4 pt-8 md:px-6">
+          <h2 className="text-xl font-semibold tracking-tight">{t.artist.about}</h2>
+          <button
+            type="button"
+            onClick={() => setFullBio((v) => !v)}
+            aria-expanded={fullBio}
+            className={cn("max-w-[75ch] text-left text-sm text-fg-2 hover:text-fg", !fullBio && "line-clamp-4")}
+          >
+            {data.description}
+          </button>
+        </section>
+      )}
     </div>
   );
 }

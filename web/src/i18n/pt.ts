@@ -299,7 +299,11 @@ export const pt: Messages = {
   artist: {
     fallbackName: "Artista",
     label: "Artista",
-    hits: "Maiores sucessos",
+    hits: "Mais tocadas",
+    showMore: "Mostrar mais",
+    showLess: "Mostrar menos",
+    about: "Sobre",
+    playAll: (name) => `Tocar as mais tocadas de ${name}`,
     openFailed: "Não deu para abrir este artista",
     noHits: "Nenhuma música encontrada",
     noHitsBody: "O YouTube Music não lista sucessos para este artista.",
