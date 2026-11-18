@@ -1,4 +1,6 @@
-import { type Connection, type MusikeApi, type SystemMedia } from "./apiTypes";
+import { getT } from "../i18n";
+import { ApiError, type Connection, type MusikeApi, type SystemMedia } from "./apiTypes";
+import { desktop } from "./desktop";
 import { httpBackend } from "./httpApi";
 
 // The HTTP backend: the Musike server this page came from (web app, desktop app). The Android build swaps this module
@@ -32,8 +34,43 @@ export const capabilities = { video: true, engineSettings: true, retryOnError: f
 /** Media elements hide the HTTP error body; fetch it to show the real reason. */
 export const explainStreamError = (url: string, _error?: MediaError | null) => http.explain(url);
 
-/** Only the Android app chooses where its library lives (the phone, or a Musike server). */
-export const connection: Connection | null = null;
+/**
+ * Where the library lives, for the apps: the Android app (native/api.ts) and the desktop app, which shows either
+ * this computer's own library or a Musike server's pages. In a browser: null.
+ */
+export const connection: Connection | null = desktop?.connect ? desktopConnection(desktop.connect, desktop.localLibrary) : null;
+
+function desktopConnection(
+  connect: NonNullable<NonNullable<typeof desktop>["connect"]>,
+  localLibrary: NonNullable<typeof desktop>["localLibrary"],
+): Connection {
+  const server = desktop?.server ?? null;
+  return {
+    mode: server ? "server" : "device",
+    url: server ?? desktop?.lastServer ?? "",
+
+    async connect(input) {
+      const t = getT();
+      const result = await connect(input);
+      if ("error" in result) {
+        if (result.error === "cancelled") return;
+        throw new ApiError(400, result.error === "invalid" ? t.server.invalidAddress : t.server.unreachable);
+      }
+    },
+
+    async useDevice() {
+      // Sign out of the server first, so the session doesn't linger there.
+      if (server) await Promise.race([api.logout(), new Promise((r) => setTimeout(r, 5000))]).catch(() => {});
+      await connect(null);
+    },
+
+    async uploadLocalLibrary() {
+      const library = await localLibrary?.();
+      if (!library) throw new ApiError(404, getT().server.nothingToCopy);
+      return api.importLibrary({ format: "musike-backup", version: 1, exportedAt: new Date().toISOString(), library }, "merge");
+    },
+  };
+}
 
 /**
  * Devices in step (see stores/devices.ts): the WebSocket address, with a fresh single-use ticket. Only over https:

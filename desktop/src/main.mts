@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain, Menu, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from "electron";
 import type { RunningServer } from "../../server/src/app.js";
 import { backupLibraryOnUpdate } from "./backup.js";
 
@@ -59,17 +59,66 @@ type Lang = "en" | "pt-BR";
 const settingsFile = path.join(userData, "settings.json");
 const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR";
 
-function readLang(): Lang {
-  try {
-    const { lang } = JSON.parse(readFileSync(settingsFile, "utf8")) as { lang?: unknown };
-    if (isLang(lang)) return lang;
-  } catch {
-    // first launch
-  }
-  return "en";
+/**
+ * `server`: the Musike server the app shows, instead of this computer's own library (Settings > Server);
+ * `lastServer`: kept when switching back, to reconnect easily.
+ */
+interface Settings {
+  lang?: Lang;
+  server?: string | null;
+  lastServer?: string;
 }
 
-let lang = readLang();
+function readSettings(): Settings {
+  try {
+    const s = JSON.parse(readFileSync(settingsFile, "utf8")) as Record<string, unknown>;
+    return {
+      lang: isLang(s.lang) ? s.lang : undefined,
+      server: typeof s.server === "string" ? serverAddress(s.server) : null,
+      lastServer: typeof s.lastServer === "string" ? (serverAddress(s.lastServer) ?? undefined) : undefined,
+    };
+  } catch {
+    return {}; // first launch
+  }
+}
+
+function writeSettings(change: Settings) {
+  try {
+    writeFileSync(settingsFile, JSON.stringify({ ...readSettings(), ...change }));
+  } catch {
+    /* not critical */
+  }
+}
+
+/** "musike.home.arpa" or "http://192.168.1.240:4180/" → the origin (http(s) only), or null. */
+function serverAddress(input: unknown): string | null {
+  if (typeof input !== "string" || !input.trim()) return null;
+  const raw = input.trim();
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `http://${raw}`);
+    return (u.protocol === "http:" || u.protocol === "https:") && !u.username && !u.password ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Does a Musike server answer there? */
+async function reachable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(8000) });
+    const body = res.ok ? ((await res.json()) as { ok?: unknown }) : null;
+    return body?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+let lang: Lang = readSettings().lang ?? "en";
+
+const SERVER_DOWN: Record<Lang, (url: string) => string> = {
+  en: (url) => `no Musike server answers at ${url}.`,
+  "pt-BR": (url) => `nenhum servidor Musike responde em ${url}.`,
+};
 
 function readWindowState(): WindowState {
   try {
@@ -146,7 +195,7 @@ function createMainWindow(url: string): BrowserWindow {
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, target) => {
-    if (!target.startsWith(url)) {
+    if (originOf(target) !== originOf(url)) {
       event.preventDefault();
       if (/^https?:\/\//.test(target)) void shell.openExternal(target);
     }
@@ -156,11 +205,35 @@ function createMainWindow(url: string): BrowserWindow {
   return win;
 }
 
+const originOf = (url: string) => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
+};
+
 let mainWindow: BrowserWindow | null = null;
 let server: RunningServer | null = null;
 
 async function launch() {
   const splash = createSplash();
+  const remote = readSettings().server;
+  if (remote) {
+    // A Musike server: its pages, its library and its music. Nothing to start here.
+    if (server) {
+      await server.close();
+      server = null;
+    }
+    if (!(await reachable(remote))) {
+      const message = JSON.stringify(SERVER_DOWN[lang](remote));
+      await splash.webContents.executeJavaScript(`window.fail(${message}, true)`).catch(() => {});
+      return;
+    }
+    mainWindow = createMainWindow(remote);
+    mainWindow.once("ready-to-show", () => splash.destroy());
+    return;
+  }
   const s = await loadServer();
   // Show progress while yt-dlp and Deno download on the first launch.
   const report = setInterval(() => {
@@ -195,18 +268,69 @@ ipcMain.on("musike:theme", (event, theme: "dark" | "light") => {
 ipcMain.on("musike:lang", (_event, next: unknown) => {
   if (!isLang(next) || next === lang) return;
   lang = next;
-  try {
-    writeFileSync(settingsFile, JSON.stringify({ lang }));
-  } catch {
-    /* not critical: the splash falls back to English */
-  }
+  writeSettings({ lang });
 });
 
-ipcMain.on("musike:retry", (event) => {
-  const failed = BrowserWindow.fromWebContents(event.sender);
+/** Starts over with what settings.json says (this computer, or a server), in place of the window that asked. */
+function relaunch(from: BrowserWindow | null) {
   // Open the new splash before closing the old one, or "window-all-closed" would quit the app.
   void launch();
-  failed?.destroy();
+  from?.destroy();
+  if (from === mainWindow) mainWindow = null;
+}
+
+ipcMain.on("musike:retry", (event) => relaunch(BrowserWindow.fromWebContents(event.sender)));
+
+/** Pages of this app itself (the local server, the splash), as opposed to a Musike server's. */
+function fromThisApp(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): boolean {
+  const url = event.senderFrame?.url ?? "";
+  return url.startsWith("file://") || (!!server && originOf(url) === `http://127.0.0.1:${server.port}`);
+}
+
+/** For Settings > Server: where the app is now, and the server it knew last. */
+ipcMain.on("musike:server", (event) => {
+  const s = readSettings();
+  event.returnValue = { server: s.server ?? null, last: s.lastServer ?? s.server ?? "" };
+});
+
+type ConnectResult = { ok: true } | { error: "invalid" | "unreachable" | "cancelled" };
+
+/** Settings > Server: a Musike server's address, or null for this computer. The app starts over there. */
+ipcMain.handle("musike:connect", async (event, input: unknown): Promise<ConnectResult> => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (input === null) {
+    writeSettings({ server: null });
+    relaunch(win);
+    return { ok: true };
+  }
+  const url = serverAddress(input);
+  if (!url) return { error: "invalid" };
+  // Asked by a server's page rather than this app's own: the person says yes first.
+  if (!fromThisApp(event) && win) {
+    const { response } = await dialog.showMessageBox(win, {
+      type: "question",
+      buttons: lang === "pt-BR" ? ["Conectar", "Cancelar"] : ["Connect", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+      message: lang === "pt-BR" ? `Conectar o Musike a ${url}?` : `Connect Musike to ${url}?`,
+    });
+    if (response !== 0) return { error: "cancelled" };
+  }
+  if (!(await reachable(url))) return { error: "unreachable" };
+  writeSettings({ server: url, lastServer: url });
+  relaunch(win);
+  return { ok: true };
+});
+
+/** This computer's own library (library.json), to copy into an account on the server. */
+ipcMain.handle("musike:local-library", (event) => {
+  const remote = readSettings().server;
+  if (!fromThisApp(event) && originOf(event.senderFrame?.url ?? "") !== remote) return null;
+  try {
+    return JSON.parse(readFileSync(path.join(userData, "data", "library.json"), "utf8")) as unknown;
+  } catch {
+    return null;
+  }
 });
 
 app.on("second-instance", () => {
@@ -219,6 +343,9 @@ app.on("window-all-closed", () => app.quit());
 app.on("before-quit", () => void server?.close());
 
 void app.whenReady().then(() => {
+  // A server's pages get no more than the app's own: full screen for videos, copying links. Nothing else.
+  const allowed = new Set(["fullscreen", "clipboard-sanitized-write"]);
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, done) => done(allowed.has(permission)));
   // macOS needs an app menu: without the Edit menu, Cmd+C/V/A don't reach text fields, and Cmd+Q has no home.
   Menu.setApplicationMenu(
     isMac ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null,

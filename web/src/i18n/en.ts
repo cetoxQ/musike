@@ -475,6 +475,16 @@ export const en = {
     phoneKept: "The phone's own library stays as it is, ready for when you switch back.",
     copyLibrary: "Copy this phone's library to the server",
     copying: "Copying",
+    nothingToCopy: "There is no library on this computer yet.",
+    // The desktop app: the same choice, for this computer.
+    computer: {
+      body: "Your library and music on this computer, or on a Musike server: then the app shows the server, with your account, and plays from it.",
+      thisDevice: "This computer",
+      onThisDevice: "The library and the music are on this computer.",
+      deviceKept: "The computer's own library stays as it is, ready for when you switch back.",
+      switchBack: "Back to this computer",
+      copyLibrary: "Copy this computer's library to the server",
+    },
   },
 
   account: {

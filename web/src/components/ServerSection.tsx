@@ -1,7 +1,8 @@
-import { CloudArrowUpIcon, DeviceMobileIcon, HardDrivesIcon, WarningIcon } from "@phosphor-icons/react";
+import { CloudArrowUpIcon, DesktopIcon, DeviceMobileIcon, HardDrivesIcon, WarningIcon } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { useT } from "../i18n";
 import { connection } from "../lib/api";
+import { desktop } from "../lib/desktop";
 import { cn } from "../lib/format";
 import { useAuth } from "../stores/auth";
 import { toast } from "../stores/ui";
@@ -22,9 +23,14 @@ export function InsecureNote({ url }: { url: string }) {
   );
 }
 
-/** Android: the library and the music on this phone, or on a Musike server (switching restarts the app). */
+/** The apps: the library and the music on this phone (computer), or on a Musike server (switching restarts the app). */
 export function ServerSection() {
   const t = useT();
+  // The same choice in the desktop app, about the computer.
+  const words = desktop
+    ? { ...t.server, ...t.server.computer, thisPhone: t.server.computer.thisDevice, onThisPhone: t.server.computer.onThisDevice, phoneKept: t.server.computer.deviceKept }
+    : t.server;
+  const DeviceIcon = desktop ? DesktopIcon : DeviceMobileIcon;
   const signedIn = useAuth((s) => !s.enabled || !!s.user);
   const [choice, setChoice] = useState(connection?.mode ?? "device");
   const [address, setAddress] = useState(connection?.url ?? "");
@@ -52,14 +58,14 @@ export function ServerSection() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="text-xs font-medium text-fg-3">{t.server.title}</h3>
-      <p className="text-sm text-fg-2">{t.server.body}</p>
+      <h3 className="text-xs font-medium text-fg-3">{words.title}</h3>
+      <p className="text-sm text-fg-2">{words.body}</p>
 
-      <div role="radiogroup" aria-label={t.server.title} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
+      <div role="radiogroup" aria-label={words.title} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
         {(
           [
-            ["device", DeviceMobileIcon, t.server.thisPhone],
-            ["server", HardDrivesIcon, t.server.musikeServer],
+            ["device", DeviceIcon, words.thisPhone],
+            ["server", HardDrivesIcon, words.musikeServer],
           ] as const
         ).map(([value, Icon, label]) => (
           <button
@@ -81,12 +87,12 @@ export function ServerSection() {
       <div className="flex flex-col gap-3 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
         {choice === "device" ? (
           c.mode === "device" ? (
-            <p className="text-sm text-fg-2">{t.server.onThisPhone}</p>
+            <p className="text-sm text-fg-2">{words.onThisPhone}</p>
           ) : (
             <>
-              <p className="text-sm text-fg-2">{t.server.phoneKept}</p>
+              <p className="text-sm text-fg-2">{words.phoneKept}</p>
               <button type="button" disabled={!!busy} onClick={() => void run("device", () => c.useDevice())} className={action}>
-                <DeviceMobileIcon size={18} /> {busy === "device" ? t.account.working : t.server.switchBack}
+                <DeviceIcon size={18} /> {busy === "device" ? t.account.working : words.switchBack}
               </button>
             </>
           )
@@ -115,7 +121,7 @@ export function ServerSection() {
                 }
                 className={action}
               >
-                <CloudArrowUpIcon size={18} /> {busy === "copy" ? t.server.copying : t.server.copyLibrary}
+                <CloudArrowUpIcon size={18} /> {busy === "copy" ? t.server.copying : words.copyLibrary}
               </button>
             )}
           </>

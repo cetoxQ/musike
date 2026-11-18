@@ -469,6 +469,15 @@ export const pt: Messages = {
     phoneKept: "A biblioteca do celular continua como está, pronta para quando você voltar.",
     copyLibrary: "Copiar a biblioteca deste celular para o servidor",
     copying: "Copiando",
+    nothingToCopy: "Ainda não há biblioteca neste computador.",
+    computer: {
+      body: "Sua biblioteca e suas músicas neste computador, ou em um servidor Musike: aí o app mostra o servidor, com a sua conta, e toca por ele.",
+      thisDevice: "Este computador",
+      onThisDevice: "A biblioteca e as músicas estão neste computador.",
+      deviceKept: "A biblioteca do computador continua como está, pronta para quando você voltar.",
+      switchBack: "Voltar para este computador",
+      copyLibrary: "Copiar a biblioteca deste computador para o servidor",
+    },
   },
 
   account: {

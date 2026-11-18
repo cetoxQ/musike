@@ -106,6 +106,14 @@
         font-weight: 600;
         cursor: pointer;
       }
+      .buttons {
+        display: flex;
+        gap: 10px;
+      }
+      button.secondary {
+        background: var(--surface);
+        color: var(--fg);
+      }
       @media (prefers-reduced-motion: reduce) {
         .brand rect { animation: none; }
       }
@@ -137,6 +145,7 @@
           of: (got, total) => `${got} of ${total} MB`,
           failed: "Couldn't start: ",
           retry: "Try again",
+          local: "Use this computer",
           names: { "yt-dlp": "yt-dlp (YouTube search)", deno: "Deno (YouTube challenges)", ffmpeg: "FFmpeg (HD video)" },
         },
         "pt-BR": {
@@ -147,6 +156,7 @@
           of: (got, total) => `${got} de ${total} MB`,
           failed: "Não foi possível iniciar: ",
           retry: "Tentar de novo",
+          local: "Usar este computador",
           names: { "yt-dlp": "yt-dlp (busca no YouTube)", deno: "Deno (desafios do YouTube)", ffmpeg: "FFmpeg (vídeo HD)" },
         },
       };
@@ -170,14 +180,25 @@
           .join("");
       };
 
-      window.fail = (message) => {
+      // `server`: a Musike server didn't answer; it can be left for this computer's own library.
+      window.fail = (message, server) => {
         const status = document.getElementById("status");
         status.className = "error";
         status.textContent = t.failed + message;
+        const buttons = document.createElement("div");
+        buttons.className = "buttons";
         const retry = document.createElement("button");
         retry.textContent = t.retry;
         retry.onclick = () => window.musikeDesktop.retry();
-        document.querySelector("main").appendChild(retry);
+        buttons.appendChild(retry);
+        if (server) {
+          const local = document.createElement("button");
+          local.textContent = t.local;
+          local.className = "secondary";
+          local.onclick = () => window.musikeDesktop.connect(null);
+          buttons.appendChild(local);
+        }
+        document.querySelector("main").appendChild(buttons);
       };
     </script>
   </body>

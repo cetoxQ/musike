@@ -102,17 +102,21 @@ export function deviceName(ua = navigator.userAgent, app = isApp()): { name: str
     const model = /Android [\d.]+; ([^;)]+?)(?: Build\/|\))/.exec(ua)?.[1]?.trim();
     return { name: model && model !== "K" ? model : "Android", form };
   }
-  const browser = /Edg\//.test(ua)
-    ? "Edge"
-    : /OPR\//.test(ua)
-      ? "Opera"
-      : /Firefox\//.test(ua)
-        ? "Firefox"
-        : /Chrome\//.test(ua)
-          ? "Chrome"
-          : /Safari\//.test(ua)
-            ? "Safari"
-            : "Browser";
+  // The desktop app (Electron, showing a Musike server's pages): "Musike (Windows)".
+  const browser =
+    "musikeDesktop" in window
+      ? "Musike"
+      : /Edg\//.test(ua)
+        ? "Edge"
+        : /OPR\//.test(ua)
+          ? "Opera"
+          : /Firefox\//.test(ua)
+            ? "Firefox"
+            : /Chrome\//.test(ua)
+              ? "Chrome"
+              : /Safari\//.test(ua)
+                ? "Safari"
+                : "Browser";
   const os = /Android/.test(ua)
     ? "Android"
     : /iPhone|iPad/.test(ua)
