@@ -18,7 +18,7 @@ export interface PublicUser {
 
 export interface UserInfo extends PublicUser {
   createdAt: number;
-  /** Last time any of their devices was used, or null if they never signed in. */
+  /** Last sign-in or use of any of their devices (to the hour), or null if they never signed in. */
   lastSeen: number | null;
 }
 
@@ -92,9 +92,7 @@ export function accounts(db: Db) {
   const USER = "SELECT id, username, role, must_change_password, password_hash, created_at FROM users";
   const byId = q(`${USER} WHERE id = ?`);
   const byName = q(`${USER} WHERE username = ?`);
-  const all = q(`
-    SELECT u.id, u.username, u.role, u.must_change_password, u.created_at, MAX(s.last_seen) AS last_seen
-    FROM users u LEFT JOIN sessions s ON s.user_id = u.id GROUP BY u.id ORDER BY u.username COLLATE NOCASE`);
+  const all = q("SELECT id, username, role, must_change_password, created_at, last_seen FROM users ORDER BY username COLLATE NOCASE");
   const withPassword = q("SELECT COUNT(*) AS n FROM users WHERE password_hash IS NOT NULL");
   const admins = q("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'");
   const insert = q("INSERT INTO users (username, role, password_hash, must_change_password, created_at) VALUES (?, ?, ?, 1, ?)");
@@ -107,6 +105,7 @@ export function accounts(db: Db) {
   const sessionGet = q(`SELECT s.id AS sid, s.last_seen, s.expires_at, u.id, u.username, u.role, u.must_change_password
     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`);
   const sessionTouch = q("UPDATE sessions SET last_seen = ?, expires_at = ? WHERE id = ?");
+  const userSeen = q("UPDATE users SET last_seen = ? WHERE id = ?");
   const sessionDelete = q("DELETE FROM sessions WHERE id = ?");
   const sessionsOfUser = q("DELETE FROM sessions WHERE user_id = ? AND id <> ?");
   const sessionsPrune = q("DELETE FROM sessions WHERE expires_at < ?");
@@ -223,6 +222,7 @@ export function accounts(db: Db) {
       const token = randomBytes(32).toString("base64url");
       const now = Date.now();
       sessionInsert.run(sha256(token), userId, client, userAgent.slice(0, 300), now, now, now + SESSION_MS);
+      userSeen.run(now, userId);
       return token;
     },
 
@@ -236,7 +236,10 @@ export function accounts(db: Db) {
         sessionDelete.run(r.sid);
         return null;
       }
-      if (now - Number(r.last_seen) > TOUCH_MS) sessionTouch.run(now, now + SESSION_MS, r.sid);
+      if (now - Number(r.last_seen) > TOUCH_MS) {
+        sessionTouch.run(now, now + SESSION_MS, r.sid);
+        userSeen.run(now, r.id);
+      }
       return { id: String(r.sid), user: toUser(r) };
     },
 

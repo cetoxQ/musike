@@ -139,6 +139,11 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX sessions_user ON sessions (user_id);
   `,
+  `
+  -- Last use of any of the user's devices, kept on the user: sessions end (sign-out, password change), this stays.
+  ALTER TABLE users ADD COLUMN last_seen INTEGER;
+  UPDATE users SET last_seen = (SELECT MAX(last_seen) FROM sessions WHERE sessions.user_id = users.id);
+  `,
 ];
 
 /** node:sqlite, loaded only when used. Its one-time "experimental feature" warning stays out of the logs. */

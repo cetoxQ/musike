@@ -97,7 +97,9 @@ function UsersAdmin({ me }: { me: number }) {
   };
 
   const seen = (u: UserInfo) =>
-    u.lastSeen ? t.account.lastSeen(new Date(u.lastSeen).toLocaleDateString(t.locale)) : t.account.neverSignedIn;
+    u.lastSeen
+      ? t.account.lastSeen(new Date(u.lastSeen).toLocaleString(t.locale, { dateStyle: "short", timeStyle: "short" }))
+      : t.account.neverSignedIn;
 
   return (
     <div className="flex flex-col gap-3">
