@@ -1,7 +1,7 @@
 import { KeyboardIcon, QueueIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/format";
 import { useT } from "../i18n";
-import { selectCurrent, usePlayer, useStatusText } from "../player/player";
+import { selectShown, selectShownStatus, usePlayer, useStatusText } from "../player/player";
 import { useUi } from "../stores/ui";
 import { ArtistLink } from "./ArtistLink";
 import { DevicesButton, ElsewhereNote } from "./Devices";
@@ -12,10 +12,12 @@ import { IconButton } from "./IconButton";
 
 /** Desktop and tablet player: a floating island under the content. */
 export function PlayerBar() {
-  const track = usePlayer(selectCurrent);
+  // This device's track, or the one playing on the device it controls.
+  const track = usePlayer(selectShown);
+  const elsewhere = usePlayer((s) => !!s.remote);
   const statusText = useStatusText();
   const t = useT();
-  const status = usePlayer((s) => s.status);
+  const status = usePlayer(selectShownStatus);
   const panelOpen = useUi((s) => s.panelOpen || s.drawerOpen);
   const panelTab = useUi((s) => s.panelTab);
   const togglePanel = useUi((s) => s.togglePanel);
@@ -78,7 +80,8 @@ export function PlayerBar() {
           >
             <SidebarSimpleIcon size={18} mirrored />
           </IconButton>
-          <Volume className="max-lg:hidden" />
+          {/* This device's volume: no use while another one plays. */}
+          {!elsewhere && <Volume className="max-lg:hidden" />}
           <IconButton label={t.player.shortcuts} size="sm" onClick={() => setShortcutsOpen(true)} className="max-xl:hidden">
             <KeyboardIcon size={18} />
           </IconButton>

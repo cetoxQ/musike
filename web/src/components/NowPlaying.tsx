@@ -12,10 +12,10 @@ import { createPortal } from "react-dom";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import type { Track } from "../lib/types";
-import { selectCurrent, usePlayer, useStatusText } from "../player/player";
+import { selectOwnQueue, selectShown, selectShownStatus, usePlayer, useStatusText } from "../player/player";
 import { useUi, type PanelTab } from "../stores/ui";
 import { AlbumLink, ArtistLink } from "./ArtistLink";
-import { DevicesButton } from "./Devices";
+import { DevicesButton, ElsewhereNote } from "./Devices";
 import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
@@ -26,11 +26,12 @@ import { SLOT, VideoSlot } from "./Video";
 /** Artwork or the live video, with a soft ambient glow from the cover behind it. */
 function Stage({ track, slot, className }: { track: Track; slot: number; className?: string }) {
   const t = useT();
-  const showsVideo = usePlayer((s) => s.mediaKind === "video");
+  // While controlling another device, this one's video isn't what plays: the picture is.
+  const showsVideo = usePlayer((s) => s.mediaKind === "video" && !s.remote);
   const aspect = usePlayer((s) => s.videoAspect);
   // In Video mode on a song: say we're looking for its clip, or that it has none.
   const note = usePlayer((s) =>
-    s.preferVideo ? (s.videoNote ?? (s.statusText === "findingClip" ? s.statusText : null)) : null,
+    s.preferVideo && !s.remote ? (s.videoNote ?? (s.statusText === "findingClip" ? s.statusText : null)) : null,
   );
   if (showsVideo) {
     const portrait = aspect < 1;
@@ -78,7 +79,7 @@ function Stage({ track, slot, className }: { track: Track; slot: number; classNa
 
 function TrackHeading({ track, large = false }: { track: Track; large?: boolean }) {
   const statusText = useStatusText();
-  const status = usePlayer((s) => s.status);
+  const status = usePlayer(selectShownStatus);
   return (
     <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
@@ -107,9 +108,9 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
 }
 
 function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
-  const track = usePlayer(selectCurrent);
+  const track = usePlayer(selectShown);
   const startRadio = usePlayer((s) => s.startRadio);
-  const queue = usePlayer((s) => s.queue);
+  const queue = usePlayer(selectOwnQueue);
   const index = usePlayer((s) => s.index);
   const t = useT();
 
@@ -248,7 +249,7 @@ export function PanelDrawer() {
 
 /** Full-screen Now Playing for phones. Drag down (or Back) to close. */
 export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const track = usePlayer(selectCurrent);
+  const track = usePlayer(selectShown);
   const reduce = useReducedMotion();
   const drag = useDragControls();
   const [view, setView] = useState<"player" | "queue">("player");
@@ -315,6 +316,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   <ModeSwitch className="justify-center" />
+                  <ElsewhereNote className="justify-center" />
                 </div>
               </div>
             )}

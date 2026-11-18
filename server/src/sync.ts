@@ -7,7 +7,8 @@ import type { Track } from "./types.js";
 
 // Devices of one account, Spotify-style: each open app (browser tab, phone) is a device, the server tells every
 // device what the others are playing, and only one device plays at a time: starting playback on one pauses the
-// others. Devices exist while connected; nothing is stored.
+// others. The others control it: their commands (play, skip, play this album...) are passed on to it, and so is a
+// hand-over, when playback moves to another device with its queue. Devices exist while connected; nothing is stored.
 //
 // A connection starts with a ticket from POST /api/sync/ticket: a browser can't send "Authorization" (or choose its
 // cookies) when it opens a WebSocket, so the session is checked there, over plain HTTP, and the ticket carries it
@@ -20,7 +21,9 @@ const PING_MS = 25_000;
 /** A device has this long to say who it is. */
 const HELLO_MS = 10_000;
 const MAX_DEVICES = 20;
-const MAX_BYTES = 64 * 1024;
+/** A hand-over carries a queue (up to MAX_QUEUE tracks). */
+const MAX_BYTES = 512 * 1024;
+const MAX_QUEUE = 500;
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** Closing codes the apps act on. */
@@ -39,13 +42,26 @@ export const CLOSE = {
 export type DeviceKind = "web" | "app";
 export type DeviceForm = "computer" | "phone";
 
+export type Repeat = "off" | "all" | "one";
+
 export interface PlayState {
   track: Track | null;
   playing: boolean;
   /** Seconds into the track when the device reported it. */
   position: number;
   duration: number;
+  shuffle: boolean;
+  repeat: Repeat;
 }
+
+/** What one device asks another (the one playing, or the one taking over) to do. */
+export type Command =
+  | { action: "play" | "pause" | "next" | "prev" | "shuffle" | "repeat" }
+  | { action: "seek"; position: number }
+  | { action: "playList"; tracks: Track[]; start: number }
+  | { action: "playTrack" | "playNext" | "addToQueue" | "startRadio"; track: Track }
+  | { action: "takeOver"; queue: Track[]; index: number; position: number; shuffle: boolean; repeat: Repeat }
+  | { action: "handOver"; to: string };
 
 /** What every device of an account is told about each device. `age`: milliseconds since its last report. */
 export interface DeviceInfo {
@@ -58,7 +74,8 @@ export interface DeviceInfo {
 
 export type ServerMessage =
   | { type: "devices"; you: string; active: string | null; devices: DeviceInfo[] }
-  | { type: "pause" };
+  | { type: "pause" }
+  | { type: "command"; from: string; command: Command };
 
 interface Device {
   id: string;
@@ -89,18 +106,88 @@ interface Account {
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const seconds = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.min(Math.max(v, 0), 86_400) : 0);
 
+const REPEATS = new Set<unknown>(["off", "all", "one"]);
+const repeatOf = (v: unknown): Repeat => (REPEATS.has(v) ? (v as Repeat) : "off");
+
+function trackOf(v: unknown): Track | null {
+  if (!v) return null;
+  try {
+    return sanitizeTrack(v);
+  } catch {
+    return null;
+  }
+}
+
+/** A list of tracks, without the ones that don't check out. */
+function tracksOf(v: unknown): Track[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .slice(0, MAX_QUEUE)
+    .map(trackOf)
+    .filter((t): t is Track => !!t);
+}
+
+const indexIn = (v: unknown, length: number) => (Number.isInteger(v) ? Math.min(Math.max(v as number, 0), length - 1) : 0);
+
 function playState(v: unknown): PlayState | null {
   if (!v || typeof v !== "object") return null;
   const s = v as Record<string, unknown>;
-  let track: Track | null = null;
-  if (s.track) {
-    try {
-      track = sanitizeTrack(s.track);
-    } catch {
-      return null;
+  const track = trackOf(s.track);
+  if (s.track && !track) return null;
+  return {
+    track,
+    playing: s.playing === true && !!track,
+    position: seconds(s.position),
+    duration: seconds(s.duration),
+    shuffle: s.shuffle === true,
+    repeat: repeatOf(s.repeat),
+  };
+}
+
+/** A command as it may be passed on, or null. */
+function commandOf(v: unknown): Command | null {
+  if (!v || typeof v !== "object") return null;
+  const c = v as Record<string, unknown>;
+  switch (c.action) {
+    case "play":
+    case "pause":
+    case "next":
+    case "prev":
+    case "shuffle":
+    case "repeat":
+      return { action: c.action };
+    case "seek":
+      return { action: "seek", position: seconds(c.position) };
+    case "playList": {
+      const tracks = tracksOf(c.tracks);
+      return tracks.length ? { action: "playList", tracks, start: indexIn(c.start, tracks.length) } : null;
     }
+    case "playTrack":
+    case "playNext":
+    case "addToQueue":
+    case "startRadio": {
+      const track = trackOf(c.track);
+      return track ? { action: c.action, track } : null;
+    }
+    case "takeOver": {
+      const queue = tracksOf(c.queue);
+      if (!queue.length) return null;
+      return {
+        action: "takeOver",
+        queue,
+        index: indexIn(c.index, queue.length),
+        position: seconds(c.position),
+        shuffle: c.shuffle === true,
+        repeat: repeatOf(c.repeat),
+      };
+    }
+    case "handOver": {
+      const to = text(c.to, 64);
+      return DEVICE_ID.test(to) ? { action: "handOver", to } : null;
+    }
+    default:
+      return null;
   }
-  return { track, playing: s.playing === true && !!track, position: seconds(s.position), duration: seconds(s.duration) };
 }
 
 export interface SyncOptions {
@@ -195,6 +282,11 @@ export function syncHub(opts: SyncOptions = {}) {
         me.at = Date.now();
         if (state.playing) startedOn(a, me);
         announce(a);
+      } else if (m.type === "command") {
+        // Only to another device of the same account.
+        const to = a.devices.get(text(m.to, 64));
+        const command = commandOf(m.command);
+        if (to && to !== me && command) send(to, { type: "command", from: me.id, command });
       }
     });
 

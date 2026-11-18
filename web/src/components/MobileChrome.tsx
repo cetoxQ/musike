@@ -3,8 +3,7 @@ import { NavLink, useNavigate } from "react-router";
 import { cn } from "../lib/format";
 import { useT } from "../i18n";
 import { NOW_PLAYING_HASH, paths } from "../lib/routes";
-import { selectCurrent, usePlayer, useStatusText } from "../player/player";
-import { useDevices, useElsewhere } from "../stores/devices";
+import { selectShown, selectShownDuration, selectShownPosition, selectShownStatus, usePlayer, useStatusText } from "../player/player";
 import { Artwork } from "./Artwork";
 import { DevicesButton, ElsewhereNote } from "./Devices";
 import { PlayPauseIcon } from "./Controls";
@@ -56,37 +55,16 @@ export function TabBar() {
 }
 
 export function MiniPlayer() {
-  const track = usePlayer(selectCurrent);
-  const position = usePlayer((s) => s.position);
-  const duration = usePlayer((s) => s.duration);
-  const status = usePlayer((s) => s.status);
+  // This device's track, or the one playing on the device it controls.
+  const track = usePlayer(selectShown);
+  const position = usePlayer(selectShownPosition);
+  const duration = usePlayer(selectShownDuration);
+  const status = usePlayer(selectShownStatus);
   const statusText = useStatusText();
   const toggle = usePlayer((s) => s.toggle);
-  const elsewhere = useElsewhere();
-  const openDevices = useDevices((s) => s.setOpen);
   const t = useT();
   const navigate = useNavigate();
-  if (!track) {
-    // Nothing here, but another device of the account plays: show that.
-    const remote = elsewhere?.state?.track;
-    if (!elsewhere || !remote) return null;
-    return (
-      <div className="fixed inset-x-2 bottom-[calc(72px+env(safe-area-inset-bottom))] z-20">
-        <div className="island p-1! shadow-[0_10px_30px_rgb(0_0_0/0.35)]">
-          <div className="island-core flex h-14 items-center gap-3 pr-1 pl-1.5">
-            <button type="button" onClick={() => openDevices(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-              <Artwork src={remote.thumb} className="size-11 rounded-[10px]" />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{remote.title}</span>
-                <span className="block truncate text-xs text-accent">{t.devices.playingOn(elsewhere.name)}</span>
-              </span>
-            </button>
-            <DevicesButton size="md" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!track) return null;
   const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
   return (

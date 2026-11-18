@@ -19,13 +19,13 @@ import { useT } from "../i18n";
 import { capabilities } from "../lib/api";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
-import { usePlayer } from "../player/player";
+import { selectHasShown, selectShownDuration, selectShownPosition, selectShownStatus, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 import { IconButton, PlayDisc } from "./IconButton";
 import { Slider } from "./Slider";
 
 export function PlayPauseIcon({ size = 22 }: { size?: number }) {
-  const status = usePlayer((s) => s.status);
+  const status = usePlayer(selectShownStatus);
   if (status === "loading") {
     return <span className="block size-[18px] animate-spin rounded-full border-2 border-current border-t-transparent" />;
   }
@@ -36,10 +36,11 @@ export function Transport({ big = false }: { big?: boolean }) {
   const t = useT();
   const p = usePlayer(
     useShallow((s) => ({
-      hasQueue: s.queue.length > 0,
-      status: s.status,
-      shuffle: s.shuffle,
-      repeat: s.repeat,
+      // This device's player, or the device it controls.
+      hasQueue: selectHasShown(s),
+      status: selectShownStatus(s),
+      shuffle: s.remote ? s.remote.shuffle : s.shuffle,
+      repeat: s.remote ? s.remote.repeat : s.repeat,
       toggle: s.toggle,
       prev: s.prev,
       next: s.next,
@@ -94,9 +95,9 @@ export function Transport({ big = false }: { big?: boolean }) {
 
 export function Scrubber({ touch = false, className }: { touch?: boolean; className?: string }) {
   const t = useT();
-  const position = usePlayer((s) => s.position);
-  const duration = usePlayer((s) => s.duration);
-  const buffered = usePlayer((s) => s.buffered);
+  const position = usePlayer(selectShownPosition);
+  const duration = usePlayer(selectShownDuration);
+  const buffered = usePlayer((s) => (s.remote ? 0 : s.buffered));
   const seek = usePlayer((s) => s.seek);
   const [scrub, setScrub] = useState<number | null>(null);
   const shown = scrub ?? position;
@@ -167,8 +168,9 @@ export function ModeSwitch({ className }: { className?: string }) {
   const quality = usePlayer((s) => s.quality);
   const setQuality = usePlayer((s) => s.setQuality);
   const showingVideo = usePlayer((s) => s.mediaKind === "video");
-  // The Android app plays audio only for now.
-  if (!capabilities.video) return null;
+  const elsewhere = usePlayer((s) => !!s.remote);
+  // The Android app plays audio only for now; while controlling another device, its mode is its own.
+  if (!capabilities.video || elsewhere) return null;
 
   const seg = (on: boolean) =>
     cn(

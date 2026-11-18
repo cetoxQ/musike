@@ -524,10 +524,15 @@ export const pt: Messages = {
     title: "Dispositivos",
     thisDevice: "este dispositivo",
     playingOn: (name: string) => `Tocando em ${name}`,
+    pausedOn: (name: string) => `Pausado em ${name}`,
+    playHere: "Tocar neste dispositivo",
+    playOn: (name: string) => `Tocar em ${name}`,
     paused: "Pausado",
     idle: "Parado",
     connecting: "Conectando...",
-    note: "O Musike aberto com a sua conta em outro dispositivo aparece aqui. Um dispositivo toca por vez: tocar algo aqui pausa os outros.",
+    queueTitle: (name: string) => `A fila está em ${name}`,
+    queueBody: "As músicas que você tocar, tocar em seguida ou adicionar à fila vão para lá.",
+    note: "O Musike aberto com a sua conta em outro dispositivo aparece aqui. Um dispositivo toca por vez, e os outros o controlam. Toque em um dispositivo para tocar nele.",
   },
 
   toasts: {

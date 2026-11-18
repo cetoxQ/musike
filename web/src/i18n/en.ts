@@ -530,10 +530,15 @@ export const en = {
     title: "Devices",
     thisDevice: "this device",
     playingOn: (name: string) => `Playing on ${name}`,
+    pausedOn: (name: string) => `Paused on ${name}`,
+    playHere: "Play on this device",
+    playOn: (name: string) => `Play on ${name}`,
     paused: "Paused",
     idle: "Not playing",
     connecting: "Connecting...",
-    note: "Musike open with your account on another device shows up here. One device plays at a time: playing something here pauses the others.",
+    queueTitle: (name: string) => `The queue is on ${name}`,
+    queueBody: "Songs you play, play next or add to the queue go there.",
+    note: "Musike open with your account on another device shows up here. One device plays at a time, and the others control it. Tap a device to play there.",
   },
 
   toasts: {

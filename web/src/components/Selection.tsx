@@ -4,7 +4,7 @@ import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
-import { selectCurrent, usePlayer } from "../player/player";
+import { selectShown, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 import { useRecent } from "../stores/recent";
 import { useUi } from "../stores/ui";
@@ -188,8 +188,9 @@ export function SelectableRow({
   note?: ReactNode;
   trailing?: ReactNode;
 }) {
-  const isCurrent = usePlayer((s) => selectCurrent(s)?.id === track.id);
-  const isPlaying = usePlayer((s) => s.status === "playing" || s.status === "loading");
+  // Also a track playing on the device this one controls.
+  const isCurrent = usePlayer((s) => selectShown(s)?.id === track.id);
+  const isPlaying = usePlayer((s) => s.remote?.playing ?? (s.status === "playing" || s.status === "loading"));
   const isFavorite = useLibrary((s) => s.favorites.some((f) => f.id === track.id));
   const pushRecent = useRecent((s) => s.push);
   const openMenu = useUi((s) => s.openMenu);

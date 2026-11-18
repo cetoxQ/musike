@@ -22,7 +22,7 @@ import { api } from "../lib/api";
 import { shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { SavedYtPlaylist, YtPlaylistPage } from "../lib/types";
-import { usePlayer } from "../player/player";
+import { selectOwnQueue, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 import { useRecent } from "../stores/recent";
 
@@ -38,7 +38,7 @@ export default function YtPlaylist() {
   const page = useRemote<YtPlaylistPage>(`ytPlaylist:${lang}:${id}`, (signal) => api.ytPlaylist(id, signal));
   const playList = usePlayer((s) => s.playList);
   const toggle = usePlayer((s) => s.toggle);
-  const queue = usePlayer((s) => s.queue);
+  const queue = usePlayer(selectOwnQueue);
   const status = usePlayer((s) => s.status);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const inLibrary = useLibrary((s) => s.ytPlaylists.some((p) => p.id === id));

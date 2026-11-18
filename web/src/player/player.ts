@@ -15,7 +15,59 @@ export type Status = "idle" | "loading" | "playing" | "paused" | "error";
 type Kind = "audio" | "video";
 type Quality = "sd" | "hd";
 
+/**
+ * Another device of the account plays, and this one shows it and controls it, Spotify-style (stores/devices.ts
+ * keeps it up to date). The player's buttons and "play" anywhere in the app go there instead.
+ */
+export interface RemoteView {
+  device: string;
+  name: string;
+  track: Track | null;
+  playing: boolean;
+  /** Where the track is now (kept moving while it plays). */
+  position: number;
+  duration: number;
+  shuffle: boolean;
+  repeat: Repeat;
+}
+
+/** What the controlling device sends (see stores/devices.ts). */
+export interface RemoteControl {
+  play(): void;
+  pause(): void;
+  next(): void;
+  prev(): void;
+  seek(seconds: number): void;
+  toggleShuffle(): void;
+  cycleRepeat(): void;
+  playList(tracks: Track[], start: number): void;
+  playTrack(track: Track): void;
+  playNext(track: Track): void;
+  addToQueue(track: Track): void;
+  startRadio(track: Track): void;
+}
+
+let remoteControl: RemoteControl | null = null;
+let localOnly = 0;
+
+/** stores/devices.ts: where commands go while `remote` is set. */
+export function setRemoteControl(control: RemoteControl | null) {
+  remoteControl = control;
+}
+
+/** Runs `fn` on this device's own player, even while it controls another one: for commands from other devices. */
+export function locally<T>(fn: () => T): T {
+  localOnly++;
+  try {
+    return fn();
+  } finally {
+    localOnly--;
+  }
+}
+
 interface PlayerState {
+  /** Set while this device controls another one (see RemoteView). */
+  remote: RemoteView | null;
   queue: Track[];
   /** Queue order before shuffle was turned on, restored when it is turned off. */
   original: Track[] | null;
@@ -61,6 +113,8 @@ interface PlayerState {
   setPreferVideo: (on: boolean) => void;
   setQuality: (q: Quality) => void;
   setAutoRadio: (on: boolean) => void;
+  /** Another device hands its playback over: its queue, from where it was, playing. */
+  takeOver: (queue: Track[], index: number, position: number, shuffle: boolean, repeat: Repeat) => void;
 }
 
 // Media elements live outside React so playback survives any re-render or route change.
@@ -138,6 +192,9 @@ const needsClipLookup = (track: Track, preferVideo: boolean) =>
   preferVideo && track.kind === "song" && !clipFor.has(track.id);
 
 export const usePlayer = create<PlayerState>((set, get) => {
+  /** Where an action goes instead of this device's player: the device being controlled, if any. */
+  const elsewhere = () => (!localOnly && get().remote ? remoteControl : null);
+
   const kindFor = (track: Track): Kind =>
     capabilities.video && get().preferVideo && (track.kind === "video" || !!clipFor.get(track.id)) ? "video" : "audio";
   /** The YouTube id to stream: the song itself, or its music video in Video mode. */
@@ -377,6 +434,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     original: saved.original ?? null,
     index: saved.index ?? 0,
     status: saved.queue?.length ? "paused" : "idle",
+    remote: null,
     statusText: null,
     mediaKind: "audio",
     videoNote: null,
@@ -395,6 +453,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
     playList: (tracks, start = 0) => {
       if (!tracks.length) return;
+      const r = elsewhere();
+      if (r) return r.playList(tracks, start);
       const first = tracks[start] ?? tracks[0];
       if (get().shuffle) {
         const rest = tracks.filter((_, i) => i !== start);
@@ -407,6 +467,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     playTrack: (track) => {
+      const r = elsewhere();
+      if (r) return r.playTrack(track);
       const s = get();
       const at = s.queue.findIndex((t) => t.id === track.id);
       if (at >= 0) return load(at);
@@ -420,6 +482,11 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     playNext: (track) => {
+      const r = elsewhere();
+      if (r) {
+        r.playNext(track);
+        return toast(getT().player.playsNext(track.title));
+      }
       const s = get();
       if (!s.queue.length) return get().playList([track]);
       const insert = s.index + 1;
@@ -431,6 +498,11 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     addToQueue: (track) => {
+      const r = elsewhere();
+      if (r) {
+        r.addToQueue(track);
+        return toast(getT().player.addedToQueue(track.title));
+      }
       const s = get();
       if (!s.queue.length) return get().playList([track]);
       set({ queue: [...s.queue, track], original: s.original ? [...s.original, track] : null });
@@ -465,6 +537,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
     startRadio: async (track) => {
       toast(getT().player.startingRadio(track.title));
+      const r = elsewhere();
+      if (r) return r.startRadio(track);
       try {
         const related = (await api.radio(track.id)).filter((t) => t.id !== track.id);
         const s = get();
@@ -486,6 +560,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     toggle: () => {
+      const r = elsewhere();
+      if (r) return get().remote!.playing ? r.pause() : r.play();
       const s = get();
       const track = s.queue[s.index];
       if (!track) return;
@@ -521,6 +597,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     next: () => {
+      const r = elsewhere();
+      if (r) return r.next();
       const s = get();
       if (s.index < s.queue.length - 1) return load(s.index + 1);
       if (s.repeat === "all" && s.queue.length) return load(0);
@@ -528,12 +606,21 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     prev: () => {
+      const r = elsewhere();
+      if (r) return r.prev();
       const s = get();
       if (s.position > 3 || s.index === 0) return get().seek(0);
       load(s.index - 1);
     },
 
     seek: (seconds) => {
+      const r = elsewhere();
+      if (r) {
+        const remote = get().remote!;
+        const at = Math.max(0, Math.min(seconds, remote.duration || seconds));
+        set({ remote: { ...remote, position: at } });
+        return r.seek(at);
+      }
       const t = Math.max(0, Math.min(seconds, get().duration || seconds));
       set({ position: t });
       const media = activeMedia();
@@ -561,6 +648,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     toggleShuffle: () => {
+      const r = elsewhere();
+      if (r) return r.toggleShuffle();
       const s = get();
       const current = s.queue[s.index];
       if (!s.shuffle) {
@@ -576,6 +665,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     cycleRepeat: () => {
+      const r = elsewhere();
+      if (r) return r.cycleRepeat();
       const order: Repeat[] = ["off", "all", "one"];
       set({ repeat: order[(order.indexOf(get().repeat) + 1) % order.length] });
     },
@@ -592,6 +683,14 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     setAutoRadio: (autoRadio) => set({ autoRadio }),
+
+    takeOver: (queue, index, position, shuffle, repeat) => {
+      if (!queue.length) return;
+      const at = Math.min(Math.max(index, 0), queue.length - 1);
+      // The order comes as the other device had it (shuffled or not); turning shuffle off here keeps it.
+      set({ queue: queue.slice(), original: null, shuffle, repeat });
+      load(at, { startAt: position });
+    },
   };
 });
 
@@ -599,6 +698,16 @@ audio.volume = videoEl.volume = usePlayer.getState().volume;
 audio.muted = videoEl.muted = usePlayer.getState().muted;
 
 export const selectCurrent = (s: PlayerState): Track | null => s.queue[s.index] ?? null;
+
+// What the player shows: this device's playback, or the one of the device it controls (`remote`).
+export const selectShown = (s: PlayerState): Track | null => (s.remote ? s.remote.track : selectCurrent(s));
+export const selectShownStatus = (s: PlayerState): Status => (s.remote ? (s.remote.playing ? "playing" : "paused") : s.status);
+export const selectShownPosition = (s: PlayerState) => (s.remote ? s.remote.position : s.position);
+export const selectShownDuration = (s: PlayerState) => (s.remote ? s.remote.duration : s.duration);
+export const selectHasShown = (s: PlayerState) => (s.remote ? !!s.remote.track : s.queue.length > 0);
+const NO_TRACKS: Track[] = [];
+/** This device's queue; empty while it controls another device (whose queue isn't known here). */
+export const selectOwnQueue = (s: PlayerState) => (s.remote ? NO_TRACKS : s.queue);
 
 /** Whether the track can be shown as video (art tracks are audio with a still image). */
 
@@ -711,7 +820,8 @@ if ("mediaSession" in navigator) {
 
 /** The player's status line in the current language, or null when there is nothing to say. */
 export function useStatusText(): string | null {
-  const note = usePlayer((s) => s.statusText);
+  // This device's loading notes and errors don't describe the device it controls.
+  const note = usePlayer((s) => (s.remote ? null : s.statusText));
   const t = useT();
   if (note === null) return null;
   return typeof note === "string" ? t.player.status[note] : note.error;

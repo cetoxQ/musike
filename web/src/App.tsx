@@ -18,9 +18,9 @@ import { getT } from "./i18n";
 import { capabilities } from "./lib/api";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
-import { usePlayer } from "./player/player";
+import { selectHasShown, usePlayer } from "./player/player";
 import { useAuth } from "./stores/auth";
-import { useDevices, useElsewhere } from "./stores/devices";
+import { useDevices } from "./stores/devices";
 import { useLibrary } from "./stores/library";
 import { useRecent } from "./stores/recent";
 import { openSettings, useSystem } from "./stores/system";
@@ -44,10 +44,8 @@ export default function App() {
   const navigationType = useNavigationType();
   const isMd = useMediaQuery(MD);
   const panelOpen = useUi((s) => s.panelOpen);
-  const hasTrack = usePlayer((s) => s.queue.length > 0);
-  const elsewhere = useElsewhere();
-  // The mini player also shows a track another device plays.
-  const showsPlayer = hasTrack || !!elsewhere;
+  // A track here, or one playing on the device this one controls.
+  const hasTrack = usePlayer(selectHasShown);
   const loadLibrary = useLibrary((s) => s.load);
   const loadSystem = useSystem((s) => s.load);
   const main = useRef<HTMLElement>(null);
@@ -132,7 +130,7 @@ export default function App() {
           ref={main}
           className={cn(
             "scroll-area relative min-w-0 flex-1 overflow-y-auto md:rounded-[20px] md:bg-surface-1 md:ring-1 md:ring-line",
-            showsPlayer ? "pb-[calc(152px+env(safe-area-inset-bottom))]" : "pb-[calc(88px+env(safe-area-inset-bottom))]",
+            hasTrack ? "pb-[calc(152px+env(safe-area-inset-bottom))]" : "pb-[calc(88px+env(safe-area-inset-bottom))]",
             "md:pb-0",
           )}
         >
