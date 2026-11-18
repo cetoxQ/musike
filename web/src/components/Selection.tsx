@@ -1,5 +1,6 @@
 import { CheckIcon, HeartIcon, PlayIcon, PlaylistIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
@@ -153,10 +154,12 @@ export function SelectionBar({
 }
 
 /**
- * A track row you can pick, Spotify-style. With nothing selected there are no checkboxes and tapping the row plays
- * the track. A long press on the artwork picks it, and so does "Select" in the menu that a long press (or right
- * click) anywhere else opens; then the checkboxes show and tapping rows picks more, until nothing is picked again.
- * The artwork always plays on a tap.
+ * A track row you can pick, Spotify-style: with nothing selected, tapping the row plays the track; while picking,
+ * tapping rows picks more. The artwork always plays on a tap.
+ *
+ * With a mouse the checkbox is always there, and a right click picks. On a touch screen there are no checkboxes
+ * until something is picked: a long press on the artwork picks the track, and so does "Select" in the menu that a
+ * long press anywhere else opens; the checkboxes go away again when nothing is picked.
  */
 export function SelectableRow({
   track,
@@ -176,7 +179,7 @@ export function SelectableRow({
   dimmed?: boolean;
   /** Something is selected: taps on the row pick instead of playing. */
   selecting?: boolean;
-  /** Show the checkboxes: while picking, by default; always where the list starts out picked. */
+  /** On a touch screen, show the checkboxes: while picking, by default; always where the list starts out picked. */
   checks?: boolean;
   onToggle: () => void;
   onPlay: () => void;
@@ -191,6 +194,7 @@ export function SelectableRow({
   const pushRecent = useRecent((s) => s.push);
   const openMenu = useUi((s) => s.openMenu);
   const art = useRef<HTMLButtonElement>(null);
+  const touch = useMediaQuery(TOUCH);
   const t = useT();
   const play = () => {
     onPlay();
@@ -201,12 +205,12 @@ export function SelectableRow({
     <div
       onContextMenu={(e) => {
         e.preventDefault();
-        if (pressedOn(art.current, e)) onToggle();
+        if (!touch || pressedOn(art.current, e)) onToggle();
         else openMenu({ track, x: e.clientX, y: e.clientY, select: { selected, toggle: onToggle } });
       }}
       className="group flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-surface-2 md:px-3"
     >
-      {checks && (
+      {(checks || !touch) && (
         <button
           type="button"
           role="checkbox"

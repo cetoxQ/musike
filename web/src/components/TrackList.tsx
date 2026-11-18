@@ -1,5 +1,6 @@
 import { ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { memo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
@@ -22,12 +23,25 @@ interface RowProps {
   /** Lists you can pick tracks from (see TrackList). */
   selectable?: boolean;
   selected?: boolean;
-  /** Something is picked: checkboxes show, and taps pick instead of playing. */
+  /** Something is picked: taps pick instead of playing (and on a touch screen, the checkboxes show). */
   selecting?: boolean;
   onToggle?: () => void;
+  /** A touch screen rather than a mouse (see TrackList). */
+  touch?: boolean;
 }
 
-const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, showAlbum, selectable, selected, selecting, onToggle }: RowProps) {
+const TrackRow = memo(function TrackRow({
+  track,
+  position,
+  onPlay,
+  playlistId,
+  showAlbum,
+  selectable,
+  selected,
+  selecting,
+  onToggle,
+  touch,
+}: RowProps) {
   const isCurrent = usePlayer((s) => selectCurrent(s)?.id === track.id);
   const isPlaying = usePlayer((s) => s.status === "playing" || s.status === "loading");
   const isFavorite = useLibrary((s) => s.favorites.some((t) => t.id === track.id));
@@ -35,7 +49,7 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
   const openMenu = useUi((s) => s.openMenu);
   const art = useRef<HTMLDivElement>(null);
   const t = useT();
-  const checks = !!(selectable && selecting);
+  const checks = !!(selectable && (selecting || !touch));
 
   const menuAt = (e: MouseEvent) => {
     e.preventDefault();
@@ -47,16 +61,16 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
       playlistId,
       x: fromButton ? r.right - 256 : e.clientX,
       y: fromButton ? r.bottom + 6 : e.clientY,
-      select: selectable && onToggle ? { selected: !!selected, toggle: onToggle } : undefined,
+      select: touch && selectable && onToggle ? { selected: !!selected, toggle: onToggle } : undefined,
     });
   };
 
   return (
     <li
       onContextMenu={(e) => {
-        // In a list you can pick from, a long press (or right click) on the artwork picks the track; anywhere else
-        // it opens the menu, which has "Select" too.
-        if (selectable && onToggle && pressedOn(art.current, e)) {
+        // On a touch screen, in a list you can pick from, a long press on the artwork picks the track; anywhere else
+        // it opens the menu, which has "Select" too. A right click always opens the menu.
+        if (touch && selectable && onToggle && pressedOn(art.current, e)) {
           e.preventDefault();
           onToggle();
           return;
@@ -172,9 +186,9 @@ interface ListProps {
   showAlbum?: boolean;
   header?: boolean;
   /**
-   * Tracks can be picked, Spotify-style: with nothing picked there are no checkboxes and tapping a row plays it. A
-   * long press on the artwork picks it, and so does "Select" in the row's menu; then checkboxes show and taps pick,
-   * until nothing is picked again. A selection bar plays, favorites or adds the picked tracks.
+   * Tracks can be picked, Spotify-style: with nothing picked, tapping a row plays it; while picking, taps pick. With a
+   * mouse every row has a checkbox. On a touch screen there are none until something is picked: a long press on the
+   * artwork picks a track, and so does "Select" in the row's menu. A selection bar plays, favorites or adds them.
    */
   selection?: ListSelection;
 }
@@ -185,9 +199,11 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
   const t = useT();
   // Pages ask for the album column where it makes sense; Settings can turn it off everywhere.
   const showAlbum = useAppearance((s) => s.albumColumn) && albumWanted;
+  const touch = useMediaQuery(TOUCH);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const chosen = selection ? tracks.filter((x) => picked.has(x.id)) : [];
   const allSelected = tracks.length > 0 && chosen.length === tracks.length;
+  const checks = !!selection && (chosen.length > 0 || !touch);
   const toggle = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
@@ -212,7 +228,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
         <div
           className={cn(
             "mb-1 hidden items-center gap-3 border-b border-line px-3 pb-2 text-xs font-medium tracking-wide text-fg-3 md:grid",
-            chosen.length > 0
+            checks
               ? showAlbum
                 ? "md:grid-cols-[32px_28px_44px_1fr_auto_auto] lg:grid-cols-[32px_28px_44px_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
                 : "md:grid-cols-[32px_28px_44px_1fr_auto_auto]"
@@ -221,7 +237,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
                 : "md:grid-cols-[28px_44px_1fr_auto_auto]",
           )}
         >
-          {chosen.length > 0 && <span />}
+          {checks && <span />}
           <span className="text-center font-mono">#</span>
           <span />
           <span>{t.trackList.title}</span>
@@ -248,6 +264,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
             selected={picked.has(t.id)}
             selecting={chosen.length > 0}
             onToggle={selection ? () => toggle(t.id) : undefined}
+            touch={touch}
           />
         ))}
       </ul>
