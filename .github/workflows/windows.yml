@@ -1,0 +1,43 @@
+# The Windows installer alone, for this fork: on every push to the "local" branch that touches the app, or by hand
+# (Actions > Windows app > Run workflow). The installer is in the run's artifacts.
+#
+# It is the desktop app as it ships: Musike with its own library on the PC (no accounts, no Musike server, no
+# devices in step). Same app ID as the official app: installing it replaces that one, and keeps its library.
+name: Windows app
+
+on:
+  push:
+    branches: [local]
+    paths: ["web/**", "server/src/**", "desktop/**", "pnpm-lock.yaml", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter musike-desktop dist
+      - name: Summary
+        shell: bash
+        run: |
+          exe=$(ls release/*-Windows.exe)
+          { echo "### Windows"; echo "- $(basename "$exe")"; echo "- commit: ${GITHUB_SHA::7}"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: musike-windows-${{ github.run_number }}
+          path: release/*-Windows.exe
+          if-no-files-found: error
+          retention-days: 14
