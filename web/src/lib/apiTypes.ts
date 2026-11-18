@@ -22,7 +22,35 @@ import type {
  * (lib/api.ts); the Android app does the same work on the phone (native/api.ts). The build picks one.
  */
 
-export type ErrorCode = "tool_missing" | "maybe_outdated" | "bot_check";
+export type ErrorCode = "tool_missing" | "maybe_outdated" | "bot_check" | "auth_required" | "password_change_required";
+
+export type Role = "admin" | "user";
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  role: Role;
+  mustChangePassword: boolean;
+}
+
+/** Accounts on this server: off (everyone shares one library), or on, maybe still waiting for the admin. */
+export interface AuthStatus {
+  enabled: boolean;
+  /** No password set yet: the first visit creates the admin. */
+  setup: boolean;
+  user: AuthUser | null;
+}
+
+export interface UserInfo extends AuthUser {
+  createdAt: number;
+  lastSeen: number | null;
+}
+
+/**
+ * Told when the server says the session ended or a new password is due, wherever that happens (lib/api.ts calls
+ * it, the auth store listens). Here so that both backends share it.
+ */
+export const authEvents: { listener: ((code: "auth_required" | "password_change_required") => void) | null } = { listener: null };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: ErrorCode) {
@@ -126,4 +154,17 @@ export interface MusikeApi {
 
   system(): Promise<SystemInfo>;
   updateYtdlp(channel: Channel): Promise<SystemJob>;
+
+  authStatus(): Promise<AuthStatus>;
+  setup(username: string, password: string): Promise<{ user: AuthUser }>;
+  login(username: string, password: string): Promise<{ user: AuthUser }>;
+  logout(): Promise<void>;
+  changePassword(current: string, password: string): Promise<{ user: AuthUser }>;
+  users(): Promise<UserInfo[]>;
+  /** The new account and its temporary password (shown once). */
+  createUser(username: string, role: Role): Promise<{ user: AuthUser; password: string }>;
+  setUserRole(id: number, role: Role): Promise<{ user: AuthUser }>;
+  /** A new temporary password; the user's devices are signed out. */
+  resetUserPassword(id: number): Promise<{ password: string }>;
+  deleteUser(id: number): Promise<void>;
 }

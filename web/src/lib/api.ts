@@ -1,6 +1,9 @@
 import { getLang, getT } from "../i18n";
 import {
   ApiError,
+  authEvents,
+  type AuthStatus,
+  type AuthUser,
   type Channel,
   type ErrorCode,
   type ImportResult,
@@ -9,6 +12,7 @@ import {
   type SystemInfo,
   type SystemJob,
   type SystemMedia,
+  type UserInfo,
 } from "./apiTypes";
 import type {
   AlbumCard,
@@ -52,7 +56,10 @@ async function request<T>(path: string, init?: RequestInit & { json?: unknown })
     if (rest.signal?.aborted) throw e;
     return {};
   });
-  if (!res.ok) throw new ApiError(res.status, body.error ?? getT().player.httpError(res.status), body.code);
+  if (!res.ok) {
+    if (body.code === "auth_required" || body.code === "password_change_required") authEvents.listener?.(body.code);
+    throw new ApiError(res.status, body.error ?? getT().player.httpError(res.status), body.code);
+  }
   return body as T;
 }
 
@@ -117,6 +124,26 @@ export const api: MusikeApi = {
 
   system: () => request<SystemInfo>("/api/system"),
   updateYtdlp: (channel: Channel) => request<SystemJob>("/api/system/ytdlp", { method: "POST", json: { channel } }),
+
+  // An older server has no accounts: its 404 means "off".
+  authStatus: () =>
+    request<AuthStatus>("/api/auth/status").catch((e) => {
+      if (e instanceof ApiError && e.status === 404) return { enabled: false, setup: false, user: null };
+      throw e;
+    }),
+  setup: (username: string, password: string) =>
+    request<{ user: AuthUser }>("/api/auth/setup", { method: "POST", json: { username, password } }),
+  login: (username: string, password: string) =>
+    request<{ user: AuthUser }>("/api/auth/login", { method: "POST", json: { username, password } }),
+  logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+  changePassword: (current: string, password: string) =>
+    request<{ user: AuthUser }>("/api/auth/password", { method: "POST", json: { current, password } }),
+  users: () => request<{ users: UserInfo[] }>("/api/users").then((r) => r.users),
+  createUser: (username: string, role: "admin" | "user") =>
+    request<{ user: AuthUser; password: string }>("/api/users", { method: "POST", json: { username, role } }),
+  setUserRole: (id: number, role: "admin" | "user") => request<{ user: AuthUser }>(`/api/users/${id}`, { method: "PATCH", json: { role } }),
+  resetUserPassword: (id: number) => request<{ password: string }>(`/api/users/${id}/password`, { method: "POST" }),
+  deleteUser: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
 };
 
 /** What a media element plays for a track: here, the server's stream proxy. The Android backend resolves it on the phone. */
@@ -146,6 +173,7 @@ export async function explainStreamError(url: string): Promise<{ message: string
     const res = await fetch(url, { headers: { Range: "bytes=0-0", [LANG_HEADER]: getLang() } });
     if (res.ok) return { message: t.player.browserCantPlay };
     const body = await res.json().catch(() => ({}));
+    if (body.code === "auth_required" || body.code === "password_change_required") authEvents.listener?.(body.code);
     return { message: body.error ?? t.player.httpError(res.status), code: body.code };
   } catch {
     return { message: t.player.serverDown };

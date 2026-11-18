@@ -4,7 +4,7 @@ import path from "node:path";
 import { startServer } from "./app.js";
 import { config } from "./config.js";
 
-const { port, tools, library } = await startServer();
+const { port, tools, library, accounts } = await startServer();
 
 const lan = Object.values(networkInterfaces())
   .flat()
@@ -18,4 +18,7 @@ console.log(`  yt-dlp:  ${tools.ytdlp ?? "NOT FOUND (install it from Musike's Se
 if (!tools.deno) console.log(`  Deno:    not found (YouTube may fail without it)`);
 if (!tools.ffmpeg) console.log(`  FFmpeg:  not found (HD video unavailable)`);
 console.log(`  Data:    ${path.relative(process.cwd(), config.dataDir) || config.dataDir}`);
-console.log(`  Library: ${library === "sqlite" ? "musike.db (SQLite)" : "library.json"}\n`);
+console.log(`  Library: ${library === "sqlite" ? "musike.db (SQLite)" : "library.json"}`);
+console.log(
+  `  Accounts: ${accounts === "off" ? "off" : accounts === "setup" ? "on, waiting for the admin: open Musike in a browser to choose the password" : "on"}\n`,
+);

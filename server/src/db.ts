@@ -122,6 +122,23 @@ const MIGRATIONS: string[] = [
   CREATE INDEX plays_user_track ON plays (user_id, track_id);
   CREATE INDEX plays_user_time ON plays (user_id, played_at);
   `,
+  `
+  -- Accounts. No password yet: the first admin sets one on the first visit (when accounts are on).
+  ALTER TABLE users ADD COLUMN password_hash TEXT;
+  ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0;
+
+  -- Signed-in devices. id is the SHA-256 of the session token: the token itself is never stored.
+  CREATE TABLE sessions (
+    id         TEXT    PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    client     TEXT    NOT NULL DEFAULT 'web' CHECK (client IN ('web', 'app')),
+    user_agent TEXT    NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    last_seen  INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX sessions_user ON sessions (user_id);
+  `,
 ];
 
 /** node:sqlite, loaded only when used. Its one-time "experimental feature" warning stays out of the logs. */

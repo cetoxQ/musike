@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import fastifyStatic from "@fastify/static";
-import Fastify from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import { accounts, checkPassword, checkUsername, loginThrottle, type PublicUser, type Role, SESSION_DAYS } from "./auth.js";
 import {
   ALBUM_ID,
   album,
@@ -28,6 +29,45 @@ import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
 import { downloadHd, pruneCache, resolveStreams } from "./ytdlp.js";
 
+declare module "fastify" {
+  interface FastifyRequest {
+    /** Who is signed in (accounts on), or null. */
+    user: PublicUser | null;
+    sessionId: string | null;
+  }
+}
+
+const COOKIE = "musike_session";
+
+function readCookie(header: string | undefined, name: string): string {
+  for (const part of (header ?? "").split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0 && part.slice(0, i).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(i + 1).trim());
+      } catch {
+        return "";
+      }
+    }
+  }
+  return "";
+}
+
+/** The session token: "Authorization: Bearer" (apps), or the cookie (the web app). */
+function tokenOf(req: FastifyRequest): string {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) return auth.slice(7).trim();
+  return readCookie(req.headers.cookie, COOKIE);
+}
+
+/** HttpOnly: page scripts can't read it. SameSite=Lax: other sites can't send it with their requests. */
+const sessionCookie = (token: string, secure: boolean, maxAge: number) =>
+  `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+
+/** Routes that work signed out (health: Docker's check), and the ones left while a new password is due. */
+const OPEN = new Set(["/api/health", "/api/auth/status", "/api/auth/login", "/api/auth/setup", "/api/auth/logout"]);
+const WHILE_PASSWORD_DUE = new Set(["/api/auth/status", "/api/auth/password", "/api/auth/logout"]);
+
 function videoId(params: unknown): string {
   const id = (params as { id?: string }).id ?? "";
   if (!VIDEO_ID.test(id)) throw new HttpError(400, msg("invalidVideoId"));
@@ -50,6 +90,8 @@ export interface StartOptions {
 export interface RunningServer {
   port: number;
   tools: Tools;
+  /** Accounts: off, on, or on and waiting for the first admin to set a password. */
+  accounts: "off" | "on" | "setup";
   /** Where the library lives: data/musike.db, or data/library.json. */
   library: "sqlite" | "json";
   close: () => Promise<void>;
@@ -58,9 +100,20 @@ export interface RunningServer {
 /** Builds the Musike HTTP server (API + web app) and starts listening. */
 export async function startServer(opts: StartOptions = {}): Promise<RunningServer> {
   const store = await openServerLibrary();
-  const lib = store.library;
+  if (config.auth && !store.db) {
+    store.close();
+    throw new Error("MUSIKE_AUTH=on needs the library in SQLite (Node 22.13 or later, and not MUSIKE_LIBRARY=json).");
+  }
+  const users = config.auth && store.db ? accounts(store.db) : null;
+  users?.pruneSessions();
+  const throttle = loginThrottle();
+  /** Each signed-in user's own library; the one library when accounts are off. */
+  const libOf = (req: FastifyRequest) => (req.user ? store.forUser(req.user.id) : store.library);
+
   const found = await refreshTools();
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "warn" } });
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "warn" }, trustProxy: config.trustProxy });
+  app.decorateRequest("user", null);
+  app.decorateRequest("sessionId", null);
 
   app.setErrorHandler((err, req, reply) => {
     const e = err as Error & { statusCode?: number };
@@ -71,13 +124,142 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     if (!reply.sent) reply.code(status).send({ error, code: e instanceof HttpError ? e.code : undefined });
   });
 
+  // Accounts (MUSIKE_AUTH=on): every API route needs a session, except OPEN. The web app's files are public:
+  // it shows the sign-in screen itself.
+  if (users) {
+    app.addHook("onRequest", async (req) => {
+      const path = req.url.split("?")[0];
+      if (!path.startsWith("/api/")) return;
+      const s = users.session(tokenOf(req));
+      if (s) {
+        req.user = s.user;
+        req.sessionId = s.id;
+      }
+      if (OPEN.has(path)) return;
+      if (!s) throw new HttpError(401, msg("notSignedIn"), "auth_required");
+      if (s.user.mustChangePassword && !WHILE_PASSWORD_DUE.has(path)) {
+        throw new HttpError(403, msg("passwordChangeRequired"), "password_change_required");
+      }
+    });
+  }
+  const enabled = () => {
+    if (!users) throw new HttpError(404, msg("accountsOff"));
+    return users;
+  };
+  const admin = (req: FastifyRequest): PublicUser => {
+    enabled();
+    if (req.user?.role !== "admin") throw new HttpError(403, msg("adminOnly"));
+    return req.user;
+  };
+  const role = (v: unknown): Role => (v === "admin" ? "admin" : "user");
+  const otherUser = (req: FastifyRequest): number => {
+    const me = admin(req);
+    const id = Number((req.params as { uid?: string }).uid);
+    if (!Number.isInteger(id) || id < 1) throw new HttpError(404, msg("userNotFound"));
+    if (id === me.id) throw new HttpError(400, msg("notYourself"));
+    return id;
+  };
+  const signIn = (req: FastifyRequest, reply: FastifyReply, user: PublicUser, client: "web" | "app") => {
+    const token = enabled().startSession(user.id, client, String(req.headers["user-agent"] ?? ""));
+    if (client === "app") return { user, token };
+    reply.header("set-cookie", sessionCookie(token, req.protocol === "https", SESSION_DAYS * 86_400));
+    return { user };
+  };
+
   app.get("/api/health", async () => ({ ok: true }));
+
+  app.get("/api/auth/status", async (req) =>
+    users ? { enabled: true, setup: users.needsSetup(), user: req.user } : { enabled: false, setup: false, user: null },
+  );
+
+  /** First visit: the admin chooses a username and a password. Works once, while nobody has a password. */
+  app.post("/api/auth/setup", async (req, reply) => {
+    const body = (req.body ?? {}) as { username?: unknown; password?: unknown };
+    const user = await enabled().setup(checkUsername(body.username ?? "admin"), checkPassword(body.password));
+    app.log.warn({ event: "setup", user: user.username, ip: req.ip }, "admin account set up");
+    return signIn(req, reply, user, "web");
+  });
+
+  /** `client: "app"` returns the token (for "Authorization: Bearer") instead of setting the cookie. */
+  app.post("/api/auth/login", async (req, reply) => {
+    const accounts = enabled();
+    const body = (req.body ?? {}) as { username?: unknown; password?: unknown; client?: unknown };
+    const name = typeof body.username === "string" ? body.username.trim().slice(0, 64) : "";
+    const keys = [`user:${name.toLowerCase()}`, `ip:${req.ip}`];
+    const wait = throttle.wait(keys);
+    if (wait) throw new HttpError(429, msg("tooManyAttempts", { seconds: wait }));
+    const user = name && typeof body.password === "string" ? await accounts.login(name, body.password) : null;
+    if (!user) {
+      throttle.fail(keys);
+      // One line per failure, with the address: what fail2ban and the like watch for.
+      app.log.warn({ event: "login_failed", user: name, ip: req.ip }, "login failed");
+      throw new HttpError(401, msg("wrongLogin"));
+    }
+    throttle.succeed(keys);
+    return signIn(req, reply, user, body.client === "app" ? "app" : "web");
+  });
+
+  app.post("/api/auth/logout", async (req, reply) => {
+    if (req.sessionId) users?.endSession(req.sessionId);
+    reply.header("set-cookie", sessionCookie("", req.protocol === "https", 0));
+    return reply.code(204).send();
+  });
+
+  /** Changes your own password (needed after a temporary one) and signs out your other devices. */
+  app.post("/api/auth/password", async (req) => {
+    const accounts = enabled();
+    const me = req.user!;
+    const body = (req.body ?? {}) as { current?: unknown; password?: unknown };
+    const keys = [`password:${me.id}`];
+    const wait = throttle.wait(keys);
+    if (wait) throw new HttpError(429, msg("tooManyAttempts", { seconds: wait }));
+    if (typeof body.current !== "string" || !(await accounts.checkCurrent(me.id, body.current))) {
+      throttle.fail(keys);
+      app.log.warn({ event: "password_change_failed", user: me.username, ip: req.ip }, "wrong current password");
+      throw new HttpError(400, msg("wrongPassword"));
+    }
+    throttle.succeed(keys);
+    const password = checkPassword(body.password);
+    if (password === body.current) throw new HttpError(400, msg("samePassword"));
+    const user = await accounts.changePassword(me.id, password);
+    accounts.endOtherSessions(me.id, req.sessionId!);
+    return { user };
+  });
+
+  // Managing accounts: admins only, and never their own (no locking yourself out).
+
+  app.get("/api/users", async (req) => {
+    admin(req);
+    return { users: enabled().list() };
+  });
+
+  /** A new account and its temporary password, shown once: the user changes it at the first sign-in. */
+  app.post("/api/users", async (req) => {
+    admin(req);
+    const body = (req.body ?? {}) as { username?: unknown; role?: unknown };
+    return enabled().create(checkUsername(body.username), role(body.role));
+  });
+
+  app.patch("/api/users/:uid", async (req) => {
+    const id = otherUser(req);
+    return { user: enabled().setRole(id, role((req.body as { role?: unknown } | null)?.role)) };
+  });
+
+  /** Forgotten password: a new temporary one, and the user's devices are signed out. */
+  app.post("/api/users/:uid/password", async (req) => ({ password: await enabled().reset(otherUser(req)) }));
+
+  /** Deletes the account and its library. */
+  app.delete("/api/users/:uid", async (req, reply) => {
+    enabled().delete(otherUser(req));
+    return reply.code(204).send();
+  });
 
   // System: yt-dlp status and one-click update
 
   app.get("/api/system", (req) => systemInfo(langOf(req)));
 
   app.post("/api/system/ytdlp", async (req) => {
+    if (users) admin(req);
     const { channel } = (req.body ?? {}) as { channel?: string };
     return presentJob(startJob((channel === "nightly" ? "nightly" : "stable") satisfies Channel), langOf(req));
   });
@@ -178,14 +360,14 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   // Library
 
-  app.get("/api/library", () => lib.getLibraryLite());
+  app.get("/api/library", (req) => libOf(req).getLibraryLite());
 
   /** The play log: one artist's tracks (most played first), or all of it (for backups). */
   app.get("/api/plays", async (req) => {
     const { artist, name } = req.query as { artist?: string; name?: string };
-    if (artist === undefined) return { plays: await lib.allPlays() };
+    if (artist === undefined) return { plays: await libOf(req).allPlays() };
     if (!ARTIST_ID.test(artist)) throw new HttpError(400, msg("invalidArtist"));
-    return { plays: await lib.playsFor(artist, String(name ?? "").slice(0, 300)) };
+    return { plays: await libOf(req).playsFor(artist, String(name ?? "").slice(0, 300)) };
   });
 
   /** Restores a backup file exported by any Musike instance. Big libraries need more than the 1 MB default body. */
@@ -196,77 +378,77 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     if (typeof backup.version !== "number" || backup.version > 1) {
       throw new HttpError(400, msg("newerBackup"));
     }
-    return lib.importLibrary(backup.library, body.mode === "replace" ? "replace" : "merge");
+    return libOf(req).importLibrary(backup.library, body.mode === "replace" ? "replace" : "merge");
   });
 
   app.put("/api/favorites/:id", async (req) => {
     const track = library.sanitizeTrack(req.body);
     if (track.id !== videoId(req.params)) throw new HttpError(400, msg("idMismatch"));
-    return { favorites: await lib.addFavorite(track) };
+    return { favorites: await libOf(req).addFavorite(track) };
   });
 
   /** Bulk add, e.g. from the list search. */
   app.post("/api/favorites", async (req) => {
     const { tracks } = (req.body ?? {}) as { tracks?: unknown };
     if (!Array.isArray(tracks)) throw new HttpError(400, msg("tracksRequired"));
-    return { favorites: await lib.addFavorites(tracks.slice(0, 500).map(library.sanitizeTrack)) };
+    return { favorites: await libOf(req).addFavorites(tracks.slice(0, 500).map(library.sanitizeTrack)) };
   });
 
-  app.delete("/api/favorites/:id", async (req) => ({ favorites: await lib.removeFavorite(videoId(req.params)) }));
+  app.delete("/api/favorites/:id", async (req) => ({ favorites: await libOf(req).removeFavorite(videoId(req.params)) }));
 
-  app.post("/api/history", async (req) => ({ history: await lib.pushHistory(library.sanitizeTrack(req.body)) }));
+  app.post("/api/history", async (req) => ({ history: await libOf(req).pushHistory(library.sanitizeTrack(req.body)) }));
 
   /** Artists and albums kept in the library. */
   app.put("/api/library/artists/:aid", async (req) => {
     const saved = library.sanitizeArtist(req.body);
     if (saved.id !== (req.params as { aid: string }).aid) throw new HttpError(400, msg("idMismatch"));
-    return { artists: await lib.saveArtist(saved) };
+    return { artists: await libOf(req).saveArtist(saved) };
   });
 
   app.delete("/api/library/artists/:aid", async (req) => {
     const { aid } = req.params as { aid: string };
     if (!ARTIST_ID.test(aid)) throw new HttpError(400, msg("invalidArtist"));
-    return { artists: await lib.removeArtist(aid) };
+    return { artists: await libOf(req).removeArtist(aid) };
   });
 
   app.put("/api/library/albums/:alid", async (req) => {
     const saved = library.sanitizeAlbum(req.body);
     if (saved.id !== (req.params as { alid: string }).alid) throw new HttpError(400, msg("idMismatch"));
-    return { albums: await lib.saveAlbum(saved) };
+    return { albums: await libOf(req).saveAlbum(saved) };
   });
 
   app.put("/api/library/yt-playlists/:pid", async (req) => {
     const saved = library.sanitizeYtPlaylist(req.body);
     if (saved.id !== (req.params as { pid: string }).pid) throw new HttpError(400, msg("idMismatch"));
-    return { ytPlaylists: await lib.saveYtPlaylist(saved) };
+    return { ytPlaylists: await libOf(req).saveYtPlaylist(saved) };
   });
 
   app.delete("/api/library/yt-playlists/:pid", async (req) => {
     const { pid } = req.params as { pid: string };
     if (!YT_PLAYLIST_ID.test(pid)) throw new HttpError(400, msg("invalidYtPlaylist"));
-    return { ytPlaylists: await lib.removeYtPlaylist(pid) };
+    return { ytPlaylists: await libOf(req).removeYtPlaylist(pid) };
   });
 
   app.delete("/api/library/albums/:alid", async (req) => {
     const { alid } = req.params as { alid: string };
     if (!ALBUM_ID.test(alid)) throw new HttpError(400, msg("invalidAlbum"));
-    return { albums: await lib.removeAlbum(alid) };
+    return { albums: await libOf(req).removeAlbum(alid) };
   });
 
   app.post("/api/playlists", async (req) => {
     const body = (req.body ?? {}) as { name?: unknown; tracks?: unknown };
     const tracks = Array.isArray(body.tracks) ? body.tracks.slice(0, 500).map(library.sanitizeTrack) : [];
-    return lib.createPlaylist(typeof body.name === "string" ? body.name : "", tracks);
+    return libOf(req).createPlaylist(typeof body.name === "string" ? body.name : "", tracks);
   });
 
   app.patch("/api/playlists/:pid", async (req) => {
     const { pid } = req.params as { pid: string };
     const { name } = (req.body ?? {}) as { name?: unknown };
-    return lib.renamePlaylist(pid, typeof name === "string" ? name : "");
+    return libOf(req).renamePlaylist(pid, typeof name === "string" ? name : "");
   });
 
   app.delete("/api/playlists/:pid", async (req, reply) => {
-    await lib.deletePlaylist((req.params as { pid: string }).pid);
+    await libOf(req).deletePlaylist((req.params as { pid: string }).pid);
     return reply.code(204).send();
   });
 
@@ -274,11 +456,11 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   app.post("/api/playlists/:pid/tracks", async (req) => {
     const body = (req.body ?? {}) as { tracks?: unknown };
     const tracks = Array.isArray(body.tracks) ? body.tracks.slice(0, 500).map(library.sanitizeTrack) : library.sanitizeTrack(req.body);
-    return lib.addToPlaylist((req.params as { pid: string }).pid, tracks);
+    return libOf(req).addToPlaylist((req.params as { pid: string }).pid, tracks);
   });
 
   app.delete("/api/playlists/:pid/tracks/:id", async (req) =>
-    lib.removeFromPlaylist((req.params as { pid: string }).pid, videoId(req.params)),
+    libOf(req).removeFromPlaylist((req.params as { pid: string }).pid, videoId(req.params)),
   );
 
   // Web app (production build)
@@ -307,6 +489,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     port,
     tools: found,
     library: store.kind,
+    accounts: !users ? "off" : users.needsSetup() ? "setup" : "on",
     close: async () => {
       await app.close();
       store.close();

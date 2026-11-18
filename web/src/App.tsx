@@ -18,6 +18,7 @@ import { capabilities } from "./lib/api";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
 import { usePlayer } from "./player/player";
+import { useAuth } from "./stores/auth";
 import { useLibrary } from "./stores/library";
 import { openSettings, useSystem } from "./stores/system";
 import { toast, useUi } from "./stores/ui";
@@ -64,6 +65,9 @@ export default function App() {
         return;
       }
       const latest = info.ytdlp.latest[info.ytdlp.channel];
+      const auth = useAuth.getState();
+      // With accounts on, updating yt-dlp is the admin's job: don't nag the others.
+      if (auth.enabled && auth.user?.role !== "admin") return;
       if (info.ytdlp.updateAvailable && latest) {
         try {
           if (sessionStorage.getItem("musike:update-notice") === latest) return;

@@ -32,6 +32,7 @@ Runs as a **Windows**, **macOS** and **Linux** app, as an **Android**, **Android
 - [How it works](#how-it-works)
 - [Installation](#installation)
 - [Moving your library (backup)](#moving-your-library-backup)
+- [Accounts](#accounts)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Configuration](#configuration)
 - [API](#api)
@@ -326,6 +327,23 @@ The file is readable, versioned JSON:
 
 On import the server validates every track (YouTube ID, sizes, `https://` images only), skips invalid entries instead of rejecting the whole file, and refuses backups from newer versions with a clear message.
 
+## Accounts
+
+A Musike server can have accounts (`MUSIKE_AUTH=on`, Docker and the Node server). Everyone then signs in and has their own library: favorites, playlists, history, saved artists, albums and playlists, and play counts.
+
+1. **First visit:** Musike asks for the admin's username and password. Until that's done, anyone who opens Musike can do it, so do it right after turning accounts on. The library you had becomes the admin's.
+2. **New accounts:** in **Settings > Users**, the admin creates an account and gets a temporary password, shown once. The new user changes it at the first sign-in.
+3. **Forgotten password:** the admin resets it in **Settings > Users**: a new temporary password, and that user's devices are signed out. There is no email reset.
+4. **Your password:** **Settings > Account > Change password** signs out your other devices.
+
+Admins can also make other accounts admins, or delete them with their library. Nobody can demote or delete their own account, and there's always at least one admin. Only admins update yt-dlp.
+
+- Sessions last 30 days from the last use. The web app keeps the session in an `HttpOnly` cookie; apps can sign in with `{ "client": "app" }` and send `Authorization: Bearer <token>`.
+- Passwords are stored as scrypt hashes, session tokens as SHA-256 hashes.
+- After 5 wrong passwords in a row for a username or an address, each attempt waits longer (30 seconds, doubling, up to 15 minutes). Every failure is logged at `warn` with the address (`"event":"login_failed"`), for tools like fail2ban.
+- Behind a reverse proxy, set `MUSIKE_TRUST_PROXY` so the addresses in the logs and the limits are the clients', not the proxy's. Outside your home network, use HTTPS: the cookie is marked `Secure` when the request came over HTTPS.
+- Accounts need the library in SQLite. The desktop and Android apps have no accounts: their library is on the device.
+
 ## Keyboard shortcuts
 
 | Key | Action |
@@ -356,6 +374,8 @@ Server environment variables (all optional):
 | `YTDLP_EXTRA_ARGS` | | Extra flags, e.g. `--cookies-from-browser firefox` |
 | `MUSIKE_DIRECT_AUDIO` | | `first`: start audio straight from YouTube's API (about half a second, as on Android), with yt-dlp as the fallback. By default yt-dlp comes first |
 | `MUSIKE_DATA_DIR` | `server/data` (`/data` in Docker) | Where the library lives (`musike.db`) |
+| `MUSIKE_AUTH` | | `on`: [accounts](#accounts), each with its own library |
+| `MUSIKE_TRUST_PROXY` | | Behind a reverse proxy: `true`, or the proxy's addresses or ranges (`172.16.0.0/12`). Client addresses and HTTPS are then read from `X-Forwarded-*` |
 | `MUSIKE_LIBRARY` | automatic | `sqlite`: require the database. `json`: keep `library.json` (what the desktop app does). Unset: SQLite when Node has it (22.13 or later), `library.json` otherwise |
 | `MUSIKE_CACHE_DIR` | `server/cache` (`/cache` in Docker) | Downloaded HD videos |
 | `MUSIKE_CACHE_MAX_MB` | `2048` | Video cache limit (least recently played go first) |
@@ -399,7 +419,17 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `PUT` / `DELETE` | `/api/library/yt-playlists/:pid` | Saves / removes a YouTube Music playlist (a link) in the library |
 | `POST` | `/api/library/import` | Imports a backup (`{ backup, mode: "merge" \| "replace" }`) |
 | `GET` | `/api/system` | yt-dlp, Deno and FFmpeg versions and downloads |
-| `POST` | `/api/system/ytdlp` | Updates or installs yt-dlp (`{ channel: "stable" \| "nightly" }`) |
+| `POST` | `/api/system/ytdlp` | Updates or installs yt-dlp (`{ channel: "stable" \| "nightly" }`); admins only with accounts on |
+| `GET` | `/api/auth/status` | Accounts on or off, whether the admin still has to be set up, and who is signed in |
+| `POST` | `/api/auth/setup` | First visit: the admin's `{ username, password }` (only while nobody has a password) |
+| `POST` | `/api/auth/login` | `{ username, password, client?: "app" }`: sets the session cookie, or returns `{ token }` for apps |
+| `POST` | `/api/auth/logout` | Ends this session |
+| `POST` | `/api/auth/password` | Changes your password (`{ current, password }`) and signs out your other devices |
+| `GET` / `POST` | `/api/users` | Admins: the accounts / creates one (`{ username, role }`, answers its temporary password) |
+| `PATCH` / `DELETE` | `/api/users/:uid` | Admins: changes the role (`{ role }`) / deletes the account and its library |
+| `POST` | `/api/users/:uid/password` | Admins: a new temporary password; the user's devices are signed out |
+
+With accounts on, every route except `/api/health` and `/api/auth/*` needs a session, and answers `401` (`code: "auth_required"`) without one, or `403` (`code: "password_change_required"`) while a temporary password is still in use.
 
 ## Project structure
 
@@ -415,6 +445,7 @@ musike/
 │     ├─ library.ts     the library: rules, backup import, the JSON store (desktop, Android)
 │     ├─ librarySqlite.ts the same library in SQLite (the server)
 │     ├─ db.ts          the database file and its schema migrations
+│     ├─ auth.ts        accounts: passwords, sessions, sign-in limits
 │     ├─ storage.ts     picks the store at startup, moves library.json into the database
 │     ├─ i18n.ts        server messages in each language
 │     ├─ tools.ts       finds yt-dlp, Deno, FFmpeg (Windows registry, winget, PATH)

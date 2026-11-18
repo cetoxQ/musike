@@ -17,6 +17,13 @@ export const config = {
    */
   directAudioFirst: process.env.MUSIKE_DIRECT_AUDIO === "first",
   dataDir: process.env.MUSIKE_DATA_DIR ?? path.join(root, "data"),
+  /** MUSIKE_AUTH=on: accounts. Everyone signs in and has their own library; an admin manages the accounts. */
+  auth: ["on", "true", "1"].includes((process.env.MUSIKE_AUTH ?? "").toLowerCase()),
+  /**
+   * Behind a reverse proxy, which proxies to believe for the client's address (X-Forwarded-For) and for HTTPS:
+   * "true" (any), or addresses and ranges (e.g. "127.0.0.1,172.16.0.0/12"). Unset: none.
+   */
+  trustProxy: trustProxy(process.env.MUSIKE_TRUST_PROXY ?? ""),
   /** Where the library lives: "sqlite" (data/musike.db) or "json" (data/library.json). Unset: SQLite when Node has it. */
   library: (["sqlite", "json"].includes(process.env.MUSIKE_LIBRARY ?? "") ? process.env.MUSIKE_LIBRARY : "auto") as "sqlite" | "json" | "auto",
   cacheDir: process.env.MUSIKE_CACHE_DIR ?? path.join(root, "cache"),
@@ -34,3 +41,9 @@ export const config = {
   /** HTTP for youtubei.js; the platform's own fetch here (the Android app passes its native one). */
   fetch: undefined as typeof fetch | undefined,
 };
+
+function trustProxy(v: string): boolean | string[] {
+  const list = v.split(",").map((s) => s.trim()).filter(Boolean);
+  if (!list.length) return false;
+  return list.length === 1 && list[0] === "true" ? true : list;
+}

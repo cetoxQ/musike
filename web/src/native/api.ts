@@ -52,6 +52,10 @@ async function call<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
 
 const tracks = (list: unknown[]) => list.slice(0, 500).map(library.sanitizeTrack);
 
+async function noAccounts(): Promise<never> {
+  throw new ApiError(400, tr(getLang(), msg("accountsOff")));
+}
+
 const SYSTEM: SystemInfo = {
   ytdlp: { path: "built-in", version: null, channel: "stable", latest: { stable: null, nightly: null }, updateAvailable: false },
   deno: "built-in",
@@ -135,6 +139,18 @@ export const api: MusikeApi = {
   updateYtdlp: async () => {
     throw new ApiError(400, "yt-dlp isn't used on this device.");
   },
+
+  // Accounts are a server thing: the phone's own library has none.
+  authStatus: async () => ({ enabled: false, setup: false, user: null }),
+  setup: noAccounts,
+  login: noAccounts,
+  logout: noAccounts,
+  changePassword: noAccounts,
+  users: noAccounts,
+  createUser: noAccounts,
+  setUserRole: noAccounts,
+  resetUserPassword: noAccounts,
+  deleteUser: noAccounts,
 };
 
 /** On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. */

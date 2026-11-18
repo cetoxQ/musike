@@ -11,8 +11,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LANGUAGES, useI18n, useT, type Lang } from "../i18n";
 import { capabilities, type Channel } from "../lib/api";
 import { cn } from "../lib/format";
+import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
 import { useUi } from "../stores/ui";
+import { AccountSection } from "./AccountSection";
 import { BackupSection } from "./BackupSection";
 import { AccentPicker, LayoutSection } from "./CustomizeSection";
 import { Modal } from "./Modal";
@@ -85,6 +87,8 @@ export function SettingsDialog() {
   const t = useT();
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
+  // With accounts on, only admins update yt-dlp (it changes the server for everyone).
+  const canManage = useAuth((s) => !s.enabled || s.user?.role === "admin");
 
   useEffect(() => {
     if (open) void load();
@@ -125,6 +129,8 @@ export function SettingsDialog() {
     <Modal open={open} onClose={() => setOpen(false)} title={t.settings.title}>
       {/* Side padding keeps outset rings and the scrollbar from clipping the cards' edges. */}
       <div className="scroll-area -mx-2 flex max-h-[70dvh] flex-col gap-5 overflow-y-auto px-2 pb-1">
+
+        <AccountSection />
 
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-medium text-fg-3">{t.settings.appearance}</h3>
@@ -195,6 +201,7 @@ export function SettingsDialog() {
               </div>
             )}
 
+            {canManage && (
             <button
               type="button"
               disabled={running || !info || (missing && !info.canInstall)}
@@ -210,6 +217,7 @@ export function SettingsDialog() {
               )}
               {action}
             </button>
+            )}
 
             {missing && info && !info.canInstall && (
               <p className="text-sm text-danger">

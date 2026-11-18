@@ -2,13 +2,18 @@ import { existsSync } from "node:fs";
 import { readFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { config } from "./config.js";
-import { DEFAULT_USER, openDb } from "./db.js";
+import { type Db, DEFAULT_USER, openDb } from "./db.js";
 import { jsonLibrary, type LibraryStore } from "./library.js";
 import { fileStorage } from "./libraryFile.js";
 import { sqliteLibraries } from "./librarySqlite.js";
 
 export interface ServerLibrary {
+  /** The library of the first user (everyone's, when accounts are off). */
   library: LibraryStore;
+  /** Each user's own library. With library.json there is only one. */
+  forUser: (userId: number) => LibraryStore;
+  /** The database, for accounts. Null with library.json. */
+  db: Db | null;
   /** Where it lives: data/musike.db, or data/library.json. */
   kind: "sqlite" | "json";
   close: () => void;
@@ -22,21 +27,23 @@ export async function openServerLibrary(dir = config.dataDir, want = config.libr
   if (want !== "json") {
     try {
       const db = await openDb(path.join(dir, "musike.db"));
-      const library = sqliteLibraries(db).forUser(DEFAULT_USER);
+      const libraries = sqliteLibraries(db);
+      const library = libraries.forUser(DEFAULT_USER);
       try {
         await importJsonFile(dir, library);
       } catch (e) {
         db.close();
         throw e;
       }
-      return { library, kind: "sqlite", close: () => db.close() };
+      return { library, forUser: libraries.forUser, db, kind: "sqlite", close: () => db.close() };
     } catch (e) {
       const missing = (e as NodeJS.ErrnoException).code === "ERR_UNKNOWN_BUILTIN_MODULE";
       if (want === "sqlite" || !missing) throw e;
       console.warn("  This Node has no SQLite (22.13 or later needed): the library stays in library.json.");
     }
   }
-  return { library: jsonLibrary(fileStorage(dir)), kind: "json", close: () => {} };
+  const library = jsonLibrary(fileStorage(dir));
+  return { library, forUser: () => library, db: null, kind: "json", close: () => {} };
 }
 
 /**

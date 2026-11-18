@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
+import { AuthGate } from "./components/AuthScreens";
 import { desktop } from "./lib/desktop";
 import "./styles.css";
 import "./tv/tv.css";
@@ -19,7 +20,9 @@ installTvMode();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthGate>
+        <App />
+      </AuthGate>
     </BrowserRouter>
   </StrictMode>,
 );
