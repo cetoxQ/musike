@@ -13,6 +13,8 @@ export interface PublicUser {
   id: number;
   username: string;
   role: Role;
+  /** The first admin: always an admin, and other admins can't demote, reset or delete them. */
+  owner: boolean;
   mustChangePassword: boolean;
 }
 
@@ -83,16 +85,17 @@ const toUser = (r: Row): PublicUser => ({
   id: Number(r.id),
   username: String(r.username),
   role: r.role === "admin" ? "admin" : "user",
+  owner: Number(r.owner) === 1,
   mustChangePassword: Number(r.must_change_password) === 1,
 });
 
 /** Users and sessions in the database. */
 export function accounts(db: Db) {
   const q = (sql: string) => db.prepare(sql);
-  const USER = "SELECT id, username, role, must_change_password, password_hash, created_at FROM users";
+  const USER = "SELECT id, username, role, owner, must_change_password, password_hash, created_at FROM users";
   const byId = q(`${USER} WHERE id = ?`);
   const byName = q(`${USER} WHERE username = ?`);
-  const all = q("SELECT id, username, role, must_change_password, created_at, last_seen FROM users ORDER BY username COLLATE NOCASE");
+  const all = q("SELECT id, username, role, owner, must_change_password, created_at, last_seen FROM users ORDER BY owner DESC, username COLLATE NOCASE");
   const withPassword = q("SELECT COUNT(*) AS n FROM users WHERE password_hash IS NOT NULL");
   const admins = q("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'");
   const insert = q("INSERT INTO users (username, role, password_hash, must_change_password, created_at) VALUES (?, ?, ?, 1, ?)");
@@ -102,7 +105,7 @@ export function accounts(db: Db) {
   const remove = q("DELETE FROM users WHERE id = ?");
 
   const sessionInsert = q("INSERT INTO sessions (id, user_id, client, user_agent, created_at, last_seen, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  const sessionGet = q(`SELECT s.id AS sid, s.last_seen, s.expires_at, u.id, u.username, u.role, u.must_change_password
+  const sessionGet = q(`SELECT s.id AS sid, s.last_seen, s.expires_at, u.id, u.username, u.role, u.owner, u.must_change_password
     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`);
   const sessionTouch = q("UPDATE sessions SET last_seen = ?, expires_at = ? WHERE id = ?");
   const userSeen = q("UPDATE users SET last_seen = ? WHERE id = ?");
@@ -143,6 +146,7 @@ export function accounts(db: Db) {
         nameFree(username, id);
         setName.run(username, id);
         setPassword.run(hash, 0, id);
+        db.prepare("UPDATE users SET owner = 1 WHERE id = ?").run(id);
         return toUser(get(id)!);
       });
     },
@@ -186,6 +190,19 @@ export function accounts(db: Db) {
         return Number(insert.run(username, role, hash, Date.now()).lastInsertRowid);
       });
       return { user: toUser(get(id)!), password };
+    },
+
+    /** Throws if this is the owner: only the owner (or the server's command line) changes that account. */
+    guardOwner(id: number) {
+      if (Number(mustGet(id).owner) === 1) throw new HttpError(403, msg("ownerProtected"));
+    },
+
+    /** The command line's reset (any account, the owner too), by username. */
+    async resetByName(username: string): Promise<{ user: PublicUser; password: string }> {
+      const r = byName.get(username.trim()) as Row | undefined;
+      if (!r) throw new HttpError(404, msg("userNotFound"));
+      const user = toUser(r);
+      return { user, password: await this.reset(user.id) };
     },
 
     /** Forgot their password: a temporary one, and every device signed out. */

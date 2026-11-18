@@ -338,6 +338,13 @@ A Musike server can have accounts (`MUSIKE_AUTH=on`, Docker and the Node server)
 
 Admins can also make other accounts admins, or delete them with their library. Nobody can demote or delete their own account, and there's always at least one admin. Only admins update yt-dlp.
 
+The first admin is the **owner**: always an admin, and no other admin can demote, reset or delete that account. If the owner forgets their password, reset it from the server's command line (it prints a temporary password; works for any account):
+
+```bash
+docker compose exec musike node server.mjs reset-password <username>   # Docker
+pnpm --filter @musike/server start reset-password <username>          # Node server
+```
+
 - Sessions last 30 days from the last use. The web app keeps the session in an `HttpOnly` cookie; apps can sign in with `{ "client": "app" }` and send `Authorization: Bearer <token>`.
 - Passwords are stored as scrypt hashes, session tokens as SHA-256 hashes.
 - After 5 wrong passwords in a row for a username or an address, each attempt waits longer (30 seconds, doubling, up to 15 minutes). Every failure is logged at `warn` with the address (`"event":"login_failed"`), for tools like fail2ban.

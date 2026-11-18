@@ -126,10 +126,10 @@ function UsersAdmin({ me }: { me: number }) {
                   u.role === "admin" ? "bg-accent-soft text-accent-text" : "bg-surface-3 text-fg-2",
                 )}
               >
-                {u.role === "admin" ? t.account.admin : t.account.user}
+                {u.owner ? t.account.owner : u.role === "admin" ? t.account.admin : t.account.user}
               </span>
             </div>
-            {u.id !== me && (
+            {u.id !== me && !u.owner && (
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
@@ -225,7 +225,7 @@ export function AccountSection() {
         <div className="flex flex-col gap-3 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
           <p className="text-sm">
             {t.account.signedInAs(user.username)}
-            <span className="text-fg-3"> · {user.role === "admin" ? t.account.admin : t.account.user}</span>
+            <span className="text-fg-3"> · {user.owner ? t.account.owner : user.role === "admin" ? t.account.admin : t.account.user}</span>
           </p>
           {changing ? (
             <PasswordForm

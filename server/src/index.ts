@@ -2,7 +2,31 @@ import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
 import { startServer } from "./app.js";
+import { accounts as accountsOf } from "./auth.js";
 import { config } from "./config.js";
+import { openDb } from "./db.js";
+
+// Command line, next to the running server (e.g. docker compose exec musike node server.mjs reset-password ava):
+// a forgotten password, the owner's included, which no admin can reset from the app.
+if (process.argv[2] === "reset-password") {
+  const username = process.argv[3];
+  if (!username) {
+    console.error("Usage: reset-password <username>");
+    process.exit(2);
+  }
+  const db = await openDb(path.join(config.dataDir, "musike.db"));
+  try {
+    const { user, password } = await accountsOf(db).resetByName(username);
+    console.log(`Temporary password for ${user.username}: ${password}`);
+    console.log("Their devices were signed out; the new password is chosen at the next sign-in.");
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exitCode = 1;
+  } finally {
+    db.close();
+  }
+  process.exit();
+}
 
 const { port, tools, library, accounts } = await startServer();
 

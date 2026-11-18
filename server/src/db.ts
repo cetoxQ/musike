@@ -144,6 +144,12 @@ const MIGRATIONS: string[] = [
   ALTER TABLE users ADD COLUMN last_seen INTEGER;
   UPDATE users SET last_seen = (SELECT MAX(last_seen) FROM sessions WHERE sessions.user_id = users.id);
   `,
+  `
+  -- The owner: the first admin (user 1, who set Musike up and had the library from before accounts). Always an
+  -- admin; other admins can't demote, reset or delete them.
+  ALTER TABLE users ADD COLUMN owner INTEGER NOT NULL DEFAULT 0;
+  UPDATE users SET owner = 1, role = 'admin' WHERE id = 1;
+  `,
 ];
 
 /** node:sqlite, loaded only when used. Its one-time "experimental feature" warning stays out of the logs. */

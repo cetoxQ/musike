@@ -471,6 +471,7 @@ export const en = {
     signOut: "Sign out",
     signedInAs: (name: string) => `Signed in as ${name}`,
     admin: "Admin",
+    owner: "Owner",
     user: "User",
     users: "Users",
     usersBody: "Each account has its own library. New accounts and resets get a temporary password, to change at the first sign-in.",

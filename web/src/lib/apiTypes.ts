@@ -30,6 +30,8 @@ export interface AuthUser {
   id: number;
   username: string;
   role: Role;
+  /** The first admin: other admins can't demote, reset or delete them. */
+  owner: boolean;
   mustChangePassword: boolean;
 }
 

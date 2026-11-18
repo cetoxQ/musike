@@ -465,6 +465,7 @@ export const pt: Messages = {
     signOut: "Sair",
     signedInAs: (name) => `Conectado como ${name}`,
     admin: "Admin",
+    owner: "Proprietário",
     user: "Usuário",
     users: "Usuários",
     usersBody: "Cada conta tem sua própria biblioteca. Contas novas e senhas redefinidas recebem uma senha temporária, que deve ser trocada no primeiro acesso.",

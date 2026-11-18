@@ -157,6 +157,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const id = Number((req.params as { uid?: string }).uid);
     if (!Number.isInteger(id) || id < 1) throw new HttpError(404, msg("userNotFound"));
     if (id === me.id) throw new HttpError(400, msg("notYourself"));
+    enabled().guardOwner(id);
     return id;
   };
   const signIn = (req: FastifyRequest, reply: FastifyReply, user: PublicUser, client: "web" | "app") => {
