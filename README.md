@@ -264,7 +264,7 @@ Or with plain Docker: `docker run -d -p 4180:4180 -v musike-data:/data -v musike
 
 - A new image is published for every release; `docker compose pull && docker compose up -d` updates it. The library stays in the `/data` volume.
 - To back up the database itself, copy `/data` while the container is stopped (with it running, `musike.db-wal` may hold the latest changes). [Export](#moving-your-library-backup) works any time.
-- yt-dlp can also be updated from **Settings** without a new image (until the container is recreated).
+- yt-dlp can also be updated from **Settings** without a new image (until the container is recreated). To always have a channel, set `YTDLP_CHANNEL=nightly` (or `stable`): Musike updates yt-dlp to it at start and once a day, so a recreated container doesn't fall back to the image's version.
 - All the [environment variables](#configuration) work, e.g. `YTDLP_EXTRA_ARGS="--cookies /data/cookies.txt"` for YouTube's bot checks.
 
 > **Run it at home, not on a VPS:** YouTube blocks datacenter IPs ("Sign in to confirm you're not a bot"). A home server uses your residential IP.
@@ -372,6 +372,7 @@ Server environment variables (all optional):
 | `HOST` | `0.0.0.0` | Use `127.0.0.1` to accept only this computer |
 | `YTDLP_PATH` | automatic | Forces a specific yt-dlp executable |
 | `YTDLP_EXTRA_ARGS` | | Extra flags, e.g. `--cookies-from-browser firefox` |
+| `YTDLP_CHANNEL` | | `nightly` or `stable`: keeps yt-dlp on that channel and up to date (at start and once a day). Unset: only Settings changes it |
 | `MUSIKE_DIRECT_AUDIO` | | `first`: start audio straight from YouTube's API (about half a second, as on Android), with yt-dlp as the fallback. By default yt-dlp comes first |
 | `MUSIKE_DATA_DIR` | `server/data` (`/data` in Docker) | Where the library lives (`musike.db`) |
 | `MUSIKE_AUTH` | | `on`: [accounts](#accounts), each with its own library |

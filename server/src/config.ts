@@ -12,6 +12,14 @@ export const config = {
   // Extra yt-dlp flags, e.g. YTDLP_EXTRA_ARGS="--cookies-from-browser firefox"
   ytdlpExtraArgs: (process.env.YTDLP_EXTRA_ARGS ?? "").split(" ").filter(Boolean),
   /**
+   * YTDLP_CHANNEL=stable|nightly: keep yt-dlp on that channel and up to date, at start and once a day (a recreated
+   * container comes back with the image's yt-dlp). Unset: yt-dlp changes only from Settings.
+   */
+  ytdlpChannel: (["stable", "nightly"].includes(process.env.YTDLP_CHANNEL ?? "") ? process.env.YTDLP_CHANNEL : null) as
+    | "stable"
+    | "nightly"
+    | null,
+  /**
    * MUSIKE_DIRECT_AUDIO=first: start audio from YouTube's API directly (in-process, about half a second, the way
    * the Android app plays), and use yt-dlp only when that fails. By default yt-dlp comes first (a few seconds).
    */

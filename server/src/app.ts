@@ -24,7 +24,7 @@ import { findVideoFor, radio, search, suggestions } from "./search.js";
 import { openServerLibrary } from "./storage.js";
 import { proxyStream, serveFile } from "./stream.js";
 import { langOf, msg, tr } from "./i18n.js";
-import { presentJob, startJob, systemInfo, type Channel } from "./system.js";
+import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./system.js";
 import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
 import { downloadHd, pruneCache, resolveStreams } from "./ytdlp.js";
@@ -485,12 +485,14 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   }
 
   pruneCache().catch(() => {});
+  const stopChannel = config.ytdlpChannel ? keepChannel(config.ytdlpChannel) : () => {};
   return {
     port,
     tools: found,
     library: store.kind,
     accounts: !users ? "off" : users.needsSetup() ? "setup" : "on",
     close: async () => {
+      stopChannel();
       await app.close();
       store.close();
     },
