@@ -15,6 +15,7 @@ import { paths } from "../lib/routes";
 import type { ArtistPage, PlayEntry, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
+import { useRecent } from "../stores/recent";
 
 /** Songs shown before "Show more", and after it. */
 const TOP_FEW = 5;
@@ -70,6 +71,12 @@ export default function Artist() {
 
   const data = page.status === "ok" ? page.data : null;
   const tracks = data?.tracks ?? [];
+
+  // Opened: on top of the Search page's Recent list.
+  const pushRecent = useRecent((s) => s.push);
+  useEffect(() => {
+    if (data?.id === id) pushRecent({ kind: "artist", id, name: data.name || name, thumb: state?.art || data.banner });
+  }, [data?.id]);
 
   // Your own plays of this artist, fetched again whenever a new track starts (it may be one of theirs).
   const lastPlayed = useLibrary((s) => s.history[0]?.id);

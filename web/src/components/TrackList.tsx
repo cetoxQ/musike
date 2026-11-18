@@ -6,6 +6,7 @@ import type { Track } from "../lib/types";
 import { selectCurrent, usePlayer } from "../player/player";
 import { useAppearance } from "../stores/appearance";
 import { useLibrary } from "../stores/library";
+import { useRecent } from "../stores/recent";
 import { useUi } from "../stores/ui";
 import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { Artwork } from "./Artwork";
@@ -125,6 +126,7 @@ interface ListProps {
 
 export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true }: ListProps) {
   const playList = usePlayer((s) => s.playList);
+  const pushRecent = useRecent((s) => s.push);
   const t = useT();
   // Pages ask for the album column where it makes sense; Settings can turn it off everywhere.
   const showAlbum = useAppearance((s) => s.albumColumn) && albumWanted;
@@ -157,7 +159,10 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
             position={i}
             playlistId={playlistId}
             showAlbum={showAlbum}
-            onPlay={() => playList(context ?? tracks, i)}
+            onPlay={() => {
+              playList(context ?? tracks, i);
+              pushRecent({ kind: "track", track: tracks[i] });
+            }}
           />
         ))}
       </ul>

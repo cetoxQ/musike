@@ -417,6 +417,18 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   app.post("/api/history", async (req) => ({ history: await libOf(req).pushHistory(library.sanitizeTrack(req.body)) }));
 
+  /** The Search page's "Recent" list: what you searched for, opened or played. */
+  app.get("/api/recent", async (req) => ({ recent: await libOf(req).recent() }));
+
+  app.post("/api/recent", async (req) => ({ recent: await libOf(req).pushRecent(library.sanitizeRecent(req.body)) }));
+
+  app.delete("/api/recent/:kind/:id", async (req) => {
+    const { kind, id } = req.params as { kind: string; id: string };
+    return { recent: await libOf(req).removeRecent(kind.slice(0, 20), id.slice(0, 200)) };
+  });
+
+  app.delete("/api/recent", async (req) => ({ recent: await libOf(req).clearRecent() }));
+
   /** Artists and albums kept in the library. */
   app.put("/api/library/artists/:aid", async (req) => {
     const saved = library.sanitizeArtist(req.body);

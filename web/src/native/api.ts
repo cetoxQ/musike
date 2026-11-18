@@ -132,6 +132,10 @@ const onThePhone: MusikeApi = {
   deletePlaylist: (id) => call(() => lib.deletePlaylist(id)),
   addToPlaylist: (id, t) => call(() => lib.addToPlaylist(id, Array.isArray(t) ? tracks(t) : library.sanitizeTrack(t))),
   removeFromPlaylist: (id, trackId) => call(() => lib.removeFromPlaylist(id, trackId)),
+  recent: (signal) => call(() => lib.recent(), signal),
+  pushRecent: (item) => call(async () => lib.pushRecent(library.sanitizeRecent(item))),
+  removeRecent: (kind, id) => call(() => lib.removeRecent(kind, id)),
+  clearRecent: () => call(() => lib.clearRecent()),
   importLibrary: (backup, mode) =>
     call(async () => {
       const b = (backup ?? {}) as { format?: unknown; version?: unknown; library?: unknown };

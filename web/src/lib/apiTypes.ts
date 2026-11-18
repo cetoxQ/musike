@@ -10,6 +10,9 @@ import type {
   PlayEntry,
   Playlist,
   PlaylistCard,
+  RecentInput,
+  RecentItem,
+  RecentKind,
   SavedAlbum,
   SavedArtist,
   SavedYtPlaylist,
@@ -169,6 +172,11 @@ export interface MusikeApi {
   addToPlaylist(id: string, t: Track | Track[]): Promise<Playlist>;
   removeFromPlaylist(id: string, trackId: string): Promise<Playlist>;
   importLibrary(backup: unknown, mode: "merge" | "replace"): Promise<ImportResult>;
+  /** The Search page's "Recent" list, newest first. */
+  recent(signal?: AbortSignal): Promise<RecentItem[]>;
+  pushRecent(item: RecentInput): Promise<RecentItem[]>;
+  removeRecent(kind: RecentKind, id: string): Promise<RecentItem[]>;
+  clearRecent(): Promise<RecentItem[]>;
 
   system(): Promise<SystemInfo>;
   updateYtdlp(channel: Channel): Promise<SystemJob>;

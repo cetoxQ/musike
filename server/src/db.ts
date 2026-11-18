@@ -157,6 +157,19 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  `
+  -- The Search page's "Recent" list: searches, tracks, artists, albums and playlists, newest first. data is the
+  -- entry as the app gets it (JSON).
+  CREATE TABLE recent (
+    user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    kind    TEXT    NOT NULL CHECK (kind IN ('query', 'track', 'artist', 'album', 'playlist')),
+    id      TEXT    NOT NULL,
+    data    TEXT    NOT NULL,
+    at      INTEGER NOT NULL,
+    PRIMARY KEY (user_id, kind, id)
+  );
+  CREATE INDEX recent_user_at ON recent (user_id, at);
+  `,
 ];
 
 /** node:sqlite, loaded only when used. Its one-time "experimental feature" warning stays out of the logs. */

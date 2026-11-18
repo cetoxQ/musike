@@ -25,6 +25,9 @@ import type {
   PlayEntry,
   Playlist,
   PlaylistCard,
+  RecentInput,
+  RecentItem,
+  RecentKind,
   SavedAlbum,
   SavedArtist,
   SavedYtPlaylist,
@@ -147,6 +150,12 @@ export function httpBackend(opts: HttpBackendOptions) {
       request<Playlist>(`/api/playlists/${id}/tracks`, { method: "POST", json: Array.isArray(t) ? { tracks: t } : t }),
     removeFromPlaylist: (id: string, trackId: string) =>
       request<Playlist>(`/api/playlists/${id}/tracks/${trackId}`, { method: "DELETE" }),
+
+    recent: (signal?: AbortSignal) => request<{ recent: RecentItem[] }>("/api/recent", { signal }).then((r) => r.recent),
+    pushRecent: (item: RecentInput) => request<{ recent: RecentItem[] }>("/api/recent", { method: "POST", json: item }).then((r) => r.recent),
+    removeRecent: (kind: RecentKind, id: string) =>
+      request<{ recent: RecentItem[] }>(`/api/recent/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }).then((r) => r.recent),
+    clearRecent: () => request<{ recent: RecentItem[] }>("/api/recent", { method: "DELETE" }).then((r) => r.recent),
 
     importLibrary: (backup: unknown, mode: "merge" | "replace") =>
       request<ImportResult>("/api/library/import", { method: "POST", json: { backup, mode } }),

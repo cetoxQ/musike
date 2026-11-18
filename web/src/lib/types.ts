@@ -76,6 +76,27 @@ export interface SavedYtPlaylist {
   savedAt: number;
 }
 
+/**
+ * Something you searched for, opened or played, for the Search page's "Recent" list: a search, a track, an artist,
+ * an album or a YouTube Music playlist. Newest first; one entry per thing (opening it again moves it on top).
+ */
+export type RecentItem =
+  | { kind: "query"; id: string; q: string; at: number }
+  | { kind: "track"; id: string; track: Track; at: number }
+  | { kind: "artist"; id: string; name: string; thumb: string; at: number }
+  | { kind: "album"; id: string; title: string; artist: string; artistId?: string; thumb: string; at: number }
+  | { kind: "playlist"; id: string; title: string; author: string; thumb: string; at: number };
+
+/** What the app sends to add one: the server sets the id and the time. */
+export type RecentInput =
+  | { kind: "query"; q: string }
+  | { kind: "track"; track: Track }
+  | { kind: "artist"; id: string; name: string; thumb: string }
+  | { kind: "album"; id: string; title: string; artist: string; artistId?: string; thumb: string }
+  | { kind: "playlist"; id: string; title: string; author: string; thumb: string };
+
+export type RecentKind = RecentItem["kind"];
+
 /** How often a track was played here, and when last. */
 export interface PlayEntry {
   track: Track;

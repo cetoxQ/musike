@@ -8,6 +8,7 @@ import {
   playlistName,
   randomUUID,
   rankPlays,
+  RECENT_LIMIT,
   SAVED_LIMIT,
 } from "./library.js";
 import {
@@ -15,6 +16,7 @@ import {
   type Library,
   type PlayEntry,
   type Playlist,
+  type RecentItem,
   type SavedAlbum,
   type SavedArtist,
   type SavedYtPlaylist,
@@ -223,6 +225,18 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
   const playsClear = run(`DELETE FROM plays WHERE user_id = ?`);
   const toPlay = (r: Row): PlayEntry => ({ track: toTrack(r), count: Number(r.plays), lastPlayed: Number(r.last) });
 
+  // Recent list: one row per entry; a new one gets a new rowid, so entries saved in the same millisecond keep order.
+
+  const recentAll = rows(`SELECT data, at FROM recent WHERE user_id = ? ORDER BY at DESC, rowid DESC`);
+  const recentDelete = run(`DELETE FROM recent WHERE user_id = ? AND kind = ? AND id = ?`);
+  const recentInsert = run(`INSERT INTO recent (user_id, kind, id, data, at) VALUES (?, ?, ?, ?, ?)`);
+  const recentClear = run(`DELETE FROM recent WHERE user_id = ?`);
+  const recentTrim = run(
+    `DELETE FROM recent WHERE user_id = ? AND rowid NOT IN (SELECT rowid FROM recent WHERE user_id = ? ORDER BY at DESC, rowid DESC LIMIT ?)`,
+  );
+  const recentList = (uid: number): RecentItem[] =>
+    recentAll(uid).map((r) => ({ ...(JSON.parse(String(r.data)) as RecentItem), at: Number(r.at) }));
+
   function readLibrary(uid: number): Library {
     return {
       favorites: favorites.list(uid),
@@ -391,6 +405,29 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
             return result;
           });
         },
+
+        recent: () => tx(() => recentList(uid)),
+
+        pushRecent: (item) =>
+          tx(() => {
+            const at = Date.now();
+            recentDelete(uid, item.kind, item.id);
+            recentInsert(uid, item.kind, item.id, JSON.stringify({ ...item, at }), at);
+            recentTrim(uid, uid, RECENT_LIMIT);
+            return recentList(uid);
+          }),
+
+        removeRecent: (kind, id) =>
+          tx(() => {
+            recentDelete(uid, kind, id);
+            return recentList(uid);
+          }),
+
+        clearRecent: () =>
+          tx(() => {
+            recentClear(uid);
+            return recentList(uid);
+          }),
       };
     },
   };

@@ -9,7 +9,7 @@ import {
   ShuffleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { IconButton, PlayDisc } from "../components/IconButton";
@@ -24,6 +24,7 @@ import { paths } from "../lib/routes";
 import type { AlbumPage, SavedAlbum } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
+import { useRecent } from "../stores/recent";
 
 /** An album, its tracks in their original order: play it whole, shuffle it, save it or pick from it. */
 export default function Album() {
@@ -44,6 +45,14 @@ export default function Album() {
 
   const album = page.status === "ok" ? page.data : null;
   const tracks = album?.tracks ?? [];
+
+  // Opened: on top of the Search page's Recent list.
+  const pushRecent = useRecent((s) => s.push);
+  useEffect(() => {
+    if (album?.id === id) {
+      pushRecent({ kind: "album", id, title: album.title, artist: album.artist, artistId: album.artistId ?? undefined, thumb: album.thumb || album.art });
+    }
+  }, [album?.id]);
   const title = album?.title || (location.state as { name?: string } | null)?.name || t.album.fallbackName;
   // The queue holds exactly this album: the big button pauses and resumes instead of starting over.
   const isThisPlaying = tracks.length > 0 && queue.length === tracks.length && queue.every((q, i) => q.id === tracks[i]?.id);

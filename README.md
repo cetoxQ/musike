@@ -426,6 +426,8 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `PUT` / `DELETE` | `/api/favorites/:id` | Favorite / unfavorite |
 | `POST` | `/api/favorites` | Favorite many at once (`{ tracks }`) |
 | `POST` | `/api/history` | Records a played track |
+| `GET` / `POST` / `DELETE` | `/api/recent` | The Search page's "Recent" list / adds an entry (`{ kind: "query", q }`, `{ kind: "track", track }`, or an artist, album or playlist) / clears it |
+| `DELETE` | `/api/recent/:kind/:id` | Removes one entry |
 | `POST` | `/api/playlists` | Creates a playlist |
 | `PATCH` / `DELETE` | `/api/playlists/:pid` | Renames / deletes |
 | `POST` / `DELETE` | `/api/playlists/:pid/tracks[/:id]` | Adds (one track or `{ tracks }`) / removes a track |

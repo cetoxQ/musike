@@ -7,6 +7,8 @@ import {
   type Library,
   type PlayEntry,
   type Playlist,
+  type RecentItem,
+  type RecentKind,
   type SavedAlbum,
   type SavedArtist,
   type SavedYtPlaylist,
@@ -20,6 +22,9 @@ export const HISTORY_LIMIT = 60;
 export const SAVED_LIMIT = 2000;
 /** Tracks remembered in the play log of the JSON library; the least recently played go first. */
 export const PLAYS_LIMIT = 3000;
+/** Entries in the Search page's "Recent" list. */
+export const RECENT_LIMIT = 50;
+export const RECENT_KINDS: readonly RecentKind[] = ["query", "track", "artist", "album", "playlist"];
 
 /**
  * Everything the app does with a library. Two implementations: jsonLibrary below (one JSON document, used by
@@ -56,6 +61,12 @@ export interface LibraryStore {
    * "replace" swaps the whole library for the backup's.
    */
   importLibrary(input: unknown, mode: "merge" | "replace"): Promise<ImportResult>;
+  /** The "Recent" list, newest first (not part of backups). */
+  recent(): Promise<RecentItem[]>;
+  /** On top of the list, stamped now (an entry already there moves). */
+  pushRecent(item: RecentItem): Promise<RecentItem[]>;
+  removeRecent(kind: string, id: string): Promise<RecentItem[]>;
+  clearRecent(): Promise<RecentItem[]>;
 }
 
 /** Where the JSON library is kept: a file on the desktop app, app storage on Android. */
@@ -127,6 +138,41 @@ export function sanitizeYtPlaylist(input: unknown): SavedYtPlaylist {
     art: url(p.art),
     savedAt: time(p.savedAt),
   };
+}
+
+/** A "Recent" entry from the app, validated; its id comes from what it is (a search's id is its lowercase text). */
+export function sanitizeRecent(input: unknown): RecentItem {
+  const r = (input ?? {}) as Record<string, unknown>;
+  const at = Date.now();
+  switch (r.kind) {
+    case "query": {
+      const q = str(r.q, 200).trim();
+      if (!q) break;
+      return { kind: "query", id: q.toLocaleLowerCase(), q, at };
+    }
+    case "track": {
+      const track = sanitizeTrack(r.track);
+      return { kind: "track", id: track.id, track, at };
+    }
+    case "artist": {
+      const a = sanitizeArtist(r);
+      return { kind: "artist", id: a.id, name: a.name, thumb: a.thumb || a.art, at };
+    }
+    case "album": {
+      const a = sanitizeAlbum(r);
+      return { kind: "album", id: a.id, title: a.title, artist: a.artist, artistId: a.artistId, thumb: a.thumb || a.art, at };
+    }
+    case "playlist": {
+      const p = sanitizeYtPlaylist(r);
+      return { kind: "playlist", id: p.id, title: p.title, author: p.author, thumb: p.thumb || p.art, at };
+    }
+  }
+  throw new HttpError(400, msg("invalidRecent"));
+}
+
+/** A recent list with this entry on top (once), at most RECENT_LIMIT long. */
+export function withRecent(list: RecentItem[], item: RecentItem): RecentItem[] {
+  return [item, ...list.filter((x) => x.kind !== item.kind || x.id !== item.id)].slice(0, RECENT_LIMIT);
 }
 
 /** A playlist name as kept: trimmed, at most 80 characters, not empty. */
@@ -298,12 +344,15 @@ export function importLists(lib: Library, incoming: Library, mode: "merge" | "re
 /** The library as one JSON document (the Android and desktop apps). */
 export function jsonLibrary(storage: LibraryStorage): LibraryStore {
   let state: Library | null = null;
+  // Kept in the same document, next to the library (not part of it: backups leave it out).
+  let recent: RecentItem[] = [];
   let writeChain: Promise<void> = Promise.resolve();
 
   async function load(): Promise<Library> {
     if (state) return state;
     const json = await storage.read();
-    const lib = (json ? JSON.parse(json) : {}) as Partial<Library>;
+    const lib = (json ? JSON.parse(json) : {}) as Partial<Library> & { recent?: RecentItem[] };
+    recent = Array.isArray(lib.recent) ? lib.recent : [];
     // Libraries saved by older versions lack the newer lists.
     state = {
       favorites: lib.favorites ?? [],
@@ -319,7 +368,7 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
 
   /** Serialized writes so concurrent requests never interleave. */
   function persist(): Promise<void> {
-    const snapshot = JSON.stringify(state, null, 2);
+    const snapshot = JSON.stringify({ ...state, recent }, null, 2);
     writeChain = writeChain.then(() => storage.write(snapshot));
     return writeChain;
   }
@@ -488,6 +537,32 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
       }
       await persist();
       return result;
+    },
+
+    async recent() {
+      await load();
+      return recent;
+    },
+
+    async pushRecent(item) {
+      await load();
+      recent = withRecent(recent, { ...item, at: Date.now() });
+      await persist();
+      return recent;
+    },
+
+    async removeRecent(kind, id) {
+      await load();
+      recent = recent.filter((x) => x.kind !== kind || x.id !== id);
+      await persist();
+      return recent;
+    },
+
+    async clearRecent() {
+      await load();
+      recent = [];
+      await persist();
+      return recent;
     },
   };
 }

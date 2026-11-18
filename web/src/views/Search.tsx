@@ -17,6 +17,8 @@ import { PlaylistGrid } from "../components/PlaylistTiles";
 import { Artwork } from "../components/Artwork";
 import { GenrePanel } from "../components/GenrePanel";
 import { EmptyState, PageHeader } from "../components/Page";
+import { RecentList } from "../components/RecentList";
+import { useRecent } from "../stores/recent";
 import { TrackList, TrackListSkeleton } from "../components/TrackList";
 import { MD, useMediaQuery } from "../hooks/useMediaQuery";
 import { api } from "../lib/api";
@@ -27,25 +29,6 @@ import type { AlbumCard, ArtistCard, PlaylistCard, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { parseList } from "./BatchSearch";
 
-const RECENT_KEY = "musike:recent-searches";
-
-function readRecent(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as string[];
-  } catch {
-    return [];
-  }
-}
-
-function saveRecent(list: string[]) {
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
-  } catch {
-    /* private mode */
-  }
-}
-
-/** Accepts youtube.com/watch?v=, youtu.be/, music.youtube.com and /shorts/ links. */
 function videoIdFromUrl(text: string): string | null {
   try {
     const url = new URL(text.trim());
@@ -84,7 +67,8 @@ export default function Search() {
   const [state, setState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [error, setError] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [recent, setRecent] = useState(readRecent);
+  const recentCount = useRecent((s) => s.items.length);
+  const pushRecent = useRecent((s) => s.push);
   const [linkTrack, setLinkTrack] = useState<Track | "loading" | "error" | null>(null);
   const [retry, setRetry] = useState(0);
   const [genresOpen, setGenresOpenState] = useState(() => genresOpenMemo);
@@ -146,12 +130,7 @@ export default function Search() {
             ? api.searchPlaylists(q, ctrl.signal).then((list) => show({ playlists: list }))
             : api.search(q, kind, ctrl.signal).then((list) => show({ tracks: list }));
     found
-      .then(() => {
-        setState("ok");
-        const next = [q, ...readRecent().filter((r) => r.toLowerCase() !== q.toLowerCase())].slice(0, 8);
-        saveRecent(next);
-        setRecent(next);
-      })
+      .then(() => setState("ok"))
       .catch((e: Error) => {
         if (e.name === "AbortError") return;
         setError(e.message);
@@ -226,7 +205,10 @@ export default function Search() {
           onSubmit={(e) => {
             e.preventDefault();
             input.current?.blur();
-            if (!linkId) setQuery(text);
+            if (linkId) return;
+            setQuery(text);
+            // A search counts once it's asked for (Enter), not for every pause while typing.
+            if (text.trim()) pushRecent({ kind: "query", q: text.trim() });
           }}
           className="relative"
         >
@@ -413,37 +395,13 @@ export default function Search() {
 
         {!linkId && state === "idle" && (
           <div className="px-2 md:px-3">
-            {recent.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold tracking-tight">{t.search.recent}</h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      saveRecent([]);
-                      setRecent([]);
-                    }}
-                    className="text-sm font-medium text-fg-2 hover:text-fg"
-                  >
-                    {t.search.clearRecent}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {recent.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => {
-                        setText(r);
-                        setQuery(r);
-                      }}
-                      className="h-10 rounded-full bg-surface-2 px-4 text-sm ring-1 ring-line transition-colors hover:bg-surface-3"
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {recentCount > 0 ? (
+              <RecentList
+                onSearch={(r) => {
+                  setText(r);
+                  setQuery(r);
+                }}
+              />
             ) : (
               <EmptyState
                 icon={<MagnifyingGlassIcon size={28} />}

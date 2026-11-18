@@ -9,7 +9,7 @@ import {
   ShuffleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { IconButton, PlayDisc } from "../components/IconButton";
@@ -24,6 +24,7 @@ import { paths } from "../lib/routes";
 import type { SavedYtPlaylist, YtPlaylistPage } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
+import { useRecent } from "../stores/recent";
 
 /**
  * A YouTube Music playlist: play or shuffle it, keep it in the library (a link that follows the playlist),
@@ -46,6 +47,12 @@ export default function YtPlaylist() {
   const [copying, setCopying] = useState(false);
 
   const list = page.status === "ok" ? page.data : null;
+
+  // Opened: on top of the Search page's Recent list.
+  const pushRecent = useRecent((s) => s.push);
+  useEffect(() => {
+    if (list?.id === id) pushRecent({ kind: "playlist", id, title: list.title, author: list.author, thumb: list.thumb || list.art });
+  }, [list?.id]);
   const tracks = list?.tracks ?? [];
   const title = list?.title || (location.state as { name?: string } | null)?.name || t.ytPlaylist.fallbackName;
   // The queue holds exactly this playlist: the big button pauses and resumes instead of starting over.

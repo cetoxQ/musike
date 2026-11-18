@@ -20,6 +20,7 @@ import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
 import { usePlayer } from "./player/player";
 import { useAuth } from "./stores/auth";
 import { useLibrary } from "./stores/library";
+import { useRecent } from "./stores/recent";
 import { openSettings, useSystem } from "./stores/system";
 import { toast, useUi } from "./stores/ui";
 import Album from "./views/Album";
@@ -50,6 +51,7 @@ export default function App() {
 
   useEffect(() => {
     void loadLibrary();
+    void useRecent.getState().load();
   }, [loadLibrary]);
 
   // Check yt-dlp shortly after start and say so once if something needs doing (not on Android: no yt-dlp there).
