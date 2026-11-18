@@ -127,8 +127,9 @@ export function Scrubber({ touch = false, className }: { touch?: boolean; classN
 
 export function Volume({ className }: { className?: string }) {
   const t = useT();
-  const volume = usePlayer((s) => s.volume);
-  const muted = usePlayer((s) => s.muted);
+  // This device's volume, or the one of the device it controls.
+  const volume = usePlayer((s) => s.remote?.volume ?? s.volume);
+  const muted = usePlayer((s) => s.remote?.muted ?? s.muted);
   const setVolume = usePlayer((s) => s.setVolume);
   const toggleMute = usePlayer((s) => s.toggleMute);
   const level = muted ? 0 : volume;
@@ -163,14 +164,14 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
 /** Audio / Video segmented switch. For songs, Video plays the song's music video when YouTube has one. */
 export function ModeSwitch({ className }: { className?: string }) {
   const t = useT();
-  const preferVideo = usePlayer((s) => s.preferVideo);
+  // This device's mode, or the one of the device it controls (which may not play videos: the phone's own library).
+  const preferVideo = usePlayer((s) => s.remote?.preferVideo ?? s.preferVideo);
   const setPreferVideo = usePlayer((s) => s.setPreferVideo);
-  const quality = usePlayer((s) => s.quality);
+  const quality = usePlayer((s) => s.remote?.quality ?? s.quality);
   const setQuality = usePlayer((s) => s.setQuality);
-  const showingVideo = usePlayer((s) => s.mediaKind === "video");
-  const elsewhere = usePlayer((s) => !!s.remote);
-  // The Android app plays audio only for now; while controlling another device, its mode is its own.
-  if (!capabilities.video || elsewhere) return null;
+  const showingVideo = usePlayer((s) => s.remote?.showingVideo ?? s.mediaKind === "video");
+  const canVideo = usePlayer((s) => s.remote?.video ?? capabilities.video);
+  if (!canVideo) return null;
 
   const seg = (on: boolean) =>
     cn(

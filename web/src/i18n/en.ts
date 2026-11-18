@@ -536,8 +536,6 @@ export const en = {
     paused: "Paused",
     idle: "Not playing",
     connecting: "Connecting...",
-    queueTitle: (name: string) => `The queue is on ${name}`,
-    queueBody: "Songs you play, play next or add to the queue go there.",
     note: "Musike open with your account on another device shows up here. One device plays at a time, and the others control it. Tap a device to play there.",
   },
 

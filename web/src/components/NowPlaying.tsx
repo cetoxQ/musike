@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import type { Track } from "../lib/types";
-import { selectOwnQueue, selectShown, selectShownStatus, usePlayer, useStatusText } from "../player/player";
+import { selectShown, selectShownIndex, selectShownQueue, selectShownStatus, usePlayer, useStatusText } from "../player/player";
 import { useUi, type PanelTab } from "../stores/ui";
 import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { DevicesButton, ElsewhereNote } from "./Devices";
@@ -110,8 +110,8 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
 function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
   const track = usePlayer(selectShown);
   const startRadio = usePlayer((s) => s.startRadio);
-  const queue = usePlayer(selectOwnQueue);
-  const index = usePlayer((s) => s.index);
+  const queue = usePlayer(selectShownQueue);
+  const index = usePlayer(selectShownIndex);
   const t = useT();
 
   if (tab === "queue") return <QueueList />;

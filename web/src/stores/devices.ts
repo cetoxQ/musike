@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import { syncAddress } from "../lib/api";
+import { capabilities, syncAddress } from "../lib/api";
 import type { Track } from "../lib/types";
-import { locally, selectCurrent, setRemoteControl, usePlayer, type RemoteControl, type Repeat } from "../player/player";
+import { locally, selectCurrent, setRemoteControl, usePlayer, type Quality, type RemoteControl, type Repeat } from "../player/player";
 import { useAuth } from "./auth";
 
 // Devices of one account, Spotify-style (server/src/sync.ts). Every open Musike (browser tab, phone) tells the
@@ -18,6 +18,15 @@ export interface PlayState {
   duration: number;
   shuffle: boolean;
   repeat: Repeat;
+  volume: number;
+  muted: boolean;
+  video: boolean;
+  preferVideo: boolean;
+  quality: Quality;
+  showingVideo: boolean;
+  autoRadio: boolean;
+  /** Of the current track, in the whole queue. */
+  index: number;
 }
 
 export interface Device {
@@ -36,7 +45,13 @@ export type Command =
   | { action: "playList"; tracks: Track[]; start: number }
   | { action: "playTrack" | "playNext" | "addToQueue" | "startRadio"; track: Track }
   | { action: "takeOver"; queue: Track[]; index: number; position: number; shuffle: boolean; repeat: Repeat }
-  | { action: "handOver"; to: string };
+  | { action: "handOver"; to: string }
+  | { action: "volume"; volume: number }
+  | { action: "mute"; muted: boolean }
+  | { action: "preferVideo" | "autoRadio"; on: boolean }
+  | { action: "quality"; quality: Quality }
+  | { action: "jumpTo" | "removeAt"; index: number; id: string }
+  | { action: "clearUpcoming" };
 
 /** Closing codes from the server (sync.ts CLOSE). */
 const REPLACED = 4001;
@@ -56,10 +71,10 @@ const STALE_MS = 10 * 60_000;
 /** At most this many tracks of a queue travel to another device (around the current one). */
 const MAX_QUEUE = 500;
 
-function windowed(queue: Track[], index: number): { queue: Track[]; index: number } {
-  if (queue.length <= MAX_QUEUE) return { queue, index };
+function windowed(queue: Track[], index: number): { queue: Track[]; index: number; start: number } {
+  if (queue.length <= MAX_QUEUE) return { queue, index, start: 0 };
   const start = Math.max(0, Math.min(index - 50, queue.length - MAX_QUEUE));
-  return { queue: queue.slice(start, start + MAX_QUEUE), index: index - start };
+  return { queue: queue.slice(start, start + MAX_QUEUE), index: index - start, start };
 }
 
 /** One id per tab (sessionStorage): two tabs are two devices, a reload is the same one. */
@@ -123,6 +138,14 @@ function current(): PlayState {
     duration: s.duration || track?.duration || 0,
     shuffle: s.shuffle,
     repeat: s.repeat,
+    volume: s.volume,
+    muted: s.muted,
+    video: capabilities.video,
+    preferVideo: s.preferVideo,
+    quality: s.quality,
+    showingVideo: s.mediaKind === "video",
+    autoRadio: s.autoRadio,
+    index: s.index,
   };
 }
 
@@ -157,8 +180,14 @@ export const useDevices = create<DevicesState>((set, get) => {
   let failures = 0;
   let retry = 0;
   let unsubscribe: (() => void) | null = null;
-  /** The last state sent, to send only what changed (and a seek). */
-  let sent: { id: string | null; playing: boolean; position: number; shuffle: boolean; repeat: Repeat; at: number } | null = null;
+  /** The last state sent, to send only what changed (and a seek): everything but the position, and where that was. */
+  let sent: { key: string; playing: boolean; position: number; at: number } | null = null;
+  /** The last queue sent (it travels on its own, only when it changes). */
+  let sentQueue: { queue: Track[]; start: number } | null = null;
+  /** Other devices' queues. */
+  const queues = new Map<string, { tracks: Track[]; offset: number }>();
+  /** A volume being dragged here: the device's reports, a moment behind, mustn't pull the slider back. */
+  let volumeHeld: { volume: number; until: number } | null = null;
   /** The device this one controls, and what it last said. */
   let target: Device | null = null;
   let ticker = 0;
@@ -169,22 +198,26 @@ export const useDevices = create<DevicesState>((set, get) => {
   };
   const send = (to: string, command: Command) => post({ type: "command", to, command });
 
+  const keyOf = (state: PlayState) => JSON.stringify({ ...state, track: state.track?.id ?? null, position: 0 });
+
   const report = (force = false) => {
     const state = current();
     const now = Date.now();
-    const id = state.track?.id ?? null;
+    const key = keyOf(state);
     if (!force && sent) {
       const expected = sent.playing ? sent.position + (now - sent.at) / 1000 : sent.position;
-      const same =
-        sent.id === id &&
-        sent.playing === state.playing &&
-        sent.shuffle === state.shuffle &&
-        sent.repeat === state.repeat &&
-        Math.abs(state.position - expected) < 2;
-      if (same) return;
+      if (sent.key === key && Math.abs(state.position - expected) < 2) return;
     }
-    sent = { id, playing: state.playing, position: state.position, shuffle: state.shuffle, repeat: state.repeat, at: now };
+    sent = { key, playing: state.playing, position: state.position, at: now };
     post({ type: "state", state });
+  };
+
+  const reportQueue = (force = false) => {
+    const s = usePlayer.getState();
+    const w = windowed(s.queue, s.index);
+    if (!force && sentQueue && sentQueue.queue === s.queue && sentQueue.start === w.start) return;
+    sentQueue = { queue: s.queue, start: w.start };
+    post({ type: "queue", queue: w.queue, offset: w.start });
   };
 
   // ---- Controlling another device -------------------------------------------------------------------------------
@@ -198,6 +231,12 @@ export const useDevices = create<DevicesState>((set, get) => {
       setRemoteControl(null);
       return;
     }
+    const known = queues.get(target.id);
+    const queue = known?.tracks.length ? known.tracks : [s.track];
+    // Where its track is in what travelled (by id, should the queue be a moment behind).
+    let index = known ? s.index - known.offset : 0;
+    if (queue[index]?.id !== s.track.id) index = Math.max(0, queue.findIndex((t) => t.id === s.track!.id));
+    const held = volumeHeld && volumeHeld.until > Date.now() ? volumeHeld.volume : null;
     const view = () => ({
       device: target!.id,
       name: target!.name,
@@ -207,6 +246,15 @@ export const useDevices = create<DevicesState>((set, get) => {
       duration: s.duration,
       shuffle: s.shuffle,
       repeat: s.repeat,
+      volume: held ?? s.volume,
+      muted: held === null ? s.muted : held === 0,
+      video: s.video,
+      preferVideo: s.preferVideo,
+      quality: s.quality,
+      showingVideo: s.showingVideo,
+      autoRadio: s.autoRadio,
+      queue,
+      index,
     });
     usePlayer.setState({ remote: view() });
     setRemoteControl(control);
@@ -258,7 +306,48 @@ export const useDevices = create<DevicesState>((set, get) => {
     playNext: (track) => toTarget({ action: "playNext", track }),
     addToQueue: (track) => toTarget({ action: "addToQueue", track }),
     startRadio: (track) => toTarget({ action: "startRadio", track }),
+    setVolume: (volume) => {
+      volumeHeld = { volume, until: Date.now() + 1500 };
+      assume({ volume, muted: volume === 0 });
+      toTarget({ action: "volume", volume });
+    },
+    toggleMute: () => {
+      const muted = !target?.state?.muted;
+      volumeHeld = null;
+      assume({ muted });
+      toTarget({ action: "mute", muted });
+    },
+    setPreferVideo: (on) => {
+      assume({ preferVideo: on });
+      toTarget({ action: "preferVideo", on });
+    },
+    setQuality: (quality) => {
+      assume({ quality });
+      toTarget({ action: "quality", quality });
+    },
+    jumpTo: (i) => queueAction("jumpTo", i),
+    removeAt: (i) => {
+      queueAction("removeAt", i);
+      // Gone at once here; the device's new queue follows.
+      const known = target && queues.get(target.id);
+      if (known && target) {
+        queues.set(target.id, { ...known, tracks: known.tracks.filter((_, k) => k !== i) });
+        show();
+      }
+    },
+    clearUpcoming: () => toTarget({ action: "clearUpcoming" }),
+    setAutoRadio: (on) => {
+      assume({ autoRadio: on });
+      toTarget({ action: "autoRadio", on });
+    },
   };
+
+  /** A track of the controlled device's queue, as shown here (by position there, and id should it have moved). */
+  function queueAction(action: "jumpTo" | "removeAt", i: number) {
+    const known = target && queues.get(target.id);
+    const track = known?.tracks[i];
+    if (known && track) toTarget({ action, index: known.offset + i, id: track.id });
+  }
 
   // ---- Being controlled ----------------------------------------------------------------------------------------
 
@@ -318,6 +407,31 @@ export const useDevices = create<DevicesState>((set, get) => {
         case "handOver":
           handOver(c.to);
           break;
+        case "volume":
+          p.setVolume(c.volume);
+          break;
+        case "mute":
+          if (p.muted !== c.muted) p.toggleMute();
+          break;
+        case "preferVideo":
+          p.setPreferVideo(c.on);
+          break;
+        case "quality":
+          p.setQuality(c.quality);
+          break;
+        case "autoRadio":
+          p.setAutoRadio(c.on);
+          break;
+        case "jumpTo":
+        case "removeAt": {
+          // By position, unless the queue changed meanwhile: then by id.
+          const i = p.queue[c.index]?.id === c.id ? c.index : p.queue.findIndex((t) => t.id === c.id);
+          if (i >= 0) (c.action === "jumpTo" ? p.jumpTo : p.removeAt)(i);
+          break;
+        }
+        case "clearUpcoming":
+          p.clearUpcoming();
+          break;
       }
     });
 
@@ -333,6 +447,8 @@ export const useDevices = create<DevicesState>((set, get) => {
 
   const forget = () => {
     target = null;
+    queues.clear();
+    sentQueue = null;
     show();
   };
 
@@ -366,8 +482,9 @@ export const useDevices = create<DevicesState>((set, get) => {
     ws.onopen = () => {
       failures = 0;
       const state = current();
-      sent = { id: state.track?.id ?? null, playing: state.playing, position: state.position, shuffle: state.shuffle, repeat: state.repeat, at: Date.now() };
+      sent = { key: keyOf(state), playing: state.playing, position: state.position, at: Date.now() };
       ws.send(JSON.stringify({ type: "hello", id: me, name, kind: isApp() ? "app" : "web", form, state }));
+      reportQueue(true);
     };
     ws.onmessage = (e) => {
       let m: {
@@ -375,6 +492,9 @@ export const useDevices = create<DevicesState>((set, get) => {
         active?: string | null;
         devices?: (Omit<Device, "state"> & { state: (PlayState & { age: number }) | null })[];
         command?: Command;
+        device?: string;
+        queue?: Track[];
+        offset?: number;
       };
       try {
         m = JSON.parse(String(e.data));
@@ -388,21 +508,17 @@ export const useDevices = create<DevicesState>((set, get) => {
           name: d.name,
           kind: d.kind,
           form: d.form,
-          state: d.state && {
-            track: d.state.track,
-            playing: d.state.playing,
-            position: d.state.position,
-            duration: d.state.duration,
-            shuffle: d.state.shuffle,
-            repeat: d.state.repeat,
-            at: now - d.state.age,
-          },
+          state: d.state && (({ age, ...rest }) => ({ ...rest, at: now - age }))(d.state),
         }));
         const active = m.active ?? null;
         set({ status: "on", active, devices });
+        for (const id of queues.keys()) if (!devices.some((d) => d.id === id)) queues.delete(id);
         // Another device is the active one: this one shows it and controls it.
         target = (active !== me && devices.find((d) => d.id === active)) || null;
         stillFresh();
+      } else if (m.type === "queue" && m.device && Array.isArray(m.queue)) {
+        queues.set(m.device, { tracks: m.queue, offset: m.offset ?? 0 });
+        if (target?.id === m.device) show();
       } else if (m.type === "pause") {
         usePlayer.getState().pause();
       } else if (m.type === "command" && m.command) {
@@ -459,13 +575,20 @@ export const useDevices = create<DevicesState>((set, get) => {
       wanted = true;
       failures = 0;
       unsubscribe = usePlayer.subscribe((s, prev) => {
+        if (s.queue !== prev.queue || s.index !== prev.index) reportQueue();
         if (
           s.index !== prev.index ||
           s.queue !== prev.queue ||
           s.status !== prev.status ||
           s.position !== prev.position ||
           s.shuffle !== prev.shuffle ||
-          s.repeat !== prev.repeat
+          s.repeat !== prev.repeat ||
+          s.volume !== prev.volume ||
+          s.muted !== prev.muted ||
+          s.preferVideo !== prev.preferVideo ||
+          s.quality !== prev.quality ||
+          s.mediaKind !== prev.mediaKind ||
+          s.autoRadio !== prev.autoRadio
         ) {
           report();
         }

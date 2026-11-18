@@ -14,7 +14,6 @@ import { IconButton } from "./IconButton";
 export function PlayerBar() {
   // This device's track, or the one playing on the device it controls.
   const track = usePlayer(selectShown);
-  const elsewhere = usePlayer((s) => !!s.remote);
   const statusText = useStatusText();
   const t = useT();
   const status = usePlayer(selectShownStatus);
@@ -80,8 +79,7 @@ export function PlayerBar() {
           >
             <SidebarSimpleIcon size={18} mirrored />
           </IconButton>
-          {/* This device's volume: no use while another one plays. */}
-          {!elsewhere && <Volume className="max-lg:hidden" />}
+          <Volume className="max-lg:hidden" />
           <IconButton label={t.player.shortcuts} size="sm" onClick={() => setShortcutsOpen(true)} className="max-xl:hidden">
             <KeyboardIcon size={18} />
           </IconButton>

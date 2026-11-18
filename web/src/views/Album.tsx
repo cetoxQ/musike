@@ -22,7 +22,7 @@ import { api } from "../lib/api";
 import { shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { AlbumPage, SavedAlbum } from "../lib/types";
-import { selectOwnQueue, usePlayer } from "../player/player";
+import { selectShownQueue, selectShownStatus, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 import { useRecent } from "../stores/recent";
 
@@ -35,8 +35,8 @@ export default function Album() {
   const page = useRemote<AlbumPage>(`album:${lang}:${id}`, (signal) => api.album(id, signal));
   const playList = usePlayer((s) => s.playList);
   const toggle = usePlayer((s) => s.toggle);
-  const queue = usePlayer(selectOwnQueue);
-  const status = usePlayer((s) => s.status);
+  const queue = usePlayer(selectShownQueue);
+  const status = usePlayer(selectShownStatus);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const inLibrary = useLibrary((s) => s.albums.some((a) => a.id === id));
   const toggleAlbum = useLibrary((s) => s.toggleAlbum);

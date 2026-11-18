@@ -44,6 +44,8 @@ export type DeviceForm = "computer" | "phone";
 
 export type Repeat = "off" | "all" | "one";
 
+export type Quality = "sd" | "hd";
+
 export interface PlayState {
   track: Track | null;
   playing: boolean;
@@ -52,6 +54,22 @@ export interface PlayState {
   duration: number;
   shuffle: boolean;
   repeat: Repeat;
+  volume: number;
+  muted: boolean;
+  /** The device can play videos; and its Audio/Video choice. */
+  video: boolean;
+  preferVideo: boolean;
+  quality: Quality;
+  showingVideo: boolean;
+  autoRadio: boolean;
+  /** Position of the current track in the device's whole queue. */
+  index: number;
+}
+
+/** A device's queue (up to MAX_QUEUE tracks around the current one); `offset`: where it starts in the whole queue. */
+export interface QueueWindow {
+  tracks: Track[];
+  offset: number;
 }
 
 /** What one device asks another (the one playing, or the one taking over) to do. */
@@ -61,7 +79,13 @@ export type Command =
   | { action: "playList"; tracks: Track[]; start: number }
   | { action: "playTrack" | "playNext" | "addToQueue" | "startRadio"; track: Track }
   | { action: "takeOver"; queue: Track[]; index: number; position: number; shuffle: boolean; repeat: Repeat }
-  | { action: "handOver"; to: string };
+  | { action: "handOver"; to: string }
+  | { action: "volume"; volume: number }
+  | { action: "mute"; muted: boolean }
+  | { action: "preferVideo" | "autoRadio"; on: boolean }
+  | { action: "quality"; quality: Quality }
+  | { action: "jumpTo" | "removeAt"; index: number; id: string }
+  | { action: "clearUpcoming" };
 
 /** What every device of an account is told about each device. `age`: milliseconds since its last report. */
 export interface DeviceInfo {
@@ -75,7 +99,8 @@ export interface DeviceInfo {
 export type ServerMessage =
   | { type: "devices"; you: string; active: string | null; devices: DeviceInfo[] }
   | { type: "pause" }
-  | { type: "command"; from: string; command: Command };
+  | { type: "command"; from: string; command: Command }
+  | { type: "queue"; device: string; queue: Track[]; offset: number };
 
 interface Device {
   id: string;
@@ -85,6 +110,7 @@ interface Device {
   socket: WebSocket;
   session: string | null;
   state: PlayState | null;
+  queue: QueueWindow | null;
   /** When the state was reported (server clock). */
   at: number;
   /** Answered the last ping. */
@@ -128,6 +154,12 @@ function tracksOf(v: unknown): Track[] {
 }
 
 const indexIn = (v: unknown, length: number) => (Number.isInteger(v) ? Math.min(Math.max(v as number, 0), length - 1) : 0);
+/** A position in a whole queue (which may be longer than what travels). */
+const count = (v: unknown) => (Number.isInteger(v) ? Math.min(Math.max(v as number, 0), 1_000_000) : 0);
+const QUALITIES = new Set<unknown>(["sd", "hd"]);
+const qualityOf = (v: unknown): Quality => (QUALITIES.has(v) ? (v as Quality) : "sd");
+const TRACK_ID = /^[\w-]{1,64}$/;
+const level = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 1);
 
 function playState(v: unknown): PlayState | null {
   if (!v || typeof v !== "object") return null;
@@ -141,6 +173,14 @@ function playState(v: unknown): PlayState | null {
     duration: seconds(s.duration),
     shuffle: s.shuffle === true,
     repeat: repeatOf(s.repeat),
+    volume: level(s.volume),
+    muted: s.muted === true,
+    video: s.video === true,
+    preferVideo: s.preferVideo === true,
+    quality: qualityOf(s.quality),
+    showingVideo: s.showingVideo === true,
+    autoRadio: s.autoRadio !== false,
+    index: count(s.index),
   };
 }
 
@@ -185,6 +225,22 @@ function commandOf(v: unknown): Command | null {
       const to = text(c.to, 64);
       return DEVICE_ID.test(to) ? { action: "handOver", to } : null;
     }
+    case "volume":
+      return { action: "volume", volume: level(c.volume) };
+    case "mute":
+      return { action: "mute", muted: c.muted === true };
+    case "preferVideo":
+    case "autoRadio":
+      return { action: c.action, on: c.on === true };
+    case "quality":
+      return { action: "quality", quality: qualityOf(c.quality) };
+    case "jumpTo":
+    case "removeAt": {
+      const id = text(c.id, 64);
+      return TRACK_ID.test(id) ? { action: c.action, index: count(c.index), id } : null;
+    }
+    case "clearUpcoming":
+      return { action: "clearUpcoming" };
     default:
       return null;
   }
@@ -266,12 +322,17 @@ export function syncHub(opts: SyncOptions = {}) {
           socket,
           session: ticket.session,
           state: playState(m.state),
+          queue: null,
           at: Date.now(),
           alive: true,
         };
         a.devices.set(id, me);
         if (me.state?.playing) startedOn(a, me);
         announce(a);
+        // The others' queues, which otherwise travel only when they change.
+        for (const other of a.devices.values()) {
+          if (other !== me && other.queue) send(me, { type: "queue", device: other.id, queue: other.queue.tracks, offset: other.queue.offset });
+        }
         return;
       }
 
@@ -282,6 +343,12 @@ export function syncHub(opts: SyncOptions = {}) {
         me.at = Date.now();
         if (state.playing) startedOn(a, me);
         announce(a);
+      } else if (m.type === "queue") {
+        // Its queue changed: kept for devices that connect later, passed on to the others now.
+        me.queue = { tracks: tracksOf(m.queue), offset: count(m.offset) };
+        for (const other of a.devices.values()) {
+          if (other !== me) send(other, { type: "queue", device: me.id, queue: me.queue.tracks, offset: me.queue.offset });
+        }
       } else if (m.type === "command") {
         // Only to another device of the same account.
         const to = a.devices.get(text(m.to, 64));

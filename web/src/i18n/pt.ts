@@ -530,8 +530,6 @@ export const pt: Messages = {
     paused: "Pausado",
     idle: "Parado",
     connecting: "Conectando...",
-    queueTitle: (name: string) => `A fila está em ${name}`,
-    queueBody: "As músicas que você tocar, tocar em seguida ou adicionar à fila vão para lá.",
     note: "O Musike aberto com a sua conta em outro dispositivo aparece aqui. Um dispositivo toca por vez, e os outros o controlam. Toque em um dispositivo para tocar nele.",
   },
 

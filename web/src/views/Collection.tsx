@@ -12,7 +12,7 @@ import { useT } from "../i18n";
 import { shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { Track } from "../lib/types";
-import { selectOwnQueue, usePlayer } from "../player/player";
+import { selectShownQueue, selectShownStatus, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 
 interface Props {
@@ -26,8 +26,8 @@ export default function Collection({ kind }: Props) {
   const lib = useLibrary();
   const playList = usePlayer((s) => s.playList);
   const toggle = usePlayer((s) => s.toggle);
-  const queue = usePlayer(selectOwnQueue);
-  const status = usePlayer((s) => s.status);
+  const queue = usePlayer(selectShownQueue);
+  const status = usePlayer(selectShownStatus);
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);

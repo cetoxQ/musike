@@ -1,37 +1,24 @@
-import { DevicesIcon, QueueIcon, XIcon } from "@phosphor-icons/react";
+import { QueueIcon, XIcon } from "@phosphor-icons/react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
-import { usePlayer } from "../player/player";
+import { selectShownIndex, selectShownQueue, usePlayer } from "../player/player";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
 
 export function QueueList({ compact = false }: { compact?: boolean }) {
   const t = useT();
-  const elsewhere = usePlayer((s) => s.remote?.name ?? null);
-  const queue = usePlayer((s) => s.queue);
-  const index = usePlayer((s) => s.index);
-  const live = usePlayer((s) => s.status === "playing" || s.status === "loading");
+  // This device's queue, or the one of the device it controls (the actions go there too).
+  const queue = usePlayer(selectShownQueue);
+  const index = usePlayer(selectShownIndex);
+  const live = usePlayer((s) => s.remote?.playing ?? (s.status === "playing" || s.status === "loading"));
   const jumpTo = usePlayer((s) => s.jumpTo);
   const removeAt = usePlayer((s) => s.removeAt);
   const clearUpcoming = usePlayer((s) => s.clearUpcoming);
-  const autoRadio = usePlayer((s) => s.autoRadio);
+  const autoRadio = usePlayer((s) => s.remote?.autoRadio ?? s.autoRadio);
   const setAutoRadio = usePlayer((s) => s.setAutoRadio);
 
   const current = queue[index];
   const upcoming = queue.slice(index + 1);
-
-  // Controlling another device: its queue stays there.
-  if (elsewhere) {
-    return (
-      <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-        <span className="grid size-14 place-items-center rounded-[14px] bg-surface-3 text-accent">
-          <DevicesIcon size={26} />
-        </span>
-        <p className="font-medium">{t.devices.queueTitle(elsewhere)}</p>
-        <p className="max-w-[30ch] text-sm text-fg-2">{t.devices.queueBody}</p>
-      </div>
-    );
-  }
 
   if (!current) {
     return (
