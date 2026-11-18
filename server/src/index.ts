@@ -4,7 +4,7 @@ import path from "node:path";
 import { startServer } from "./app.js";
 import { config } from "./config.js";
 
-const { port, tools } = await startServer();
+const { port, tools, library } = await startServer();
 
 const lan = Object.values(networkInterfaces())
   .flat()
@@ -17,4 +17,5 @@ if (!existsSync(config.webDist)) console.log(`  (web app not built: run "pnpm bu
 console.log(`  yt-dlp:  ${tools.ytdlp ?? "NOT FOUND (install it from Musike's Settings)"}`);
 if (!tools.deno) console.log(`  Deno:    not found (YouTube may fail without it)`);
 if (!tools.ffmpeg) console.log(`  FFmpeg:  not found (HD video unavailable)`);
-console.log(`  Data:    ${path.relative(process.cwd(), config.dataDir) || config.dataDir}\n`);
+console.log(`  Data:    ${path.relative(process.cwd(), config.dataDir) || config.dataDir}`);
+console.log(`  Library: ${library === "sqlite" ? "musike.db (SQLite)" : "library.json"}\n`);

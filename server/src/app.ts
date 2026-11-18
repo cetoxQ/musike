@@ -19,8 +19,8 @@ import {
 } from "./browse.js";
 import { config } from "./config.js";
 import * as library from "./library.js";
-import { fileStorage } from "./libraryFile.js";
 import { findVideoFor, radio, search, suggestions } from "./search.js";
+import { openServerLibrary } from "./storage.js";
 import { proxyStream, serveFile } from "./stream.js";
 import { langOf, msg, tr } from "./i18n.js";
 import { presentJob, startJob, systemInfo, type Channel } from "./system.js";
@@ -50,12 +50,15 @@ export interface StartOptions {
 export interface RunningServer {
   port: number;
   tools: Tools;
+  /** Where the library lives: data/musike.db, or data/library.json. */
+  library: "sqlite" | "json";
   close: () => Promise<void>;
 }
 
 /** Builds the Musike HTTP server (API + web app) and starts listening. */
 export async function startServer(opts: StartOptions = {}): Promise<RunningServer> {
-  library.useLibraryStorage(fileStorage());
+  const store = await openServerLibrary();
+  const lib = store.library;
   const found = await refreshTools();
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "warn" } });
 
@@ -175,14 +178,14 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   // Library
 
-  app.get("/api/library", () => library.getLibraryLite());
+  app.get("/api/library", () => lib.getLibraryLite());
 
   /** The play log: one artist's tracks (most played first), or all of it (for backups). */
   app.get("/api/plays", async (req) => {
     const { artist, name } = req.query as { artist?: string; name?: string };
-    if (artist === undefined) return { plays: await library.allPlays() };
+    if (artist === undefined) return { plays: await lib.allPlays() };
     if (!ARTIST_ID.test(artist)) throw new HttpError(400, msg("invalidArtist"));
-    return { plays: await library.playsFor(artist, String(name ?? "").slice(0, 300)) };
+    return { plays: await lib.playsFor(artist, String(name ?? "").slice(0, 300)) };
   });
 
   /** Restores a backup file exported by any Musike instance. Big libraries need more than the 1 MB default body. */
@@ -193,77 +196,77 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     if (typeof backup.version !== "number" || backup.version > 1) {
       throw new HttpError(400, msg("newerBackup"));
     }
-    return library.importLibrary(backup.library, body.mode === "replace" ? "replace" : "merge");
+    return lib.importLibrary(backup.library, body.mode === "replace" ? "replace" : "merge");
   });
 
   app.put("/api/favorites/:id", async (req) => {
     const track = library.sanitizeTrack(req.body);
     if (track.id !== videoId(req.params)) throw new HttpError(400, msg("idMismatch"));
-    return { favorites: await library.addFavorite(track) };
+    return { favorites: await lib.addFavorite(track) };
   });
 
   /** Bulk add, e.g. from the list search. */
   app.post("/api/favorites", async (req) => {
     const { tracks } = (req.body ?? {}) as { tracks?: unknown };
     if (!Array.isArray(tracks)) throw new HttpError(400, msg("tracksRequired"));
-    return { favorites: await library.addFavorites(tracks.slice(0, 500).map(library.sanitizeTrack)) };
+    return { favorites: await lib.addFavorites(tracks.slice(0, 500).map(library.sanitizeTrack)) };
   });
 
-  app.delete("/api/favorites/:id", async (req) => ({ favorites: await library.removeFavorite(videoId(req.params)) }));
+  app.delete("/api/favorites/:id", async (req) => ({ favorites: await lib.removeFavorite(videoId(req.params)) }));
 
-  app.post("/api/history", async (req) => ({ history: await library.pushHistory(library.sanitizeTrack(req.body)) }));
+  app.post("/api/history", async (req) => ({ history: await lib.pushHistory(library.sanitizeTrack(req.body)) }));
 
   /** Artists and albums kept in the library. */
   app.put("/api/library/artists/:aid", async (req) => {
     const saved = library.sanitizeArtist(req.body);
     if (saved.id !== (req.params as { aid: string }).aid) throw new HttpError(400, msg("idMismatch"));
-    return { artists: await library.saveArtist(saved) };
+    return { artists: await lib.saveArtist(saved) };
   });
 
   app.delete("/api/library/artists/:aid", async (req) => {
     const { aid } = req.params as { aid: string };
     if (!ARTIST_ID.test(aid)) throw new HttpError(400, msg("invalidArtist"));
-    return { artists: await library.removeArtist(aid) };
+    return { artists: await lib.removeArtist(aid) };
   });
 
   app.put("/api/library/albums/:alid", async (req) => {
     const saved = library.sanitizeAlbum(req.body);
     if (saved.id !== (req.params as { alid: string }).alid) throw new HttpError(400, msg("idMismatch"));
-    return { albums: await library.saveAlbum(saved) };
+    return { albums: await lib.saveAlbum(saved) };
   });
 
   app.put("/api/library/yt-playlists/:pid", async (req) => {
     const saved = library.sanitizeYtPlaylist(req.body);
     if (saved.id !== (req.params as { pid: string }).pid) throw new HttpError(400, msg("idMismatch"));
-    return { ytPlaylists: await library.saveYtPlaylist(saved) };
+    return { ytPlaylists: await lib.saveYtPlaylist(saved) };
   });
 
   app.delete("/api/library/yt-playlists/:pid", async (req) => {
     const { pid } = req.params as { pid: string };
     if (!YT_PLAYLIST_ID.test(pid)) throw new HttpError(400, msg("invalidYtPlaylist"));
-    return { ytPlaylists: await library.removeYtPlaylist(pid) };
+    return { ytPlaylists: await lib.removeYtPlaylist(pid) };
   });
 
   app.delete("/api/library/albums/:alid", async (req) => {
     const { alid } = req.params as { alid: string };
     if (!ALBUM_ID.test(alid)) throw new HttpError(400, msg("invalidAlbum"));
-    return { albums: await library.removeAlbum(alid) };
+    return { albums: await lib.removeAlbum(alid) };
   });
 
   app.post("/api/playlists", async (req) => {
     const body = (req.body ?? {}) as { name?: unknown; tracks?: unknown };
     const tracks = Array.isArray(body.tracks) ? body.tracks.slice(0, 500).map(library.sanitizeTrack) : [];
-    return library.createPlaylist(typeof body.name === "string" ? body.name : "", tracks);
+    return lib.createPlaylist(typeof body.name === "string" ? body.name : "", tracks);
   });
 
   app.patch("/api/playlists/:pid", async (req) => {
     const { pid } = req.params as { pid: string };
     const { name } = (req.body ?? {}) as { name?: unknown };
-    return library.renamePlaylist(pid, typeof name === "string" ? name : "");
+    return lib.renamePlaylist(pid, typeof name === "string" ? name : "");
   });
 
   app.delete("/api/playlists/:pid", async (req, reply) => {
-    await library.deletePlaylist((req.params as { pid: string }).pid);
+    await lib.deletePlaylist((req.params as { pid: string }).pid);
     return reply.code(204).send();
   });
 
@@ -271,11 +274,11 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   app.post("/api/playlists/:pid/tracks", async (req) => {
     const body = (req.body ?? {}) as { tracks?: unknown };
     const tracks = Array.isArray(body.tracks) ? body.tracks.slice(0, 500).map(library.sanitizeTrack) : library.sanitizeTrack(req.body);
-    return library.addToPlaylist((req.params as { pid: string }).pid, tracks);
+    return lib.addToPlaylist((req.params as { pid: string }).pid, tracks);
   });
 
   app.delete("/api/playlists/:pid/tracks/:id", async (req) =>
-    library.removeFromPlaylist((req.params as { pid: string }).pid, videoId(req.params)),
+    lib.removeFromPlaylist((req.params as { pid: string }).pid, videoId(req.params)),
   );
 
   // Web app (production build)
@@ -292,10 +295,23 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   const host = opts.host ?? config.host;
   const preferred = opts.port ?? config.port;
   const port = opts.portFallback ? await freePort(preferred, host) : preferred;
-  await app.listen({ port, host });
+  try {
+    await app.listen({ port, host });
+  } catch (e) {
+    store.close();
+    throw e;
+  }
 
   pruneCache().catch(() => {});
-  return { port, tools: found, close: () => app.close() };
+  return {
+    port,
+    tools: found,
+    library: store.kind,
+    close: async () => {
+      await app.close();
+      store.close();
+    },
+  };
 }
 
 /** First free port from `start` (up to 10 tries), so a second copy or a dev server doesn't block launch. */

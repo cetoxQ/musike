@@ -30,7 +30,8 @@ import { forgetUrl, resolveAudio } from "./streams";
 // phone instead of behind HTTP. The build swaps lib/api.ts for this module (see vite.config.ts).
 export * from "../lib/apiTypes";
 
-library.useLibraryStorage(nativeStorage);
+// On the phone the library is one JSON document in the app's storage.
+const lib = library.jsonLibrary(nativeStorage);
 
 const fail = (status: number, key: MsgKey) => new ApiError(status, tr(getLang(), msg(key)));
 
@@ -100,34 +101,34 @@ export const api: MusikeApi = {
       return { id, title: r.title, duration: r.duration, hasSdVideo: false };
     }, signal),
 
-  library: () => call(() => library.getLibraryLite()),
-  addFavorite: (t) => call(async () => ({ favorites: await library.addFavorite(library.sanitizeTrack(t)) })),
-  addFavorites: (list) => call(async () => ({ favorites: await library.addFavorites(tracks(list)) })),
-  removeFavorite: (id) => call(async () => ({ favorites: await library.removeFavorite(id) })),
-  pushHistory: (t) => call(async () => ({ history: await library.pushHistory(library.sanitizeTrack(t)) })),
+  library: () => call(() => lib.getLibraryLite()),
+  addFavorite: (t) => call(async () => ({ favorites: await lib.addFavorite(library.sanitizeTrack(t)) })),
+  addFavorites: (list) => call(async () => ({ favorites: await lib.addFavorites(tracks(list)) })),
+  removeFavorite: (id) => call(async () => ({ favorites: await lib.removeFavorite(id) })),
+  pushHistory: (t) => call(async () => ({ history: await lib.pushHistory(library.sanitizeTrack(t)) })),
   plays: (artistId, name, signal) =>
     call(async () => {
-      if (artistId === undefined) return library.allPlays();
+      if (artistId === undefined) return lib.allPlays();
       if (!ARTIST_ID.test(artistId)) throw fail(400, "invalidArtist");
-      return library.playsFor(artistId, (name ?? "").slice(0, 300));
+      return lib.playsFor(artistId, (name ?? "").slice(0, 300));
     }, signal),
-  saveArtist: (a) => call(async () => ({ artists: await library.saveArtist(library.sanitizeArtist(a)) })),
-  removeArtist: (id) => call(async () => ({ artists: await library.removeArtist(id) })),
-  saveAlbum: (a) => call(async () => ({ albums: await library.saveAlbum(library.sanitizeAlbum(a)) })),
-  removeAlbum: (id) => call(async () => ({ albums: await library.removeAlbum(id) })),
-  saveYtPlaylist: (p) => call(async () => ({ ytPlaylists: await library.saveYtPlaylist(library.sanitizeYtPlaylist(p)) })),
-  removeYtPlaylist: (id) => call(async () => ({ ytPlaylists: await library.removeYtPlaylist(id) })),
-  createPlaylist: (name, list = []) => call(() => library.createPlaylist(name, tracks(list))),
-  renamePlaylist: (id, name) => call(() => library.renamePlaylist(id, name)),
-  deletePlaylist: (id) => call(() => library.deletePlaylist(id)),
-  addToPlaylist: (id, t) => call(() => library.addToPlaylist(id, Array.isArray(t) ? tracks(t) : library.sanitizeTrack(t))),
-  removeFromPlaylist: (id, trackId) => call(() => library.removeFromPlaylist(id, trackId)),
+  saveArtist: (a) => call(async () => ({ artists: await lib.saveArtist(library.sanitizeArtist(a)) })),
+  removeArtist: (id) => call(async () => ({ artists: await lib.removeArtist(id) })),
+  saveAlbum: (a) => call(async () => ({ albums: await lib.saveAlbum(library.sanitizeAlbum(a)) })),
+  removeAlbum: (id) => call(async () => ({ albums: await lib.removeAlbum(id) })),
+  saveYtPlaylist: (p) => call(async () => ({ ytPlaylists: await lib.saveYtPlaylist(library.sanitizeYtPlaylist(p)) })),
+  removeYtPlaylist: (id) => call(async () => ({ ytPlaylists: await lib.removeYtPlaylist(id) })),
+  createPlaylist: (name, list = []) => call(() => lib.createPlaylist(name, tracks(list))),
+  renamePlaylist: (id, name) => call(() => lib.renamePlaylist(id, name)),
+  deletePlaylist: (id) => call(() => lib.deletePlaylist(id)),
+  addToPlaylist: (id, t) => call(() => lib.addToPlaylist(id, Array.isArray(t) ? tracks(t) : library.sanitizeTrack(t))),
+  removeFromPlaylist: (id, trackId) => call(() => lib.removeFromPlaylist(id, trackId)),
   importLibrary: (backup, mode) =>
     call(async () => {
       const b = (backup ?? {}) as { format?: unknown; version?: unknown; library?: unknown };
       if (b.format !== "musike-backup") throw fail(400, "notBackup");
       if (typeof b.version !== "number" || b.version > 1) throw fail(400, "newerBackup");
-      return library.importLibrary(b.library, mode);
+      return lib.importLibrary(b.library, mode);
     }),
 
   system: async () => SYSTEM,

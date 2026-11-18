@@ -22,6 +22,8 @@ const userData = app.getPath("userData");
 process.env.MUSIKE_DATA_DIR = path.join(userData, "data");
 process.env.MUSIKE_CACHE_DIR = path.join(userData, "cache");
 process.env.MUSIKE_BIN_DIR = path.join(userData, "bin");
+// The desktop app keeps library.json (one user; the update backups below copy that file).
+process.env.MUSIKE_LIBRARY = "json";
 process.env.MUSIKE_WEB_DIST = app.isPackaged ? path.join(process.resourcesPath, "web") : path.resolve(here, "..", "..", "web", "dist");
 
 // A copy of the library from before each update, in userData/backups (the installer makes one too).

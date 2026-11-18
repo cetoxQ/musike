@@ -4,7 +4,7 @@ import path from "node:path";
 import { config } from "./config.js";
 import type { LibraryStorage } from "./library.js";
 
-/** The library as data/library.json, replaced atomically (write a temp file, then rename over). */
+/** The JSON library as data/library.json, replaced atomically (write a temp file, then rename over). */
 export function fileStorage(dir = config.dataDir): LibraryStorage {
   const file = path.join(dir, "library.json");
   return {

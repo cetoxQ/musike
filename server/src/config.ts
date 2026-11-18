@@ -17,6 +17,8 @@ export const config = {
    */
   directAudioFirst: process.env.MUSIKE_DIRECT_AUDIO === "first",
   dataDir: process.env.MUSIKE_DATA_DIR ?? path.join(root, "data"),
+  /** Where the library lives: "sqlite" (data/musike.db) or "json" (data/library.json). Unset: SQLite when Node has it. */
+  library: (["sqlite", "json"].includes(process.env.MUSIKE_LIBRARY ?? "") ? process.env.MUSIKE_LIBRARY : "auto") as "sqlite" | "json" | "auto",
   cacheDir: process.env.MUSIKE_CACHE_DIR ?? path.join(root, "cache"),
   /** HD video cache limit; least recently played videos are evicted first. */
   cacheMaxBytes: Number(process.env.MUSIKE_CACHE_MAX_MB ?? 2048) * 1024 * 1024,

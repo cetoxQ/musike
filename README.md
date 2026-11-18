@@ -130,7 +130,7 @@ flowchart LR
   subgraph S["Musike server (Fastify)"]
     API["REST API"]
     P["Stream proxy<br/>HTTP Range"]
-    L[("library.json")]
+    L[("musike.db<br/>SQLite")]
   end
   YTM["YouTube Music<br/>youtubei.js"]
   T["yt-dlp + Deno + FFmpeg"]
@@ -148,7 +148,7 @@ flowchart LR
 1. **Catalog:** the server queries YouTube Music with [youtubei.js](https://github.com/LuanRT/YouTube.js): search, suggestions, genres, artists, albums, radio and picking the official music video.
 2. **Playback:** yt-dlp resolves the stream URLs (AAC audio, MP4 video), running YouTube's player code with Deno. Those URLs are tied to the IP that resolved them, so the server **proxies** the bytes, forwarding the `Range` header so seeking is instant. Nothing is written to disk for audio.
 3. **HD video and videos without an SD version:** yt-dlp downloads and merges video + audio with FFmpeg, keeps it in a cache (least-recently-played first, 2 GB by default) and the server serves the file with Range support.
-4. **Library:** playlists, favorites and history live in `library.json`, written atomically.
+4. **Library:** playlists, favorites, history, saved artists, albums and playlists, and the play log live in `musike.db`, a SQLite database (Node's built-in `node:sqlite`, so nothing to install). Each change is one transaction. The desktop and Android apps keep a single `library.json` instead, written atomically. A server upgraded from an earlier version moves its `library.json` into the database on the first start and keeps the file as `library.json.imported`.
 
 **On Android** there is no server. The app runs Musike's server code itself (catalog and library, from `server/src`) and asks YouTube for the audio stream from the phone, so the stream URL belongs to the phone's own connection and the player reads it directly, without a proxy. Which YouTube client the app uses to get streams is read from [`mobile/streaming.json`](mobile/streaming.json), so it can be adjusted without releasing a new app.
 5. **Web:** a single `<video>` element moves around the page (panel, full screen, mini player, cinema mode) without interrupting playback.
@@ -247,7 +247,7 @@ services:
     ports:
       - "4180:4180"
     volumes:
-      - musike-data:/data   # library: playlists, favorites, history
+      - musike-data:/data   # library (musike.db): playlists, favorites, history
       - musike-cache:/cache # HD videos already downloaded
     restart: unless-stopped
 volumes:
@@ -262,6 +262,7 @@ docker compose up -d   # then open http://<that machine>:4180
 Or with plain Docker: `docker run -d -p 4180:4180 -v musike-data:/data -v musike-cache:/cache ghcr.io/ernani1234/musike`. To build the image from source instead: `docker build -t musike .`
 
 - A new image is published for every release; `docker compose pull && docker compose up -d` updates it. The library stays in the `/data` volume.
+- To back up the database itself, copy `/data` while the container is stopped (with it running, `musike.db-wal` may hold the latest changes). [Export](#moving-your-library-backup) works any time.
 - yt-dlp can also be updated from **Settings** without a new image (until the container is recreated).
 - All the [environment variables](#configuration) work, e.g. `YTDLP_EXTRA_ARGS="--cookies /data/cookies.txt"` for YouTube's bot checks.
 
@@ -354,7 +355,8 @@ Server environment variables (all optional):
 | `YTDLP_PATH` | automatic | Forces a specific yt-dlp executable |
 | `YTDLP_EXTRA_ARGS` | | Extra flags, e.g. `--cookies-from-browser firefox` |
 | `MUSIKE_DIRECT_AUDIO` | | `first`: start audio straight from YouTube's API (about half a second, as on Android), with yt-dlp as the fallback. By default yt-dlp comes first |
-| `MUSIKE_DATA_DIR` | `server/data` (`/data` in Docker) | Where `library.json` lives |
+| `MUSIKE_DATA_DIR` | `server/data` (`/data` in Docker) | Where the library lives (`musike.db`) |
+| `MUSIKE_LIBRARY` | automatic | `sqlite`: require the database. `json`: keep `library.json` (what the desktop app does). Unset: SQLite when Node has it (22.13 or later), `library.json` otherwise |
 | `MUSIKE_CACHE_DIR` | `server/cache` (`/cache` in Docker) | Downloaded HD videos |
 | `MUSIKE_CACHE_MAX_MB` | `2048` | Video cache limit (least recently played go first) |
 | `MUSIKE_BIN_DIR` | | Private tools folder (the desktop app uses `%APPDATA%\Musike\bin`) |
@@ -383,7 +385,9 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `POST` | `/api/prepare/:id` | Resolves a stream before playing |
 | `GET` | `/api/stream/:id/audio` | Audio with HTTP Range |
 | `GET` | `/api/stream/:id/video?q=sd\|hd` | Video with HTTP Range |
-| `GET` | `/api/library` | The whole library |
+| `GET` | `/api/library` | The whole library, without the play log |
+| `GET` | `/api/plays?artist=&name=` | Your plays of one artist's tracks, most played first (`artist` is the `UC…` ID, `name` matches tracks saved without one) |
+| `GET` | `/api/plays` | The whole play log, most recently played first |
 | `PUT` / `DELETE` | `/api/favorites/:id` | Favorite / unfavorite |
 | `POST` | `/api/favorites` | Favorite many at once (`{ tracks }`) |
 | `POST` | `/api/history` | Records a played track |
@@ -408,7 +412,10 @@ musike/
 │     ├─ search.ts      search, suggestions, radio and official music videos
 │     ├─ ytdlp.ts       stream resolution, HD cache, error messages
 │     ├─ stream.ts      proxy with HTTP Range
-│     ├─ library.ts     playlists, favorites, history and backup import
+│     ├─ library.ts     the library: rules, backup import, the JSON store (desktop, Android)
+│     ├─ librarySqlite.ts the same library in SQLite (the server)
+│     ├─ db.ts          the database file and its schema migrations
+│     ├─ storage.ts     picks the store at startup, moves library.json into the database
 │     ├─ i18n.ts        server messages in each language
 │     ├─ tools.ts       finds yt-dlp, Deno, FFmpeg (Windows registry, winget, PATH)
 │     ├─ bootstrap.ts   downloads the tools for the desktop app
