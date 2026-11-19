@@ -5,4 +5,6 @@
     <string name="playback_pause">Pausar</string>
     <string name="playback_next">Próxima</string>
     <string name="playback_previous">Anterior</string>
+    <string name="car_open_app">Abra o Musike no celular</string>
+    <string name="car_open_app_hint">Sua biblioteca e suas músicas estão lá</string>
 </resources>

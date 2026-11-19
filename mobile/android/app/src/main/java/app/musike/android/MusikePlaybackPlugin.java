@@ -3,11 +3,15 @@ package app.musike.android;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.util.ArrayList;
+import java.util.List;
+import org.json.JSONObject;
 
 /**
  * The app's side of PlaybackService (web/src/native/media.ts): the player reports the track and its progress
@@ -20,12 +24,38 @@ public class MusikePlaybackPlugin extends Plugin {
 
     @Override
     public void load() {
-        PlaybackService.listener = (action, position) -> {
+        PlaybackService.listener = (action, position, value) -> {
             JSObject event = new JSObject();
             event.put("action", action);
             if (position >= 0) event.put("position", position);
+            if (value != null) event.put("value", value);
             notifyListeners("action", event);
         };
+        PlaybackService.browser = (request, parent) -> {
+            JSObject event = new JSObject();
+            event.put("request", request);
+            event.put("parent", parent);
+            notifyListeners("browse", event);
+        };
+    }
+
+    /** What a folder holds, for Android Auto (the answer to a "browse" event). */
+    @PluginMethod
+    public void browseResult(PluginCall call) {
+        String request = call.getString("request");
+        JSArray items = call.getArray("items");
+        List<PlaybackService.Entry> entries = new ArrayList<>();
+        if (items != null) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject o = items.optJSONObject(i);
+                if (o == null || o.optString("id").isEmpty()) continue;
+                entries.add(
+                    new PlaybackService.Entry(o.optString("id"), o.optString("title"), o.optString("subtitle"), o.optBoolean("browsable"))
+                );
+            }
+        }
+        if (request != null) main.post(() -> PlaybackService.deliver(request, entries));
+        call.resolve();
     }
 
     @PluginMethod
@@ -61,6 +91,7 @@ public class MusikePlaybackPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         PlaybackService.listener = null;
+        PlaybackService.browser = null;
         PlaybackService.shutdown(getContext());
     }
 }

@@ -536,6 +536,15 @@ export const en = {
     role: "Role",
   },
 
+  // Android Auto's lists.
+  car: {
+    queue: "Queue",
+    favorites: "Favorites",
+    playlists: "Playlists",
+    recent: "Recent",
+    songs: (n: number) => (n === 1 ? "1 song" : `${n} songs`),
+  },
+
   devices: {
     title: "Devices",
     thisDevice: "this device",

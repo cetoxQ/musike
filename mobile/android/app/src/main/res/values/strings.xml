@@ -9,4 +9,6 @@
     <string name="playback_pause">Pause</string>
     <string name="playback_next">Next</string>
     <string name="playback_previous">Previous</string>
+    <string name="car_open_app">Open Musike on your phone</string>
+    <string name="car_open_app_hint">Your library and music are there</string>
 </resources>

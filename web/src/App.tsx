@@ -15,7 +15,7 @@ import { FloatingVideo, Theater } from "./components/Video";
 import { MD, useMediaQuery } from "./hooks/useMediaQuery";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { getT } from "./i18n";
-import { capabilities } from "./lib/api";
+import { capabilities, startCar } from "./lib/api";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
 import { selectHasShown, usePlayer } from "./player/player";
@@ -56,6 +56,9 @@ export default function App() {
     void loadLibrary();
     void useRecent.getState().load();
   }, [loadLibrary]);
+
+  // Android Auto's lists (the Android app only).
+  useEffect(() => startCar?.(), []);
 
   // Devices of this account in step (over https only; see stores/devices.ts).
   useEffect(() => {

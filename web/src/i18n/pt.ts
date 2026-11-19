@@ -529,6 +529,14 @@ export const pt: Messages = {
     role: "Função",
   },
 
+  car: {
+    queue: "Fila",
+    favorites: "Favoritas",
+    playlists: "Playlists",
+    recent: "Recentes",
+    songs: (n: number) => (n === 1 ? "1 música" : `${n} músicas`),
+  },
+
   devices: {
     title: "Dispositivos",
     thisDevice: "este dispositivo",

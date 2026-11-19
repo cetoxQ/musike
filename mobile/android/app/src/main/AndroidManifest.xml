@@ -50,11 +50,21 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Keeps the music going with the screen off; shows the media notification and lock screen controls. -->
+        <!-- Keeps the music going with the screen off; shows the media notification and lock screen controls.
+             Exported for Android Auto, which browses the library through it (see PlaybackService). -->
         <service
             android:name=".PlaybackService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- Android Auto lists Musike among the car's media apps. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
     </application>
 
 </manifest>

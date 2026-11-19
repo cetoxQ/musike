@@ -194,5 +194,8 @@ export const systemMedia = media;
  */
 export const capabilities = { video: !!server, engineSettings: false, retryOnError: true };
 
+/** Android Auto's lists and searches (native/car.ts), loaded only in the app. */
+export const startCar: (() => void) | null = () => void import("./car").then((m) => m.startCar());
+
 /** Devices in step: only connected to a Musike server over https (see native/connection.ts). */
 export const syncAddress: (() => Promise<string>) | null = server?.syncAddress ?? null;

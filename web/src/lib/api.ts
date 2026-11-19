@@ -72,6 +72,9 @@ function desktopConnection(
   };
 }
 
+/** Android Auto: only the Android app (native/api.ts). */
+export const startCar: (() => void) | null = null;
+
 /**
  * Devices in step (see stores/devices.ts): the WebSocket address, with a fresh single-use ticket. Only over https:
  * on plain http the app works as it always did, on its own. (The desktop app is http://localhost: never.)

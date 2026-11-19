@@ -15,13 +15,20 @@ interface PlaybackPlugin {
     position?: number;
     duration?: number;
   }): Promise<void>;
-  addListener(event: "action", fn: (e: { action: string; position?: number }) => void): Promise<PluginListenerHandle>;
+  /** Buttons pressed outside the app; and from Android Auto, "playItem" (value: the item's id) and "search". */
+  addListener(event: "action", fn: (e: { action: string; position?: number; value?: string }) => void): Promise<PluginListenerHandle>;
+  /** Android Auto asks what a folder holds (see native/car.ts); the answer goes back through browseResult. */
+  addListener(event: "browse", fn: (e: { request: string; parent: string }) => void): Promise<PluginListenerHandle>;
+  browseResult(options: {
+    request: string;
+    items: { id: string; title: string; subtitle?: string; browsable?: boolean }[];
+  }): Promise<void>;
 }
 
 const noop = async () => {};
-const Playback = registerPlugin<PlaybackPlugin>("MusikePlayback", {
+export const Playback = registerPlugin<PlaybackPlugin>("MusikePlayback", {
   // In a desktop browser (development), there is nothing to drive.
-  web: () => ({ update: noop, addListener: async () => ({ remove: noop }) }),
+  web: () => ({ update: noop, addListener: async () => ({ remove: noop }), browseResult: noop }),
 });
 
 /**

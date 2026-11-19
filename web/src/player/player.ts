@@ -825,13 +825,17 @@ function syncPositionState() {
 
 if (systemMedia) {
   const p = () => usePlayer.getState();
-  systemMedia.onAction((action, position) => {
-    if (action === "play" && p().status !== "playing") p().toggle();
-    else if (action === "pause" && p().status === "playing") p().toggle();
-    else if (action === "next") p().next();
-    else if (action === "previous") p().prev();
-    else if (action === "seek" && position != null) p().seek(position);
-  });
+  // The notification, the lock screen and headphone or car buttons show and drive this device's own player, even
+  // while it controls another device.
+  systemMedia.onAction((action, position) =>
+    locally(() => {
+      if (action === "play" && p().status !== "playing") p().toggle();
+      else if (action === "pause" && p().status === "playing") p().toggle();
+      else if (action === "next") p().next();
+      else if (action === "previous") p().prev();
+      else if (action === "seek" && position != null) p().seek(position);
+    }),
+  );
 }
 
 if ("mediaSession" in navigator) {
@@ -848,7 +852,8 @@ if ("mediaSession" in navigator) {
   ];
   for (const [action, handler] of handlers) {
     try {
-      ms.setActionHandler(action, handler);
+      // Media keys and the browser's controls show this device's player: they drive it, not a device it controls.
+      ms.setActionHandler(action, (d) => locally(() => handler(d)));
     } catch {
       /* action not supported */
     }
