@@ -15,7 +15,7 @@ import { FloatingVideo, Theater } from "./components/Video";
 import { MD, useMediaQuery } from "./hooks/useMediaQuery";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { getT } from "./i18n";
-import { capabilities, link, startCar } from "./lib/api";
+import { capabilities, link, startCar, syncAddress } from "./lib/api";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
 import { selectHasShown, usePlayer } from "./player/player";
@@ -56,6 +56,32 @@ export default function App() {
     void loadLibrary();
     void useRecent.getState().load();
   }, [loadLibrary]);
+
+  // Without the devices' connection (a server on http), what other devices changed isn't heard: fetched again when
+  // the window comes back after a while.
+  useEffect(() => {
+    if (syncAddress) return;
+    let away = 0;
+    let fetched = Date.now();
+    const back = () => {
+      if (document.visibilityState === "hidden") {
+        away ||= Date.now();
+        return;
+      }
+      const long = (away && Date.now() - away > 60_000) || Date.now() - fetched > 60_000;
+      away = 0;
+      if (!long) return;
+      fetched = Date.now();
+      void useLibrary.getState().refresh();
+      void useRecent.getState().load();
+    };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => {
+      document.removeEventListener("visibilitychange", back);
+      window.removeEventListener("focus", back);
+    };
+  }, []);
 
   // Android Auto's lists (the Android app only).
   useEffect(() => startCar?.(), []);

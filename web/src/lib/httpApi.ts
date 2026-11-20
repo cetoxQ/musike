@@ -1,4 +1,5 @@
 import { getLang, getT } from "../i18n";
+import { deviceId } from "./device";
 import {
   ApiError,
   authEvents,
@@ -68,6 +69,8 @@ export function httpBackend(opts: HttpBackendOptions) {
         [LANG_HEADER]: getLang(),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...(json !== undefined ? { "content-type": "application/json" } : {}),
+        // Changes say which device made them: the server tells the account's other devices (sync).
+        ...(method !== "GET" && method !== "HEAD" ? { "x-musike-device": deviceId() } : {}),
         ...(rest.headers as Record<string, string> | undefined),
       },
       body: json !== undefined ? JSON.stringify(json) : rest.body,

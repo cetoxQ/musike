@@ -24,6 +24,8 @@ const MAX_DEVICES = 20;
 /** A hand-over carries a queue (up to MAX_QUEUE tracks). */
 const MAX_BYTES = 512 * 1024;
 const MAX_QUEUE = 500;
+/** Changes to the library within this long go out to the other devices as one message. */
+const LIBRARY_MS = 500;
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** Closing codes the apps act on. */
@@ -96,8 +98,12 @@ export interface DeviceInfo {
   state: (PlayState & { age: number }) | null;
 }
 
+/** What changed in an account's library: the lists (favorites, saved, playlists), the Recent list, the history. */
+export type LibraryPart = "library" | "recent" | "history";
+
 export type ServerMessage =
   | { type: "devices"; you: string; active: string | null; devices: DeviceInfo[] }
+  | { type: "library"; parts: LibraryPart[]; history?: Track[] }
   | { type: "pause" }
   | { type: "command"; from: string; command: Command }
   | { type: "queue"; device: string; queue: Track[]; offset: number };
@@ -255,6 +261,9 @@ export function syncHub(opts: SyncOptions = {}) {
   const tickets = new Map<string, Ticket>();
   const accounts = new Map<number, Account>();
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_BYTES, perMessageDeflate: false });
+
+  /** Library changes on their way to an account's devices, gathered for LIBRARY_MS. */
+  const changes = new Map<number, { parts: Set<LibraryPart>; from: Set<string>; history?: Track[] }>();
 
   const accountOf = (user: number): Account => {
     let a = accounts.get(user);
@@ -417,6 +426,30 @@ export function syncHub(opts: SyncOptions = {}) {
       }
       wss.handleUpgrade(req, socket, head, (ws) => connected(ws, ticket));
       return true;
+    },
+
+    /**
+     * The account's library changed (through the HTTP API): its other devices are told, so what they show is fetched
+     * again. `from`: the device that made the change, which already has it. A new history comes along whole.
+     */
+    changed(user: number, part: LibraryPart, from?: string, history?: Track[]) {
+      if (!accounts.get(user)?.devices.size) return;
+      let c = changes.get(user);
+      if (!c) {
+        changes.set(user, (c = { parts: new Set(), from: new Set() }));
+        setTimeout(() => {
+          changes.delete(user);
+          const a = accounts.get(user);
+          if (!a) return;
+          const m: ServerMessage = { type: "library", parts: [...c!.parts], ...(c!.history ? { history: c!.history } : {}) };
+          // The device that made every one of these changes has them all; any other device needs them.
+          const only = c!.from.size === 1 ? [...c!.from][0] : null;
+          for (const d of a.devices.values()) if (d.id !== only) send(d, m);
+        }, LIBRARY_MS).unref();
+      }
+      c.parts.add(part);
+      c.from.add(from ?? "");
+      if (history) c.history = history;
     },
 
     /** Devices connected right now, all accounts together. */

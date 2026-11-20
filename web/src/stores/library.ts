@@ -7,6 +7,8 @@ import { toast } from "./ui";
 interface LibraryState extends Library {
   status: "idle" | "loading" | "ready" | "error";
   load: () => Promise<void>;
+  /** Fetches it again without showing it as loading (another device changed it). */
+  refresh: () => Promise<void>;
   isFavorite: (id: string) => boolean;
   toggleFavorite: (t: Track) => Promise<void>;
   addFavorites: (tracks: Track[]) => Promise<void>;
@@ -43,6 +45,15 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       set({ ...lib, artists: lib.artists ?? [], albums: lib.albums ?? [], ytPlaylists: lib.ytPlaylists ?? [], status: "ready" });
     } catch {
       set({ status: "error" });
+    }
+  },
+
+  refresh: async () => {
+    try {
+      const lib = await api.library();
+      set({ ...lib, artists: lib.artists ?? [], albums: lib.albums ?? [], ytPlaylists: lib.ytPlaylists ?? [], status: "ready" });
+    } catch {
+      /* the next change, or the next start, brings it */
     }
   },
 

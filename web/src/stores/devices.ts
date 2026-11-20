@@ -1,8 +1,30 @@
 import { create } from "zustand";
 import { capabilities, syncAddress } from "../lib/api";
+import { deviceId } from "../lib/device";
 import type { Track } from "../lib/types";
 import { locally, selectCurrent, setRemoteControl, usePlayer, type Quality, type RemoteControl, type Repeat } from "../player/player";
 import { useAuth } from "./auth";
+import { useLibrary } from "./library";
+import { useRecent } from "./recent";
+
+// What another device of the account changed in the library: fetched again, at once if this one is in view,
+// otherwise when it comes back (a phone in a pocket doesn't fetch the library at every change on the computer).
+const stale = new Set<"library" | "recent">();
+function refreshStale() {
+  if (document.visibilityState !== "visible") return;
+  if (stale.has("library")) void useLibrary.getState().refresh();
+  if (stale.has("recent")) void useRecent.getState().load();
+  stale.clear();
+}
+document.addEventListener("visibilitychange", refreshStale);
+
+function libraryChanged(parts: unknown, history: unknown) {
+  if (!Array.isArray(parts)) return;
+  if (parts.includes("history") && Array.isArray(history)) useLibrary.setState({ history: history as Track[] });
+  if (parts.includes("library")) stale.add("library");
+  if (parts.includes("recent")) stale.add("recent");
+  refreshStale();
+}
 
 // Devices of one account, Spotify-style (server/src/sync.ts). Every open Musike (browser tab, phone) tells the
 // server what it plays and sees what the others play. One device plays at a time: the active one. Any other
@@ -77,19 +99,6 @@ function windowed(queue: Track[], index: number): { queue: Track[]; index: numbe
   return { queue: queue.slice(start, start + MAX_QUEUE), index: index - start, start };
 }
 
-/** One id per tab (sessionStorage): two tabs are two devices, a reload is the same one. */
-function deviceId(): string {
-  const key = "musike:device";
-  try {
-    const known = sessionStorage.getItem(key);
-    if (known) return known;
-    const id = crypto.getRandomValues(new Uint8Array(16)).reduce((s, b) => s + b.toString(16).padStart(2, "0"), "");
-    sessionStorage.setItem(key, id);
-    return id;
-  } catch {
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
-}
 
 /** The Android app (Capacitor), rather than a browser. */
 const isApp = () => "Capacitor" in window;
@@ -468,6 +477,9 @@ export const useDevices = create<DevicesState>((set, get) => {
     show();
   };
 
+  /** Connected before: connecting again, the library is fetched again (what changed meanwhile wasn't heard). */
+  let wasOn = false;
+
   async function connect() {
     window.clearTimeout(retry);
     if (!wanted || !syncAddress || socket) return;
@@ -485,6 +497,13 @@ export const useDevices = create<DevicesState>((set, get) => {
     socket = ws;
     ws.onopen = () => {
       failures = 0;
+      // Connected again: changes made meanwhile on other devices weren't heard.
+      if (wasOn) {
+        stale.add("library");
+        stale.add("recent");
+        refreshStale();
+      }
+      wasOn = true;
       const state = current();
       sent = { key: keyOf(state), playing: state.playing, position: state.position, at: Date.now() };
       ws.send(JSON.stringify({ type: "hello", id: me, name, kind: isApp() ? "app" : "web", form, state }));
@@ -499,6 +518,8 @@ export const useDevices = create<DevicesState>((set, get) => {
         device?: string;
         queue?: Track[];
         offset?: number;
+        parts?: unknown;
+        history?: unknown;
       };
       try {
         m = JSON.parse(String(e.data));
@@ -523,6 +544,8 @@ export const useDevices = create<DevicesState>((set, get) => {
       } else if (m.type === "queue" && m.device && Array.isArray(m.queue)) {
         queues.set(m.device, { tracks: m.queue, offset: m.offset ?? 0 });
         if (target?.id === m.device) show();
+      } else if (m.type === "library") {
+        libraryChanged(m.parts, m.history);
       } else if (m.type === "pause") {
         usePlayer.getState().pause();
       } else if (m.type === "command" && m.command) {

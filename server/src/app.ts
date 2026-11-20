@@ -25,7 +25,7 @@ import { findVideoFor, radio, search, suggestions } from "./search.js";
 import { passwordGate, sameOriginWrites, securityHeaders } from "./security.js";
 import { openServerLibrary } from "./storage.js";
 import { proxyStream, serveFile } from "./stream.js";
-import { syncHub } from "./sync.js";
+import { syncHub, type LibraryPart } from "./sync.js";
 import { langOf, msg, tr } from "./i18n.js";
 import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./system.js";
 import { refreshTools, type Tools } from "./tools.js";
@@ -101,6 +101,21 @@ export interface RunningServer {
 }
 
 /** Builds the Musike HTTP server (API + web app) and starts listening. */
+
+/** The device a request comes from (sync.ts's id for it), as the web app says in a header. */
+function deviceOf(req: FastifyRequest): string | undefined {
+  const v = req.headers["x-musike-device"];
+  return typeof v === "string" && /^[\w-]{1,64}$/.test(v) ? v : undefined;
+}
+
+/** Which part of the library a route that changes something changes (the history route says so itself). */
+function libraryParts(route: string): LibraryPart[] {
+  if (route === "/api/library/import") return ["library", "recent"];
+  if (route.startsWith("/api/recent")) return ["recent"];
+  if (/^\/api\/(favorites|playlists|library\/)/.test(route)) return ["library"];
+  return [];
+}
+
 export async function startServer(opts: StartOptions = {}): Promise<RunningServer> {
   const store = await openServerLibrary();
   if (config.auth && !store.db) {
@@ -220,6 +235,14 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   /** For apps: a token to put in stream URLs (?st=), valid for hours, ended with the session. */
   app.post("/api/auth/stream-link", async (req) => enabled().streamLink(req.sessionId!));
+
+  // A change to the library, from any device: the account's other devices are told, to fetch it again (sync.ts).
+  // The history route tells them itself, with the new history.
+  app.addHook("onResponse", async (req, reply) => {
+    if (req.method === "GET" || req.method === "HEAD" || reply.statusCode >= 400) return;
+    const parts = libraryParts(req.routeOptions.url ?? "");
+    for (const part of parts) sync.changed(req.user?.id ?? DEFAULT_USER, part, deviceOf(req));
+  });
 
   /** A single-use ticket to open the device connection with (WebSocket on /api/sync, see sync.ts). */
   app.post("/api/sync/ticket", async (req) => sync.ticket(req.user?.id ?? DEFAULT_USER, req.sessionId));
@@ -427,9 +450,11 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   app.delete("/api/favorites/:id", async (req) => ({ favorites: await libOf(req).removeFavorite(videoId(req.params)) }));
 
   // ?at=: when the track was played (ms), for plays a phone made while the server was out of reach.
-  app.post("/api/history", async (req) => ({
-    history: await libOf(req).pushHistory(library.sanitizeTrack(req.body), (req.query as { at?: unknown }).at),
-  }));
+  app.post("/api/history", async (req) => {
+    const history = await libOf(req).pushHistory(library.sanitizeTrack(req.body), (req.query as { at?: unknown }).at);
+    sync.changed(req.user?.id ?? DEFAULT_USER, "history", deviceOf(req), history);
+    return { history };
+  });
 
   /** The Search page's "Recent" list: what you searched for, opened or played. */
   app.get("/api/recent", async (req) => ({ recent: await libOf(req).recent() }));
