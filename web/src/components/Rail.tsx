@@ -1,5 +1,6 @@
 import {
   BooksIcon,
+  UserCircleIcon,
   ClockCounterClockwiseIcon,
   GearSixIcon,
   HeartIcon,
@@ -24,6 +25,7 @@ const nav = [
   { to: paths.home, key: "home", Icon: HouseIcon, end: true },
   { to: paths.search, key: "search", Icon: MagnifyingGlassIcon, end: false },
   { to: paths.library, key: "library", Icon: BooksIcon, end: false },
+  { to: paths.profile, key: "profile", Icon: UserCircleIcon, end: false },
 ] as const;
 
 /** Settings entry. Shows a dot (and on the wide rail, an "Update" pill) when yt-dlp needs attention. */

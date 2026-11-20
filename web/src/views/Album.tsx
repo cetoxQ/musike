@@ -11,6 +11,7 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { share } from "../lib/share";
+import { albumTypeOf, useAlbumTypes } from "../lib/albumTypes";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
@@ -46,6 +47,11 @@ export default function Album() {
   const [saving, setSaving] = useState(false);
 
   const album = page.status === "ok" ? page.data : null;
+
+  // Album, single or EP: learnt here for free, for the profile.
+  useEffect(() => {
+    if (album) useAlbumTypes.getState().learn(album.id, albumTypeOf(album));
+  }, [album]);
   const tracks = album?.tracks ?? [];
 
   // Opened: on top of the Search page's Recent list.

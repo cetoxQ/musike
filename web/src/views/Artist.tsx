@@ -23,7 +23,7 @@ const TOP_FEW = 5;
 const TOP_MORE = 20;
 
 /** A ranked list that shows TOP_FEW rows, or TOP_MORE after "Show more". Playing a row queues the whole list. */
-function RankedTracks({ tracks }: { tracks: Track[] }) {
+export function RankedTracks({ tracks }: { tracks: Track[] }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   return (

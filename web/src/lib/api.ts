@@ -58,7 +58,8 @@ export async function shareLink(title: string, url: string): Promise<"shared" | 
 export const systemMedia: SystemMedia | null = null;
 
 /** What this build can do. The Android build has no video yet, no yt-dlp to manage, and retries expired streams. */
-export const capabilities = { video: true, engineSettings: true, retryOnError: false };
+/** playLog: every play kept with its time (a server's database), so plays can be counted by period. */
+export const capabilities = { video: true, engineSettings: true, retryOnError: false, playLog: true };
 
 /** Media elements hide the HTTP error body; fetch it to show the real reason. */
 export const explainStreamError = (url: string, _error?: MediaError | null) => http.explain(url);

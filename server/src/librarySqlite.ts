@@ -219,6 +219,11 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
   // Most recent first; plays in the same millisecond by the order they were saved.
   const RECENT = "ORDER BY last DESC, MAX(p.id) DESC";
   const playsAll = rows(`${PLAY_SUMS} WHERE p.user_id = ? GROUP BY p.track_id ${RECENT}`);
+  // Since a time: only the plays made in the app (one row each, dated); ever: those restored from backups too.
+  const playsSince = rows(
+    `${PLAY_SUMS} WHERE p.user_id = ? AND p.played_at >= ? AND p.source = 'app' GROUP BY p.track_id ORDER BY plays DESC, last DESC LIMIT ?`,
+  );
+  const playsEver = rows(`${PLAY_SUMS} WHERE p.user_id = ? GROUP BY p.track_id ORDER BY plays DESC, last DESC LIMIT ?`);
   // Tracks that name this artist page, and the ones that name no page at all (matched by name in rankPlays).
   const playsMaybeBy = rows(`${PLAY_SUMS} WHERE p.user_id = ? AND (t.artist_id = ? OR t.artist_id IS NULL) GROUP BY p.track_id ${RECENT}`);
   const playsOf = one(`SELECT COUNT(*) AS rows, COALESCE(SUM(count), 0) AS n, COALESCE(MAX(played_at), 0) AS last FROM plays WHERE user_id = ? AND track_id = ?`);
@@ -272,6 +277,8 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
         playsFor: (artistId, name, limit = 20) => tx(() => rankPlays(playsMaybeBy(uid, artistId).map(toPlay), artistId, name, limit)),
 
         allPlays: () => tx(() => playsAll(uid).map(toPlay)),
+
+        topPlays: (since, limit) => tx(() => (since > 0 ? playsSince(uid, since, limit) : playsEver(uid, limit)).map(toPlay)),
 
         addFavorite: (track) =>
           tx(() => {

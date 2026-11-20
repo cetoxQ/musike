@@ -48,6 +48,7 @@ export const en = {
     home: "Home",
     search: "Search",
     library: "Library",
+    profile: "Profile",
     settings: "Settings",
     settingsAttention: "Settings (needs attention)",
     settingsUpdate: "Settings (yt-dlp update available)",
@@ -207,6 +208,29 @@ export const en = {
     fullscreen: "Full screen",
     exitFullscreen: "Exit full screen",
     close: "Close video (Esc)",
+  },
+
+  profile: {
+    title: "Profile",
+    label: "Profile",
+    you: "You",
+    summary: (favorites: number, artists: number, playlists: number) =>
+      `${favorites} favorites · ${artists} ${artists === 1 ? "artist" : "artists"} followed · ${playlists} ${playlists === 1 ? "playlist" : "playlists"}`,
+    playTop: "Play your most played",
+    shuffleFavorites: "Shuffle your favorites",
+    top: "Your most played",
+    lately: "Last 3 months",
+    ever: "All time",
+    noTop: "Nothing played yet: a track counts after 30 seconds.",
+    standaloneTop:
+      "On this phone on its own, plays aren't kept by date: these are the tracks played in the last 3 months, by all their plays. Connected to a Musike server, only the plays of these 3 months count.",
+    albums: "Albums",
+    singles: "Singles & EPs",
+    artists: "Artists you follow",
+    live: "Live",
+    playlists: "Your playlists",
+    savedPlaylists: "Saved playlists",
+    alsoLike: "You might also like",
   },
 
   share: {

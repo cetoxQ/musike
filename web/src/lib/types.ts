@@ -180,6 +180,12 @@ export type ArtistShelf =
   | { kind: "playlists"; title: string; playlists: PlaylistCard[] }
   | { kind: "artists"; title: string; artists: ArtistCard[] };
 
+/** The profile's "You might also like" and the live performances its artists' pages list. */
+export interface Discover {
+  artists: ArtistCard[];
+  live: string[];
+}
+
 export interface AlbumPage {
   id: string;
   title: string;

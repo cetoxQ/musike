@@ -17,6 +17,7 @@ import {
 } from "../../../server/src/browse";
 import { msg, tr, type MsgKey } from "../../../server/src/i18n";
 import * as library from "../../../server/src/library";
+import { discover } from "../../../server/src/profile";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
@@ -124,6 +125,11 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       if (!ARTIST_ID.test(artistId)) throw fail(400, "invalidArtist");
       return lib.playsFor(artistId, (name ?? "").slice(0, 300));
     }, signal),
+  topPlays: (range, limit = 5, signal) =>
+    call(() => lib.topPlays(range === "all" ? 0 : Date.now() - 91 * 24 * 3600_000, Math.min(Math.max(limit, 1), 100)), signal),
+  // On the phone: the artists' pages from YouTube, from here.
+  discover: (signal) =>
+    call(async () => discover(await lib.allPlays(), (await lib.getLibraryLite()).artists, (id) => artistPage(id, getLang())), signal),
   saveArtist: (a) => call(async () => ({ artists: await lib.saveArtist(library.sanitizeArtist(a)) })),
   removeArtist: (id) => call(async () => ({ artists: await lib.removeArtist(id) })),
   saveAlbum: (a) => call(async () => ({ albums: await lib.saveAlbum(library.sanitizeAlbum(a)) })),
@@ -222,7 +228,7 @@ export const systemMedia = media;
  * On the phone alone there's no video (videos play as audio). Connected to a server, the server streams the video
  * too, as in the browser.
  */
-export const capabilities = { video: !!server, engineSettings: false, retryOnError: true };
+export const capabilities = { video: !!server, engineSettings: false, retryOnError: true, playLog: !!server };
 
 /** Android Auto's lists and searches (native/car.ts), loaded only in the app. */
 export const startCar: (() => void) | null = () => void import("./car").then((m) => m.startCar());

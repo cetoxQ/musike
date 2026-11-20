@@ -19,6 +19,7 @@ import type {
   AlbumPage,
   ArtistCard,
   ArtistPage,
+  Discover,
   Genre,
   GenreArtist,
   GenrePage,
@@ -139,6 +140,9 @@ export function httpBackend(opts: HttpBackendOptions) {
         artistId ? `/api/plays?artist=${artistId}&name=${encodeURIComponent(name ?? "")}` : "/api/plays",
         { signal },
       ).then((r) => r.plays),
+    topPlays: (range: "3m" | "all", limit = 5, signal?: AbortSignal) =>
+      request<{ plays: PlayEntry[] }>(`/api/profile/top?range=${range}&limit=${limit}`, { signal }).then((r) => r.plays),
+    discover: (signal?: AbortSignal) => request<Discover>("/api/profile/discover", { signal }),
     saveArtist: (a: SavedArtist) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${a.id}`, { method: "PUT", json: a }),
     removeArtist: (id: string) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${id}`, { method: "DELETE" }),
     saveAlbum: (a: SavedAlbum) => request<{ albums: SavedAlbum[] }>(`/api/library/albums/${a.id}`, { method: "PUT", json: a }),

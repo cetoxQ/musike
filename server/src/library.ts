@@ -38,6 +38,11 @@ export interface LibraryStore {
   playsFor(artistId: string, name: string, limit?: number): Promise<PlayEntry[]>;
   /** The whole play log, most recently played first. */
   allPlays(): Promise<PlayEntry[]>;
+  /**
+   * The most played tracks since a time (ms; 0: ever), most played first. The JSON library keeps only totals: it
+   * ranks the tracks played since then by all their plays.
+   */
+  topPlays(since: number, limit: number): Promise<PlayEntry[]>;
   addFavorite(track: Track): Promise<Track[]>;
   /** Adds many at once (in the given order, on top), skipping ones already there. */
   addFavorites(tracks: Track[]): Promise<Track[]>;
@@ -403,6 +408,13 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
 
     async allPlays() {
       return (await load()).plays;
+    },
+
+    async topPlays(since, limit) {
+      return (await load()).plays
+        .filter((p) => p.lastPlayed >= since)
+        .sort((a, b) => b.count - a.count || b.lastPlayed - a.lastPlayed)
+        .slice(0, limit);
     },
 
     async addFavorite(track) {

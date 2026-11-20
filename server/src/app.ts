@@ -21,6 +21,7 @@ import {
 import { config } from "./config.js";
 import { DEFAULT_USER } from "./db.js";
 import * as library from "./library.js";
+import { discover, type Discover } from "./profile.js";
 import { findVideoFor, radio, search, suggestions } from "./search.js";
 import { passwordGate, sameOriginWrites, securityHeaders } from "./security.js";
 import { openServerLibrary } from "./storage.js";
@@ -101,6 +102,11 @@ export interface RunningServer {
 }
 
 /** Builds the Musike HTTP server (API + web app) and starts listening. */
+
+/** The profile's "most played lately". */
+const PROFILE_RANGE_MS = 91 * 24 * 3600_000;
+/** How long the profile's suggestions are kept before they're worked out again. */
+const DISCOVER_MS = 24 * 3600_000;
 
 /** The device a request comes from (sync.ts's id for it), as the web app says in a header. */
 function deviceOf(req: FastifyRequest): string | undefined {
@@ -355,6 +361,36 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const { aid } = req.params as { aid: string };
     if (!ARTIST_ID.test(aid)) throw new HttpError(400, msg("invalidArtist"));
     return artist(aid, langOf(req));
+  });
+
+  // The profile: the most played (the last 3 months, or ever) and artists to try.
+  app.get("/api/profile/top", async (req) => {
+    const { range, limit } = req.query as { range?: string; limit?: string };
+    const since = range === "all" ? 0 : Date.now() - PROFILE_RANGE_MS;
+    const n = Math.min(Math.max(Math.trunc(Number(limit)) || 5, 1), 100);
+    return { plays: await libOf(req).topPlays(since, n) };
+  });
+
+  // Worked out from a dozen artist pages: kept a day per account and language, refreshed in the background after.
+  const discovered = new Map<string, { at: number; value: Discover | null; running: Promise<Discover> | null }>();
+  app.get("/api/profile/discover", async (req) => {
+    const lang = langOf(req);
+    const key = `${req.user?.id ?? DEFAULT_USER}:${lang}`;
+    const lib = libOf(req);
+    let e = discovered.get(key);
+    if (!e) discovered.set(key, (e = { at: 0, value: null, running: null }));
+    const entry = e;
+    if (!entry.running && Date.now() - entry.at > DISCOVER_MS) {
+      entry.running = (async () => discover(await lib.allPlays(), (await lib.getLibraryLite()).artists, (id) => artist(id, lang)))()
+        .then((value) => {
+          entry.value = value;
+          entry.at = Date.now();
+          return value;
+        })
+        .finally(() => (entry.running = null));
+      entry.running.catch(() => {});
+    }
+    return entry.value ?? (await entry.running!);
   });
 
   app.get("/api/albums/:alid", async (req) => {

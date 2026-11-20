@@ -76,6 +76,8 @@ const CATALOG = [
   "ytPlaylist",
   "videoFor",
   "system",
+  "topPlays",
+  "discover",
 ] as const;
 
 /** Changes that name a playlist by its id (first argument): one created offline gets the server's id. */

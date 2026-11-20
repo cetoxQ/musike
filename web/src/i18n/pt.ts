@@ -43,6 +43,7 @@ export const pt: Messages = {
     home: "Início",
     search: "Buscar",
     library: "Biblioteca",
+    profile: "Perfil",
     settings: "Ajustes",
     settingsAttention: "Ajustes (atenção necessária)",
     settingsUpdate: "Ajustes (atualização do yt-dlp disponível)",
@@ -201,6 +202,29 @@ export const pt: Messages = {
     fullscreen: "Tela cheia",
     exitFullscreen: "Sair da tela cheia",
     close: "Fechar vídeo (Esc)",
+  },
+
+  profile: {
+    title: "Perfil",
+    label: "Perfil",
+    you: "Você",
+    summary: (favorites: number, artists: number, playlists: number) =>
+      `${favorites} favoritas · ${artists} ${artists === 1 ? "artista seguido" : "artistas seguidos"} · ${playlists} playlists`,
+    playTop: "Tocar suas mais ouvidas",
+    shuffleFavorites: "Favoritas em ordem aleatória",
+    top: "Suas mais ouvidas",
+    lately: "Últimos 3 meses",
+    ever: "Sempre",
+    noTop: "Nada ouvido ainda: uma faixa conta depois de 30 segundos.",
+    standaloneTop:
+      "Só no celular, as reproduções não ficam com data: estas são as faixas ouvidas nos últimos 3 meses, por todas as suas reproduções. Conectado a um servidor Musike, contam só as destes 3 meses.",
+    albums: "Álbuns",
+    singles: "Singles e EPs",
+    artists: "Artistas que você segue",
+    live: "Ao vivo",
+    playlists: "Suas playlists",
+    savedPlaylists: "Playlists salvas",
+    alsoLike: "Você também pode gostar",
   },
 
   share: {

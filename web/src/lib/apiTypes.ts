@@ -3,6 +3,7 @@ import type {
   AlbumPage,
   ArtistCard,
   ArtistPage,
+  Discover,
   Genre,
   GenreArtist,
   GenrePage,
@@ -178,6 +179,10 @@ export interface MusikeApi {
   pushHistory(t: Track, at?: number): Promise<{ history: Track[] }>;
   /** One artist's tracks played here, most played first; without an artist, the whole play log. */
   plays(artistId?: string, name?: string, signal?: AbortSignal): Promise<PlayEntry[]>;
+  /** The profile: the most played in the last 3 months, or ever. */
+  topPlays(range: "3m" | "all", limit?: number, signal?: AbortSignal): Promise<PlayEntry[]>;
+  /** The profile: artists to try, from the pages of the ones you play and follow. */
+  discover(signal?: AbortSignal): Promise<Discover>;
   saveArtist(a: SavedArtist): Promise<{ artists: SavedArtist[] }>;
   removeArtist(id: string): Promise<{ artists: SavedArtist[] }>;
   saveAlbum(a: SavedAlbum): Promise<{ albums: SavedAlbum[] }>;
