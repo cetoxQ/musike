@@ -536,6 +536,18 @@ export const en = {
     role: "Role",
   },
 
+  // The Android app connected to a server that can't be reached.
+  offline: {
+    gone: "The server can't be reached: Musike goes on from this phone and sends your changes when it's back.",
+    back: "Back on the server.",
+    backSent: (n: number) => (n === 1 ? "Back on the server: 1 change sent." : `Back on the server: ${n} changes sent.`),
+    needsServer: "This needs the server, which can't be reached right now.",
+    status: (since: string) => `The server hasn't answered since ${since}. Musike plays and searches from this phone, with your library as it was then.`,
+    pending: (n: number) => (n === 1 ? "1 change waiting for the server." : `${n} changes waiting for the server.`),
+    retry: "Try now",
+    trying: "Trying",
+  },
+
   // Android Auto's lists.
   car: {
     queue: "Queue",

@@ -5,6 +5,7 @@ import {
   HISTORY_LIMIT,
   importLists,
   type LibraryStore,
+  playedAt,
   playlistName,
   randomUUID,
   rankPlays,
@@ -327,12 +328,12 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
             return ytPlaylists.list(uid);
           }),
 
-        pushHistory: (track) =>
+        pushHistory: (track, at) =>
           tx(() => {
             history.putOnTop(uid, [track]);
             history.trim(uid, HISTORY_LIMIT);
-            // Every start counts as a play, the same moment the track enters the history.
-            playInsert(uid, track.id, Date.now(), 1, "app");
+            // Every start counts as a play, the same moment the track enters the history (or when it was played).
+            playInsert(uid, track.id, playedAt(at), 1, "app");
             return history.list(uid);
           }),
 

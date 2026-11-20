@@ -57,6 +57,23 @@ export interface UserInfo extends AuthUser {
  */
 export const authEvents: { listener: ((code: "auth_required" | "password_change_required") => void) | null } = { listener: null };
 
+/**
+ * The Android app connected to a server: whether the server answers. While it doesn't, the app goes on from the
+ * phone with a copy of the account's library, and queues what changes (native/offline.ts).
+ */
+export interface ServerLink {
+  online: boolean;
+  /** Since when the server hasn't answered (ms), while offline. */
+  since: number | null;
+  /** Changes waiting for the server. */
+  pending: number;
+  subscribe(fn: () => void): () => void;
+  /** Try the server now; true once it answers. */
+  retry(): Promise<boolean>;
+  /** Connected: is the server still there? If not, the app goes on from the phone (false). */
+  check(): Promise<boolean>;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: ErrorCode) {
     super(message);
@@ -157,7 +174,8 @@ export interface MusikeApi {
   addFavorite(t: Track): Promise<{ favorites: Track[] }>;
   addFavorites(tracks: Track[]): Promise<{ favorites: Track[] }>;
   removeFavorite(id: string): Promise<{ favorites: Track[] }>;
-  pushHistory(t: Track): Promise<{ history: Track[] }>;
+  /** `at`: when it was played (ms), for a play sent later; otherwise now. */
+  pushHistory(t: Track, at?: number): Promise<{ history: Track[] }>;
   /** One artist's tracks played here, most played first; without an artist, the whole play log. */
   plays(artistId?: string, name?: string, signal?: AbortSignal): Promise<PlayEntry[]>;
   saveArtist(a: SavedArtist): Promise<{ artists: SavedArtist[] }>;

@@ -529,6 +529,17 @@ export const pt: Messages = {
     role: "Função",
   },
 
+  offline: {
+    gone: "O servidor não responde: o Musike continua pelo celular e envia suas mudanças quando ele voltar.",
+    back: "De volta ao servidor.",
+    backSent: (n: number) => (n === 1 ? "De volta ao servidor: 1 mudança enviada." : `De volta ao servidor: ${n} mudanças enviadas.`),
+    needsServer: "Isto precisa do servidor, que não responde agora.",
+    status: (since: string) => `O servidor não responde desde ${since}. O Musike toca e busca pelo celular, com a sua biblioteca como estava.`,
+    pending: (n: number) => (n === 1 ? "1 mudança esperando o servidor." : `${n} mudanças esperando o servidor.`),
+    retry: "Tentar agora",
+    trying: "Tentando",
+  },
+
   car: {
     queue: "Fila",
     favorites: "Favoritas",

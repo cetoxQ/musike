@@ -49,8 +49,11 @@ export interface LibraryStore {
   removeAlbum(id: string): Promise<SavedAlbum[]>;
   saveYtPlaylist(playlist: SavedYtPlaylist): Promise<SavedYtPlaylist[]>;
   removeYtPlaylist(id: string): Promise<SavedYtPlaylist[]>;
-  /** A track started: on top of the history, and one more play in the play log. */
-  pushHistory(track: Track): Promise<Track[]>;
+  /**
+   * A track started: on top of the history, and one more play in the play log, at `at` when given (a play made
+   * on a phone while the server was out of reach, sent later) or now.
+   */
+  pushHistory(track: Track, at?: unknown): Promise<Track[]>;
   createPlaylist(name: string, tracks?: Track[]): Promise<Playlist>;
   renamePlaylist(pid: string, name: string): Promise<Playlist>;
   deletePlaylist(pid: string): Promise<void>;
@@ -83,6 +86,13 @@ const url = (v: unknown) => {
   return /^https:\/\//.test(s) ? s : "";
 };
 const time = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : Date.now());
+
+/** When a play was made, as a client says: in the last year and not in the future, otherwise now. */
+export function playedAt(at: unknown, now = Date.now()): number {
+  const n = typeof at === "string" && /^\d{1,16}$/.test(at) ? Number(at) : at;
+  if (typeof n !== "number" || !Number.isSafeInteger(n)) return now;
+  return n > now || n < now - 366 * 24 * 3600_000 ? now : n;
+}
 
 export function sanitizeTrack(input: unknown): Track {
   const t = (input ?? {}) as Record<string, unknown>;
@@ -460,13 +470,14 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
       return lib.ytPlaylists;
     },
 
-    async pushHistory(track) {
+    async pushHistory(track, at) {
       const lib = await load();
       lib.history = [track, ...lib.history.filter((t) => t.id !== track.id)].slice(0, HISTORY_LIMIT);
       // Every start counts as a play, the same moment the track enters the history.
       const before = lib.plays.find((p) => p.track.id === track.id);
+      const when = playedAt(at);
       lib.plays = [
-        { track, count: (before?.count ?? 0) + 1, lastPlayed: Date.now() },
+        { track, count: (before?.count ?? 0) + 1, lastPlayed: Math.max(before?.lastPlayed ?? 0, when) },
         ...lib.plays.filter((p) => p.track.id !== track.id),
       ].slice(0, PLAYS_LIMIT);
       await persist();

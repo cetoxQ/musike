@@ -1,7 +1,7 @@
-import { CloudArrowUpIcon, DesktopIcon, DeviceMobileIcon, HardDrivesIcon, WarningIcon } from "@phosphor-icons/react";
-import { useState, type FormEvent } from "react";
+import { ArrowClockwiseIcon, CloudArrowUpIcon, CloudSlashIcon, DesktopIcon, DeviceMobileIcon, HardDrivesIcon, WarningIcon } from "@phosphor-icons/react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { useT } from "../i18n";
-import { connection } from "../lib/api";
+import { connection, link } from "../lib/api";
 import { desktop } from "../lib/desktop";
 import { cn } from "../lib/format";
 import { useAuth } from "../stores/auth";
@@ -99,6 +99,7 @@ export function ServerSection() {
         ) : (
           <>
             {c.mode === "server" && <p className="text-sm font-medium">{t.server.connectedTo(c.url)}</p>}
+            {c.mode === "server" && <OfflineNote />}
             <form onSubmit={connect} className="flex flex-col gap-2">
               <Field id="server-address" label={t.server.address} value={address} onChange={setAddress} autoComplete="url" />
               <button
@@ -133,5 +134,39 @@ export function ServerSection() {
         )}
       </div>
     </section>
+  );
+}
+
+const noLink = () => () => {};
+
+/** Connected to a server that doesn't answer: since when, what waits for it, and a way to try now. */
+function OfflineNote() {
+  const t = useT();
+  // Re-renders when the server comes and goes (or a change is queued).
+  const state = useSyncExternalStore(link?.subscribe ?? noLink, () => (link ? `${link.online}:${link.pending}:${link.since}` : ""));
+  const [trying, setTrying] = useState(false);
+  if (!link || link.online || !state) return null;
+  const since = new Date(link.since ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return (
+    <div role="status" className="flex flex-col gap-2 rounded-[14px] bg-surface-1 p-3 text-sm ring-1 ring-line">
+      <p className="flex items-start gap-2 text-fg-2">
+        <CloudSlashIcon size={18} className="mt-0.5 shrink-0 text-fg-3" />
+        <span>
+          {t.offline.status(since)}
+          {link.pending > 0 && <> {t.offline.pending(link.pending)}</>}
+        </span>
+      </p>
+      <button
+        type="button"
+        disabled={trying}
+        onClick={() => {
+          setTrying(true);
+          void link?.retry().finally(() => setTrying(false));
+        }}
+        className="flex h-10 items-center justify-center gap-2 self-start rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3 disabled:opacity-50"
+      >
+        <ArrowClockwiseIcon size={16} /> {trying ? t.offline.trying : t.offline.retry}
+      </button>
+    </div>
   );
 }

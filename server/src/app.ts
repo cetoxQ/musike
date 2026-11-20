@@ -426,7 +426,10 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   app.delete("/api/favorites/:id", async (req) => ({ favorites: await libOf(req).removeFavorite(videoId(req.params)) }));
 
-  app.post("/api/history", async (req) => ({ history: await libOf(req).pushHistory(library.sanitizeTrack(req.body)) }));
+  // ?at=: when the track was played (ms), for plays a phone made while the server was out of reach.
+  app.post("/api/history", async (req) => ({
+    history: await libOf(req).pushHistory(library.sanitizeTrack(req.body), (req.query as { at?: unknown }).at),
+  }));
 
   /** The Search page's "Recent" list: what you searched for, opened or played. */
   app.get("/api/recent", async (req) => ({ recent: await libOf(req).recent() }));

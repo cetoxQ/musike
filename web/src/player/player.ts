@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getT, useT } from "../i18n";
-import { api, capabilities, explainStreamError, streamSource, systemMedia, type ApiError, type ErrorCode } from "../lib/api";
+import { api, capabilities, explainStreamError, link, streamSource, systemMedia, type ApiError, type ErrorCode } from "../lib/api";
 import { createAudio } from "../lib/audio";
 import { shuffled } from "../lib/format";
 import type { Track } from "../lib/types";
@@ -213,6 +213,8 @@ const needsClipLookup = (track: Track, preferVideo: boolean) =>
 
 /** No progress for this long while it should play: treated like a stream error. */
 const STALL_MS = 20_000;
+/** Connected to a server, after this long the server is checked: gone, the stream comes from the phone at once. */
+const STALL_CHECK_MS = 6000;
 
 export const usePlayer = create<PlayerState>((set, get) => {
   /** Where an action goes instead of this device's player: the device being controlled, if any. */
@@ -447,14 +449,24 @@ export const usePlayer = create<PlayerState>((set, get) => {
   // A stream that stops arriving (the network gone, a server that stopped answering) doesn't always end in an
   // error: the player would wait forever, looking alive. No progress for a while is treated as one, so it's tried
   // again (from the phone itself when the server is out of reach).
+  let checkedStall = 0;
   setInterval(() => {
     const media = activeMedia();
     const s = get();
     if (!media || s.remote || s.status !== "loading" || media.paused || !media.src) return;
-    if (Date.now() - lastProgress < STALL_MS) return;
+    const stuck = Date.now() - lastProgress;
+    if (link?.online && stuck >= STALL_CHECK_MS && checkedStall !== lastProgress) {
+      const at = (checkedStall = lastProgress);
+      void link.check().then((ok) => {
+        if (ok || lastProgress !== at || activeMedia() !== media || get().status !== "loading") return;
+        lastProgress = Date.now();
+        onError(media);
+      });
+    }
+    if (stuck < STALL_MS) return;
     lastProgress = Date.now();
     onError(media);
-  }, 5000);
+  }, 2000);
 
   const reloadIfKindChanged = () => {
     const s = get();

@@ -1,5 +1,5 @@
 import { getT } from "../i18n";
-import { ApiError, type Connection, type MusikeApi, type SystemMedia } from "./apiTypes";
+import { ApiError, type Connection, type MusikeApi, type ServerLink, type SystemMedia } from "./apiTypes";
 import { desktop } from "./desktop";
 import { httpBackend } from "./httpApi";
 
@@ -71,6 +71,9 @@ function desktopConnection(
     },
   };
 }
+
+/** Whether the server answers: only the Android app connected to one (native/api.ts). */
+export const link: ServerLink | null = null;
 
 /** Android Auto: only the Android app (native/api.ts). */
 export const startCar: (() => void) | null = null;

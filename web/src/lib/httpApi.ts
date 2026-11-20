@@ -129,7 +129,8 @@ export function httpBackend(opts: HttpBackendOptions) {
     addFavorite: (t: Track) => request<{ favorites: Track[] }>(`/api/favorites/${t.id}`, { method: "PUT", json: t }),
     addFavorites: (tracks: Track[]) => request<{ favorites: Track[] }>("/api/favorites", { method: "POST", json: { tracks } }),
     removeFavorite: (id: string) => request<{ favorites: Track[] }>(`/api/favorites/${id}`, { method: "DELETE" }),
-    pushHistory: (t: Track) => request<{ history: Track[] }>("/api/history", { method: "POST", json: t }),
+    pushHistory: (t: Track, at?: number) =>
+      request<{ history: Track[] }>(at ? `/api/history?at=${Math.round(at)}` : "/api/history", { method: "POST", json: t }),
     plays: (artistId?: string, name?: string, signal?: AbortSignal) =>
       request<{ plays: PlayEntry[] }>(
         artistId ? `/api/plays?artist=${artistId}&name=${encodeURIComponent(name ?? "")}` : "/api/plays",

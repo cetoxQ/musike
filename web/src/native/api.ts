@@ -20,10 +20,11 @@ import * as library from "../../../server/src/library";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
-import { ApiError, type Connection, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
+import { ApiError, type Connection, type MusikeApi, type ServerLink, type SystemInfo } from "../lib/apiTypes";
 import "./android";
 import { makeConnection, savedConnection, serverBackend } from "./connection";
 import { media } from "./media";
+import { offlineCapable } from "./offline";
 import { nativeStorage } from "./storage";
 import { forgetUrl, resolveAudio } from "./streams";
 
@@ -69,7 +70,9 @@ const SYSTEM: SystemInfo = {
   job: null,
 };
 
-const onThePhone: MusikeApi = {
+/** The phone's own engine (YouTube, from the phone) over a library: the phone's own, or the copy of a server account's. */
+function phoneApi(lib: library.LibraryStore): MusikeApi {
+  return {
   search: (q, type, signal) =>
     call(async () => {
       if (!q.trim()) throw fail(400, "emptyQuery");
@@ -114,7 +117,7 @@ const onThePhone: MusikeApi = {
   addFavorite: (t) => call(async () => ({ favorites: await lib.addFavorite(library.sanitizeTrack(t)) })),
   addFavorites: (list) => call(async () => ({ favorites: await lib.addFavorites(tracks(list)) })),
   removeFavorite: (id) => call(async () => ({ favorites: await lib.removeFavorite(id) })),
-  pushHistory: (t) => call(async () => ({ history: await lib.pushHistory(library.sanitizeTrack(t)) })),
+  pushHistory: (t, at) => call(async () => ({ history: await lib.pushHistory(library.sanitizeTrack(t), at) })),
   plays: (artistId, name, signal) =>
     call(async () => {
       if (artistId === undefined) return lib.allPlays();
@@ -160,19 +163,36 @@ const onThePhone: MusikeApi = {
   setUserRole: noAccounts,
   resetUserPassword: noAccounts,
   deleteUser: noAccounts,
-};
+  };
+}
 
-export const api: MusikeApi = server ? server.api : onThePhone;
+const onThePhone = phoneApi(lib);
+
+/** Connected to a server: the server, or the phone with the account's copy while the server is out of reach. */
+const offline = server ? offlineCapable({ url: saved.url, server: server.api, phone: phoneApi }) : null;
+
+export const api: MusikeApi = offline ? offline.api : onThePhone;
+
+/** Whether the server answers (connected to one), for Settings and to reload when it's back. */
+export const link: ServerLink | null = offline?.link ?? null;
+
+const phoneStream = (id: string) => resolveAudio(id).then((r) => r.url);
 
 /**
  * On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. Connected to a
- * server, it plays the server's stream proxy.
+ * server, it plays the server's stream proxy; with the server out of reach, the phone's again (audio only).
  */
 export const streamSource = (id: string, kind: "audio" | "video" = "audio", quality: "sd" | "hd" = "sd"): Promise<string> =>
-  server ? server.streamUrl(id, kind, quality) : resolveAudio(id).then((r) => r.url);
+  server && offline
+    ? offline.streamSource(id, () => server.streamUrl(id, kind, quality), () => phoneStream(id))
+    : phoneStream(id);
 
 export async function explainStreamError(url: string, error?: MediaError | null): Promise<{ message: string }> {
-  if (server) return server.explain(url, error);
+  // The server's stream: the server says why, if it's still there.
+  if (server && offline && (url.startsWith(saved.url) || url.includes("_capacitor_http_interceptor_"))) {
+    if (!(await offline.check())) return { message: getT().offline.gone };
+    return server.explain(url, error);
+  }
   forgetUrl(url);
   return { message: navigator.onLine ? getT().player.streamFailed : getT().player.offline };
 }
