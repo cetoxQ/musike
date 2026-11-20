@@ -25,6 +25,35 @@ export async function saveFile(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/**
+ * Shares a link: the system's share sheet where the browser has one (not in the desktop app), otherwise copied.
+ * Called straight from a click: the share sheet needs it.
+ */
+export async function shareLink(title: string, url: string): Promise<"shared" | "copied" | "cancelled"> {
+  if (!desktop && typeof navigator.share === "function") {
+    try {
+      await navigator.share({ title, url });
+      return "shared";
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return "cancelled";
+    }
+  }
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    return "copied";
+  }
+  // http, where the clipboard API isn't there.
+  const area = Object.assign(document.createElement("textarea"), { value: url, readOnly: true });
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  const ok = document.execCommand("copy");
+  area.remove();
+  if (!ok) throw new Error("copy");
+  return "copied";
+}
+
 /** Only the Android app needs its own bridge to the system's media controls. */
 export const systemMedia: SystemMedia | null = null;
 

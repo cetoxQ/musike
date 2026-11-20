@@ -3,9 +3,48 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useT, type Messages } from "../i18n";
 import { cn } from "../lib/format";
 import { useLibrary } from "../stores/library";
+import { send, useShare, type ShareSite } from "../lib/share";
 import { useUi } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { Modal } from "./Modal";
+
+/** The first share: YouTube or YouTube Music links (kept; Settings changes it). */
+export function ShareDialog() {
+  const asking = useShare((s) => s.asking);
+  const t = useT();
+  const close = () => useShare.setState({ asking: null });
+  const pick = (site: ShareSite) => {
+    const item = useShare.getState().asking;
+    useShare.getState().setSite(site);
+    close();
+    if (item) void send(item, site);
+  };
+  const sites: [ShareSite, string][] = [
+    ["youtube", t.share.youtube],
+    ["ytmusic", t.share.ytmusic],
+  ];
+  return (
+    <Modal open={!!asking} onClose={close} title={t.share.chooseTitle}>
+      <p className="text-sm text-fg-2">{t.share.chooseBody}</p>
+      <div className="flex flex-col gap-2 pt-4">
+        {sites.map(([site, label], i) => (
+          <button
+            key={site}
+            type="button"
+            autoFocus={i === 0}
+            onClick={() => pick(site)}
+            className={cn(
+              "flex h-12 items-center justify-center rounded-full text-[15px] font-semibold transition-transform active:scale-[0.98]",
+              i === 0 ? "bg-accent text-accent-ink" : "bg-surface-3 hover:bg-surface-4",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
 
 export function AddToPlaylistDialog() {
   const tracks = useUi((s) => s.addToPlaylist);

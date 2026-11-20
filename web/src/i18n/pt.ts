@@ -203,6 +203,18 @@ export const pt: Messages = {
     close: "Fechar vídeo (Esc)",
   },
 
+  share: {
+    share: "Compartilhar",
+    shareX: (name: string) => `Compartilhar ${name}`,
+    chooseTitle: "Compartilhar links do",
+    chooseBody: "Quem receber o link abre lá. Você pode mudar depois nas Configurações.",
+    youtube: "YouTube",
+    ytmusic: "YouTube Music",
+    setting: "Links compartilhados abrem no",
+    copied: "Link copiado",
+    failed: "Não foi possível compartilhar",
+  },
+
   trackMenu: {
     actionsFor: (title) => `Ações para ${title}`,
     playNow: "Tocar agora",

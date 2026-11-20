@@ -104,6 +104,8 @@ export interface AlbumPage {
   thumb: string;
   art: string;
   tracks: Track[];
+  /** The album as a playlist (OLAK5uy_...): its address on YouTube, where albums have no page of their own. */
+  playlistId?: string;
 }
 
 
@@ -525,6 +527,7 @@ const albumPage = cached(60 * MINUTE, async (key): Promise<AlbumPage> => {
       }),
     );
   if (!title && !tracks.length) throw new HttpError(404, msg("albumNotFound"));
+  const playlistId = /[?&]list=(OLAK5uy_[\w-]{10,60})/.exec(String(album.url ?? ""))?.[1];
   return {
     id,
     title,
@@ -535,6 +538,7 @@ const albumPage = cached(60 * MINUTE, async (key): Promise<AlbumPage> => {
     thumb: cover.thumb,
     art: cover.art,
     tracks,
+    ...(playlistId ? { playlistId } : {}),
   };
 });
 

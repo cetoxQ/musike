@@ -1,4 +1,5 @@
-import { CaretDownIcon, CaretUpIcon, MusicNotesIcon, PlayIcon, ShuffleIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CaretUpIcon, MusicNotesIcon, PlayIcon, ShareNetworkIcon, ShuffleIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { share } from "../lib/share";
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router";
 import { AlbumRow } from "../components/AlbumTiles";
@@ -136,6 +137,9 @@ export default function Artist() {
         >
           {following ? t.artist.following : t.artist.follow}
         </button>
+        <IconButton label={t.share.shareX(name)} onClick={() => share({ kind: "artist", id, name })}>
+          <ShareNetworkIcon size={22} />
+        </IconButton>
       </div>
 
       <h2 className="px-4 pt-6 pb-1 text-xl font-semibold tracking-tight md:px-6">{t.artist.hits}</h2>

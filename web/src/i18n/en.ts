@@ -209,6 +209,18 @@ export const en = {
     close: "Close video (Esc)",
   },
 
+  share: {
+    share: "Share",
+    shareX: (name: string) => `Share ${name}`,
+    chooseTitle: "Share links from",
+    chooseBody: "Whoever gets the link opens it there. You can change this later in Settings.",
+    youtube: "YouTube",
+    ytmusic: "YouTube Music",
+    setting: "Shared links open on",
+    copied: "Link copied",
+    failed: "Couldn't share this",
+  },
+
   trackMenu: {
     actionsFor: (title: string) => `Actions for ${title}`,
     playNow: "Play now",

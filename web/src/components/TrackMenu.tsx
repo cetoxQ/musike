@@ -9,8 +9,10 @@ import {
   PlaylistIcon,
   QueueIcon,
   RadioIcon,
+  ShareNetworkIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
+import { share } from "../lib/share";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -145,6 +147,12 @@ export function TrackMenu() {
         onClick={run(() => window.open(`https://www.youtube.com/watch?v=${menu.track.id}`, "_blank", "noopener"))}
       >
         {t.trackMenu.openYoutube}
+      </Item>
+      <Item
+        icon={<ShareNetworkIcon size={18} />}
+        onClick={run(() => share({ kind: "track", id: menu.track.id, title: menu.track.title, artist: menu.track.artist }))}
+      >
+        {t.share.share}
       </Item>
     </div>
   );

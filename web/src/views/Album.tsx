@@ -6,9 +6,11 @@ import {
   PlayIcon,
   PlaylistIcon,
   PlusCircleIcon,
+  ShareNetworkIcon,
   ShuffleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
+import { share } from "../lib/share";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
@@ -131,6 +133,13 @@ export default function Album() {
           >
             {/* Not a heart: the heart in the bar below adds tracks to Favorites, this keeps the album itself. */}
             {inLibrary ? <CheckCircleIcon size={26} weight="fill" /> : <PlusCircleIcon size={26} />}
+          </IconButton>
+          <IconButton
+            label={t.share.shareX(album.title)}
+            size="lg"
+            onClick={() => share({ kind: "album", id: album.id, title: album.title, artist: album.artist, playlistId: album.playlistId })}
+          >
+            <ShareNetworkIcon size={24} />
           </IconButton>
           {saved ? (
             <Link

@@ -191,4 +191,6 @@ export interface AlbumPage {
   thumb: string;
   art: string;
   tracks: Track[];
+  /** The album as a playlist (OLAK5uy_...): its address on YouTube. Missing from older servers. */
+  playlistId?: string;
 }

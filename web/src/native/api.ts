@@ -200,6 +200,16 @@ export async function explainStreamError(url: string, error?: MediaError | null)
 /** Where the library and the music come from: this phone, or a Musike server (Settings > Server). */
 export const connection: Connection = makeConnection(saved, api, () => lib.getLibrary());
 
+/** Links go out through Android's share sheet (WhatsApp, Telegram, copy...). */
+export async function shareLink(title: string, url: string): Promise<"shared" | "copied" | "cancelled"> {
+  try {
+    await Share.share({ title, text: title, url, dialogTitle: title });
+    return "shared";
+  } catch {
+    return "cancelled";
+  }
+}
+
 /** Backups are shared through Android's share sheet (save to Files, Drive, send to the computer…). */
 export async function saveFile(name: string, text: string) {
   const { uri } = await Filesystem.writeFile({ path: name, data: text, directory: Directory.Cache, encoding: Encoding.UTF8 });

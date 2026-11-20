@@ -3,6 +3,7 @@ import {
   CheckCircleIcon,
   DownloadSimpleIcon,
   MoonIcon,
+  ShareNetworkIcon,
   SunIcon,
   TranslateIcon,
   WarningCircleIcon,
@@ -11,6 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LANGUAGES, useI18n, useT, type Lang } from "../i18n";
 import { capabilities, type Channel } from "../lib/api";
 import { cn } from "../lib/format";
+import { useShare } from "../lib/share";
 import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
 import { useUi } from "../stores/ui";
@@ -161,6 +163,8 @@ export function SettingsDialog() {
           />
         </section>
 
+        <ShareSection />
+
         <LayoutSection />
 
         <BackupSection />
@@ -256,5 +260,28 @@ export function SettingsDialog() {
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Where shared links open: YouTube (the default) or YouTube Music. */
+function ShareSection() {
+  const t = useT();
+  const site = useShare((s) => s.site) ?? "youtube";
+  const setSite = useShare((s) => s.setSite);
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-1.5 text-xs font-medium text-fg-3">
+        <ShareNetworkIcon size={14} /> {t.share.setting}
+      </h3>
+      <Segmented
+        label={t.share.setting}
+        value={site}
+        onChange={setSite}
+        options={[
+          ["youtube", t.share.youtube],
+          ["ytmusic", t.share.ytmusic],
+        ]}
+      />
+    </section>
   );
 }
