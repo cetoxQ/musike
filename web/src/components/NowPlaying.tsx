@@ -3,9 +3,11 @@ import {
   MagnifyingGlassIcon,
   QueueIcon,
   RadioIcon,
+  ShareNetworkIcon,
   VideoCameraSlashIcon,
   XIcon,
 } from "@phosphor-icons/react";
+import { share } from "../lib/share";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -104,8 +106,22 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
       </div>
       {/* The phone: no room for the panel's Start radio button, so an icon beside the heart. */}
       {large && <RadioButton track={track} />}
+      <ShareButton track={track} />
       <FavoriteButton track={track} size={large ? "lg" : "md"} />
     </div>
+  );
+}
+
+function ShareButton({ track }: { track: Track }) {
+  const t = useT();
+  return (
+    <IconButton
+      label={t.share.shareX(track.title)}
+      size="md"
+      onClick={() => share({ kind: "track", id: track.id, title: track.title, artist: track.artist })}
+    >
+      <ShareNetworkIcon size={22} />
+    </IconButton>
   );
 }
 
