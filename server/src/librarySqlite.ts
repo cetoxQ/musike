@@ -332,7 +332,8 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
           tx(() => {
             history.putOnTop(uid, [track]);
             history.trim(uid, HISTORY_LIMIT);
-            // Every start counts as a play, the same moment the track enters the history (or when it was played).
+            // A play (the app sends it once the track has really played, see the player) enters the history and the log,
+            // at the time it was played when given.
             playInsert(uid, track.id, playedAt(at), 1, "app");
             return history.list(uid);
           }),

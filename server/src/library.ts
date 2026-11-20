@@ -473,7 +473,7 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
     async pushHistory(track, at) {
       const lib = await load();
       lib.history = [track, ...lib.history.filter((t) => t.id !== track.id)].slice(0, HISTORY_LIMIT);
-      // Every start counts as a play, the same moment the track enters the history.
+      // A play (the app sends it once the track has really played, see the player) enters the history and the log.
       const before = lib.plays.find((p) => p.track.id === track.id);
       const when = playedAt(at);
       lib.plays = [

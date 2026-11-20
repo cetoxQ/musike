@@ -152,7 +152,13 @@ const mediaFor = (k: Kind): HTMLMediaElement => (k === "video" ? videoEl : audio
 let loaded: { id: string; kind: Kind; quality: Quality } | null = null;
 let pendingSeek = 0;
 let token = 0;
+/** The load that has started playing (warming the next track, and telling a pause mid-buffering from one at start). */
 let recordedToken = -1;
+
+/** A play counts (history, play log) once it has really played this long, or half a shorter track: like Spotify. */
+const PLAY_COUNTS_AFTER = 30;
+/** The track being listened to, and for how long it has actually played (seeks don't count). */
+let listening = { key: "", seconds: 0, last: -1, counted: false };
 
 const STORAGE_KEY = "musike:player";
 
@@ -271,6 +277,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
     token++;
     loaded = { id: track.id, kind, quality: s.quality };
     pendingSeek = opts.startAt ?? 0;
+    // The same track again from where it was (a retry, Audio/Video switched): the same play. Anything else is a new one.
+    const key = `${index}:${track.id}`;
+    if (key !== listening.key || !(pendingSeek > 0)) listening = { key, seconds: 0, last: -1, counted: false };
     const autoplay = opts.autoplay !== false;
     set({
       index,
@@ -339,8 +348,23 @@ export const usePlayer = create<PlayerState>((set, get) => {
     const track = s.queue[s.index];
     if (!track || recordedToken === token) return;
     recordedToken = token;
-    useLibrary.getState().recordPlay(track);
     warmUpcoming();
+  }
+
+  /** Playing on: the time it really played adds up, and past the threshold the play is recorded, once. */
+  function listened(media: HTMLMediaElement) {
+    const now = media.currentTime;
+    const step = now - listening.last;
+    listening.last = now;
+    if (listening.counted || media.paused || !(step > 0 && step < 1.5)) return;
+    listening.seconds += step;
+    const s = get();
+    const track = s.queue[s.index];
+    if (!track || listening.key !== `${s.index}:${track.id}`) return;
+    const length = Number.isFinite(media.duration) && media.duration > 0 ? media.duration : track.duration;
+    if (listening.seconds < (length > 0 ? Math.min(PLAY_COUNTS_AFTER, length / 2) : PLAY_COUNTS_AFTER)) return;
+    listening.counted = true;
+    useLibrary.getState().recordPlay(track);
   }
 
   function onEnded() {
@@ -432,6 +456,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (!isActive()) return;
       lastProgress = Date.now();
       if (pendingSeek > 0) return;
+      listened(media);
       if (Math.abs(media.currentTime - get().position) >= 0.2) set({ position: media.currentTime });
       syncSystemMedia(); // throttled on the other side
     });
