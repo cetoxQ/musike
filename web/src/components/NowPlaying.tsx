@@ -102,8 +102,20 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
           )}
         </div>
       </div>
+      {/* The phone: no room for the panel's Start radio button, so an icon beside the heart. */}
+      {large && <RadioButton track={track} />}
       <FavoriteButton track={track} size={large ? "lg" : "md"} />
     </div>
+  );
+}
+
+function RadioButton({ track }: { track: Track }) {
+  const startRadio = usePlayer((s) => s.startRadio);
+  const t = useT();
+  return (
+    <IconButton label={t.nowPlaying.startRadio} size="md" onClick={() => void startRadio(track)}>
+      <RadioIcon size={24} />
+    </IconButton>
   );
 }
 

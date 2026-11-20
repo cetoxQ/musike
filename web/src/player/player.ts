@@ -211,6 +211,9 @@ function lookupClip(track: Track): Promise<string | null> {
 const needsClipLookup = (track: Track, preferVideo: boolean) =>
   preferVideo && track.kind === "song" && !clipFor.has(track.id);
 
+/** No progress for this long while it should play: treated like a stream error. */
+const STALL_MS = 20_000;
+
 export const usePlayer = create<PlayerState>((set, get) => {
   /** Where an action goes instead of this device's player: the device being controlled, if any. */
   const elsewhere = () => (!localOnly && get().remote ? remoteControl : null);
@@ -282,6 +285,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     media.muted = s.muted;
     const start = (src: string) => {
       media.src = src;
+      lastProgress = Date.now();
       if (autoplay) play(media);
     };
     // The server's proxy URL is known right away; on Android the stream is first resolved on the phone.
@@ -373,6 +377,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
   // A stream URL that expired mid-song gets one fresh try from the same spot before giving up.
   let retriedToken = -1;
+  /** When the playing stream last moved (see the stall check below). */
+  let lastProgress = Date.now();
 
   function onError(media: HTMLMediaElement) {
     const mine = token;
@@ -421,7 +427,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (isActive() && !media.paused) set({ status: "loading" });
     });
     media.addEventListener("timeupdate", () => {
-      if (!isActive() || pendingSeek > 0) return;
+      if (!isActive()) return;
+      lastProgress = Date.now();
+      if (pendingSeek > 0) return;
       if (Math.abs(media.currentTime - get().position) >= 0.2) set({ position: media.currentTime });
       syncSystemMedia(); // throttled on the other side
     });
@@ -435,6 +443,18 @@ export const usePlayer = create<PlayerState>((set, get) => {
   }
   wire(audio);
   wire(videoEl);
+
+  // A stream that stops arriving (the network gone, a server that stopped answering) doesn't always end in an
+  // error: the player would wait forever, looking alive. No progress for a while is treated as one, so it's tried
+  // again (from the phone itself when the server is out of reach).
+  setInterval(() => {
+    const media = activeMedia();
+    const s = get();
+    if (!media || s.remote || s.status !== "loading" || media.paused || !media.src) return;
+    if (Date.now() - lastProgress < STALL_MS) return;
+    lastProgress = Date.now();
+    onError(media);
+  }, 5000);
 
   const reloadIfKindChanged = () => {
     const s = get();

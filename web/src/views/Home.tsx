@@ -1,5 +1,5 @@
 import { ClockCounterClockwiseIcon, HeartIcon, MagnifyingGlassIcon, PlayIcon } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { LogoMark } from "../components/Brand";
@@ -51,8 +51,21 @@ function RecentCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
   );
 }
 
+/**
+ * A row that snaps to its cards keeps the card it was on when one is added in front: the new first card would be
+ * scrolled out of view, to the left. Back to the start whenever the first card changes.
+ */
+function useStartOnNewFirst(first: string | undefined) {
+  const row = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    row.current?.scrollTo({ left: 0 });
+  }, [first]);
+  return row;
+}
+
 export default function Home() {
   const { favorites, playlists, history, status } = useLibrary();
+  const recentRow = useStartOnNewFirst(history[0]?.id);
   const playList = usePlayer((s) => s.playList);
   const navigate = useNavigate();
   const t = useT();
@@ -131,7 +144,10 @@ export default function Home() {
                 </Link>
               }
             >
-              <div className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 md:scroll-px-6 md:px-6">
+              <div
+                ref={recentRow}
+                className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 md:scroll-px-6 md:px-6"
+              >
                 {history.slice(0, 16).map((t, i) => (
                   <RecentCard key={t.id} track={t} onPlay={() => playList(history, i)} />
                 ))}
