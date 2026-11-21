@@ -88,7 +88,10 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
   return (
     <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
-        <h2 className={cn("truncate font-semibold tracking-tight", large ? "text-[22px] leading-tight" : "text-lg")}>{track.title}</h2>
+        {/* A title that doesn't fit slides along too, like the artist and album under it. */}
+        <h2 className={cn("font-semibold tracking-tight", large ? "text-[22px] leading-tight" : "text-lg")}>
+          <Marquee key={track.id}>{track.title}</Marquee>
+        </h2>
         <div className={cn(large ? "text-base" : "text-sm", status === "error" ? "text-danger" : "text-fg-2")}>
           {statusText ? (
             <p className="truncate">{statusText}</p>
@@ -129,18 +132,20 @@ function ShareButton({ track }: { track: Track }) {
 }
 
 /** The phone sheet's "More": the track's menu (Share, Start radio, Add to playlist, Go to artist...). */
-function MoreButton({ track }: { track: Track }) {
+function MoreButton({ track, slim = false, className }: { track: Track; slim?: boolean; className?: string }) {
   const openMenu = useUi((s) => s.openMenu);
   const t = useT();
   return (
     <IconButton
       label={t.trackMenu.actionsFor(track.title)}
+      size={slim ? "slim" : "md"}
+      className={className}
       onClick={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
         openMenu({ track, x: r.right, y: r.bottom });
       }}
     >
-      <DotsThreeVerticalIcon size={22} weight="bold" />
+      <DotsThreeVerticalIcon size={slim ? 20 : 22} weight="bold" />
     </IconButton>
   );
 }
@@ -384,14 +389,21 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   {elsewhere && <Volume wide className="w-full" />}
-                  {/* Everything for the track within reach of the thumb: the header keeps only Close. */}
-                  <div className="-mx-2 flex items-center justify-between">
+                  {/* Everything for the track within reach of the thumb: the header keeps only Close. Symmetric
+                      around Audio/Video, which sits under Play: the slim menu at the right edge has an empty twin
+                      at the left one, and a missing button (no devices, no video) leaves its cell empty. */}
+                  <div className="grid grid-cols-[1.5rem_1fr_1fr_auto_1fr_1fr_1.5rem] items-center justify-items-center">
+                    <span aria-hidden="true" />
                     <SheetViewButton target="lyrics" view={view} setView={setView} />
-                    <DevicesButton size="md" />
-                    <ModeSwitch compact />
+                    <div>
+                      <DevicesButton size="md" />
+                    </div>
+                    <div>
+                      <ModeSwitch compact />
+                    </div>
                     <ShareButton track={track} />
-                    <MoreButton track={track} />
                     <SheetViewButton target="queue" view={view} setView={setView} />
+                    <MoreButton track={track} slim className="justify-self-end" />
                   </div>
                   <ElsewhereNote className="justify-center" />
                 </div>

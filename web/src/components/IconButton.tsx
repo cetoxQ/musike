@@ -4,10 +4,11 @@ import { cn } from "../lib/format";
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   active?: boolean;
-  size?: "sm" | "md" | "lg";
+  /** `slim`: full height, narrow, for a thin glyph such as the three dots. */
+  size?: "sm" | "md" | "lg" | "slim";
 }
 
-const sizes = { sm: "size-8", md: "size-10", lg: "size-11" };
+const sizes = { sm: "size-8", md: "size-10", lg: "size-11", slim: "h-10 w-6" };
 
 export const IconButton = forwardRef<HTMLButtonElement, Props>(function IconButton(
   { label, active, size = "md", className, children, ...rest },
