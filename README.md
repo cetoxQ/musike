@@ -312,6 +312,13 @@ services:
     volumes:
       - musike-data:/data   # library (musike.db): playlists, favorites, history
       - musike-cache:/cache # HD videos already downloaded
+    environment:
+      YTDLP_EXTRA_ARGS: "--extractor-args youtubepot-bgutilhttp:base_url=http://pot:4416"
+    depends_on: [pot]
+    restart: unless-stopped
+  pot: # proof-of-origin tokens for yt-dlp, so YouTube asks less often to confirm you're not a bot
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.2
+    init: true
     restart: unless-stopped
 volumes:
   musike-data:
@@ -322,9 +329,11 @@ volumes:
 docker compose up -d   # then open http://<that machine>:4180
 ```
 
-Or with plain Docker: `docker run -d -p 4180:4180 -v musike-data:/data -v musike-cache:/cache ghcr.io/yourboiava/musike`. To build the image from source instead: `docker build -t musike .`
+The same file, with comments, is this fork's [docker-compose.yml](docker-compose.yml): `curl -O https://raw.githubusercontent.com/yourboiava/musike/local/docker-compose.yml` downloads it. Behind a VPN, see [below](#docker-behind-a-vpn).
 
-- A new image is published for every release; `docker compose pull && docker compose up -d` updates it. The library stays in the `/data` volume.
+Or with plain Docker, without the tokens: `docker run -d -p 4180:4180 -v musike-data:/data -v musike-cache:/cache ghcr.io/yourboiava/musike`. To build the image from source instead: `docker build -t musike .`
+
+- `docker compose pull && docker compose up -d` gets the latest image. The library stays in the `/data` volume.
 - To back up the database itself, copy `/data` while the container is stopped (with it running, `musike.db-wal` may hold the latest changes). [Export](#moving-your-library-backup) works any time.
 - yt-dlp can also be updated from **Settings** without a new image (until the container is recreated). To always have a channel, set `YTDLP_CHANNEL=nightly` (or `stable`): Musike updates yt-dlp to it at start and once a day, so a recreated container doesn't fall back to the image's version.
 - All the [environment variables](#configuration) work, e.g. `YTDLP_EXTRA_ARGS="--cookies /data/cookies.txt"` for YouTube's bot checks.
