@@ -1,4 +1,4 @@
-# The Android APK alone, for this fork: on every push to the "local" branch that touches the app, or by hand
+# The Android APK alone, for this fork: on every push to the "local" or "community" branch that touches the app, or by hand
 # (Actions > Android APK > Run workflow). The APK is in the run's artifacts.
 #
 # Signed with this fork's own key, in the repository secrets (the same names release.yml uses):
@@ -8,7 +8,7 @@ name: Android APK
 
 on:
   push:
-    branches: [local]
+    branches: [local, community]
     paths: ["web/**", "server/src/**", "mobile/**", "pnpm-lock.yaml", ".github/workflows/android.yml"]
   workflow_dispatch:
     inputs:
@@ -62,7 +62,7 @@ jobs:
           { echo "### Android"; echo "- $(basename "$apk")"; echo "- app ID: $MUSIKE_APP_ID"; echo "- commit: ${GITHUB_SHA::7}"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: musike-android-${{ github.run_number }}
+          name: musike-android-${{ github.ref_name }}-${{ github.run_number }}
           path: release/*-Android.apk
           if-no-files-found: error
           retention-days: 14

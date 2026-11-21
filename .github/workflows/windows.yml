@@ -1,4 +1,4 @@
-# The Windows installer alone, for this fork: on every push to the "local" branch that touches the app, or by hand
+# The Windows installer alone, for this fork: on every push to the "local" or "community" branch that touches the app, or by hand
 # (Actions > Windows app > Run workflow). The installer is in the run's artifacts.
 #
 # It is the desktop app as it ships: its own library on the PC, or a Musike server's (Settings > Server, with the
@@ -7,7 +7,7 @@ name: Windows app
 
 on:
   push:
-    branches: [local]
+    branches: [local, community]
     paths: ["web/**", "server/src/**", "desktop/**", "pnpm-lock.yaml", ".github/workflows/windows.yml"]
   workflow_dispatch:
 
@@ -37,7 +37,7 @@ jobs:
           { echo "### Windows"; echo "- $(basename "$exe")"; echo "- commit: ${GITHUB_SHA::7}"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: musike-windows-${{ github.run_number }}
+          name: musike-windows-${{ github.ref_name }}-${{ github.run_number }}
           path: release/*-Windows.exe
           if-no-files-found: error
           retention-days: 14
