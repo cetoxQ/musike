@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, rename, rm, stat, utimes } from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { ensureComponent } from "./bootstrap.js";
 import { config } from "./config.js";
 import { DEFAULT_CLIENTS, directAudio, fetchRemoteClients } from "./directAudio.js";
@@ -155,7 +156,12 @@ let directClientsAt = 0;
 async function clientsForDirect(): Promise<string[]> {
   if (Date.now() - directClientsAt > 6 * 3600_000) {
     directClientsAt = Date.now();
-    directClients = (await fetchRemoteClients()) ?? directClients;
+    // Refreshed in the background: a slow GitHub mustn't hold back the track (up to 6 s). Only the very first
+    // time waits, briefly, so a fix published there is used from the start.
+    const refresh = fetchRemoteClients().then((clients) => {
+      directClients = clients ?? directClients;
+    });
+    if (!directClients) await Promise.race([refresh, sleep(1_500)]);
   }
   return directClients ?? DEFAULT_CLIENTS;
 }
