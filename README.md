@@ -671,19 +671,27 @@ iOS limits background playback for PWAs; Audio mode works better than Video.
 
 ## Roadmap
 
-- [x] Albums and artist discographies
-- [x] Docker image
-- [x] Languages and appearance settings
-- [x] macOS app
-- [x] Linux app
-- [x] Android app (audio)
-- [x] iPhone app (audio, sideloaded)
-- [ ] Cloud sync for the library (today: [backup to a file](#moving-your-library-backup))
-- [ ] Import YouTube playlists from a link
-- [ ] Video mode on Android
-- [ ] Automatic updates for the desktop app
+**Done in this fork**
+- [x] One library on your own server, with accounts, live on every device
+- [x] Video on Android, through the server
+- [x] Profile and listening statistics, with a report to share
+- [x] Other devices as remotes
+- [x] The phone goes on when the server can't be reached
+- [x] Android Auto
+- [x] Timed lyrics
+- [x] Fewer bot checks in Docker (proof-of-origin tokens)
 
-Ideas and bug reports are welcome in [Issues](https://github.com/Ernani1234/musike/issues). For this fork's own features, open them [here](https://github.com/yourboiava/musike/issues).
+**Open ideas, no promises**
+- [ ] Video on Android on its own
+- [ ] Import YouTube playlists from a link (today: from search)
+- [ ] Download playlists to listen without a connection
+- [ ] Reorder tracks by dragging
+- [ ] Artists in Android Auto
+- [ ] Automatic updates for the Windows app
+
+The original Musike keeps [its own roadmap](https://github.com/Ernani1234/musike#roadmap).
+
+Ideas and bug reports for this fork go in [its Issues](https://github.com/yourboiava/musike/issues); for the original app, in [the original's](https://github.com/Ernani1234/musike/issues).
 
 ## Legal notice
 
