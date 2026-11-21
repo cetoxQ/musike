@@ -9,6 +9,7 @@ import {
   PlaylistIcon,
   QueueIcon,
   RadioIcon,
+  EraserIcon,
   ShareNetworkIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
@@ -153,6 +154,9 @@ export function TrackMenu() {
         onClick={run(() => share({ kind: "track", id: menu.track.id, title: menu.track.title, artist: menu.track.artist }))}
       >
         {t.share.share}
+      </Item>
+      <Item icon={<EraserIcon size={18} />} onClick={() => useUi.getState().openForget(menu.track)}>
+        {t.forget.menu}
       </Item>
     </div>
   );

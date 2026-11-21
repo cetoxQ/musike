@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import fs, { existsSync } from "node:fs";
+import path from "node:path";
 import { createServer } from "node:net";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
@@ -118,6 +119,8 @@ function deviceOf(req: FastifyRequest): string | undefined {
 function libraryParts(route: string): LibraryPart[] {
   if (route === "/api/library/import") return ["library", "recent"];
   if (route.startsWith("/api/recent")) return ["recent"];
+  if (route === "/api/history/:id") return ["library"];
+  if (route === "/api/plays/:id") return ["library", "recent"];
   if (/^\/api\/(favorites|playlists|library\/)/.test(route)) return ["library"];
   return [];
 }
@@ -364,11 +367,34 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   });
 
   // The profile: the most played (the last 3 months, or ever) and artists to try.
+  // ?since= (ms) for a period of your own; first: the oldest play on record, so a period doesn't reach past it.
   app.get("/api/profile/top", async (req) => {
-    const { range, limit } = req.query as { range?: string; limit?: string };
-    const since = range === "all" ? 0 : Date.now() - PROFILE_RANGE_MS;
+    const { range, since: from, limit } = req.query as { range?: string; since?: string; limit?: string };
+    const asked = Math.trunc(Number(from));
+    const since = Number.isFinite(asked) && asked > 0 ? Math.min(asked, Date.now()) : range === "all" ? 0 : Date.now() - PROFILE_RANGE_MS;
     const n = Math.min(Math.max(Math.trunc(Number(limit)) || 5, 1), 100);
-    return { plays: await libOf(req).topPlays(since, n) };
+    const lib = libOf(req);
+    return { plays: await lib.topPlays(since, n), first: await lib.firstPlay() };
+  });
+
+  // The profile picture: one per account, kept as a small image (data: URL) in the data folder.
+  const pictureOf = (req: FastifyRequest) => path.join(config.dataDir, "avatars", `${req.user?.id ?? DEFAULT_USER}.txt`);
+  app.get("/api/profile/image", async (req) => ({
+    image: await fs.promises.readFile(pictureOf(req), "utf8").catch(() => null),
+  }));
+  app.put("/api/profile/image", { bodyLimit: 1_048_576 }, async (req) => {
+    const image = (req.body as { image?: unknown } | null)?.image;
+    const file = pictureOf(req);
+    if (image === null) {
+      await fs.promises.rm(file, { force: true });
+      return { image: null };
+    }
+    if (typeof image !== "string" || image.length > 700_000 || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image)) {
+      throw new HttpError(400, msg("badImage"));
+    }
+    await fs.promises.mkdir(path.dirname(file), { recursive: true });
+    await fs.promises.writeFile(file, image);
+    return { image };
   });
 
   // Worked out from a dozen artist pages: kept a day per account and language, refreshed in the background after.
@@ -391,6 +417,17 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
       entry.running.catch(() => {});
     }
     return entry.value ?? (await entry.running!);
+  });
+
+  // Off Recently played; or damnatio memoriae: no trace of the track's plays left, the suggestions worked out again.
+  app.delete("/api/history/:id", async (req) => ({
+    history: await libOf(req).removeFromHistory(videoId(req.params)),
+  }));
+  app.delete("/api/plays/:id", async (req) => {
+    const history = await libOf(req).forget(videoId(req.params));
+    const user = `${req.user?.id ?? DEFAULT_USER}:`;
+    for (const key of discovered.keys()) if (key.startsWith(user)) discovered.delete(key);
+    return { history };
   });
 
   app.get("/api/albums/:alid", async (req) => {

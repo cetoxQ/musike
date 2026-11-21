@@ -71,6 +71,8 @@ const SYSTEM: SystemInfo = {
   job: null,
 };
 
+const PROFILE_IMAGE = "musike:profile-image";
+
 /** The phone's own engine (YouTube, from the phone) over a library: the phone's own, or the copy of a server account's. */
 function phoneApi(lib: library.LibraryStore): MusikeApi {
   return {
@@ -126,7 +128,29 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       return lib.playsFor(artistId, (name ?? "").slice(0, 300));
     }, signal),
   topPlays: (range, limit = 5, signal) =>
-    call(() => lib.topPlays(range === "all" ? 0 : Date.now() - 91 * 24 * 3600_000, Math.min(Math.max(limit, 1), 100)), signal),
+    call(async () => {
+      const since = typeof range === "object" ? range.since : range === "all" ? 0 : Date.now() - 91 * 24 * 3600_000;
+      return { plays: await lib.topPlays(since, Math.min(Math.max(limit, 1), 100)), first: await lib.firstPlay() };
+    }, signal),
+  // On the phone: kept in the app's storage.
+  profileImage: async () => {
+    try {
+      return localStorage.getItem(PROFILE_IMAGE);
+    } catch {
+      return null;
+    }
+  },
+  setProfileImage: async (image) => {
+    try {
+      if (image) localStorage.setItem(PROFILE_IMAGE, image);
+      else localStorage.removeItem(PROFILE_IMAGE);
+    } catch {
+      throw new ApiError(0, getT().profile.imageTooBig);
+    }
+    return image;
+  },
+  removeFromHistory: (id) => call(async () => ({ history: await lib.removeFromHistory(id) })),
+  forget: (id) => call(async () => ({ history: await lib.forget(id) })),
   // On the phone: the artists' pages from YouTube, from here.
   discover: (signal) =>
     call(async () => discover(await lib.allPlays(), (await lib.getLibraryLite()).artists, (id) => artistPage(id, getLang())), signal),

@@ -43,6 +43,12 @@ export interface LibraryStore {
    * ranks the tracks played since then by all their plays.
    */
   topPlays(since: number, limit: number): Promise<PlayEntry[]>;
+  /** When the first play still on record was made (ms), or null with none. */
+  firstPlay(): Promise<number | null>;
+  /** Off the Recently played list only. */
+  removeFromHistory(id: string): Promise<Track[]>;
+  /** Damnatio memoriae: every trace of the track's plays goes (history, play log, recent), as if never played. */
+  forget(id: string): Promise<Track[]>;
   addFavorite(track: Track): Promise<Track[]>;
   /** Adds many at once (in the given order, on top), skipping ones already there. */
   addFavorites(tracks: Track[]): Promise<Track[]>;
@@ -408,6 +414,27 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
 
     async allPlays() {
       return (await load()).plays;
+    },
+
+    async firstPlay() {
+      const plays = (await load()).plays;
+      return plays.length ? Math.min(...plays.map((p) => p.lastPlayed)) : null;
+    },
+
+    async removeFromHistory(id) {
+      const lib = await load();
+      lib.history = lib.history.filter((t) => t.id !== id);
+      await persist();
+      return lib.history;
+    },
+
+    async forget(id) {
+      const lib = await load();
+      lib.history = lib.history.filter((t) => t.id !== id);
+      lib.plays = lib.plays.filter((p) => p.track.id !== id);
+      recent = recent.filter((x) => x.kind !== "track" || x.id !== id);
+      await persist();
+      return lib.history;
     },
 
     async topPlays(since, limit) {

@@ -224,6 +224,9 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
     `${PLAY_SUMS} WHERE p.user_id = ? AND p.played_at >= ? AND p.source = 'app' GROUP BY p.track_id ORDER BY plays DESC, last DESC LIMIT ?`,
   );
   const playsEver = rows(`${PLAY_SUMS} WHERE p.user_id = ? GROUP BY p.track_id ORDER BY plays DESC, last DESC LIMIT ?`);
+  const firstPlayed = db.prepare("SELECT MIN(played_at) AS first FROM plays WHERE user_id = ?");
+  const playsForget = db.prepare("DELETE FROM plays WHERE user_id = ? AND track_id = ?");
+  const recentForget = db.prepare("DELETE FROM recent WHERE user_id = ? AND kind = 'track' AND id = ?");
   // Tracks that name this artist page, and the ones that name no page at all (matched by name in rankPlays).
   const playsMaybeBy = rows(`${PLAY_SUMS} WHERE p.user_id = ? AND (t.artist_id = ? OR t.artist_id IS NULL) GROUP BY p.track_id ${RECENT}`);
   const playsOf = one(`SELECT COUNT(*) AS rows, COALESCE(SUM(count), 0) AS n, COALESCE(MAX(played_at), 0) AS last FROM plays WHERE user_id = ? AND track_id = ?`);
@@ -277,6 +280,22 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
         playsFor: (artistId, name, limit = 20) => tx(() => rankPlays(playsMaybeBy(uid, artistId).map(toPlay), artistId, name, limit)),
 
         allPlays: () => tx(() => playsAll(uid).map(toPlay)),
+
+        firstPlay: () => tx(() => ((firstPlayed.get(uid) as { first: number | null } | undefined)?.first ?? null)),
+
+        removeFromHistory: (id) =>
+          tx(() => {
+            history.remove(uid, id);
+            return history.list(uid);
+          }),
+
+        forget: (id) =>
+          tx(() => {
+            history.remove(uid, id);
+            playsForget.run(uid, id);
+            recentForget.run(uid, id);
+            return history.list(uid);
+          }),
 
         topPlays: (since, limit) => tx(() => (since > 0 ? playsSince(uid, since, limit) : playsEver(uid, limit)).map(toPlay)),
 

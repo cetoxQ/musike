@@ -13,6 +13,12 @@ interface LibraryState extends Library {
   toggleFavorite: (t: Track) => Promise<void>;
   addFavorites: (tracks: Track[]) => Promise<void>;
   recordPlay: (t: Track) => void;
+  /** Bumped whenever your plays change (a play, one removed or forgotten): what shows them fetches again. */
+  playsVersion: number;
+  /** Off Recently played only. */
+  removeFromHistory: (id: string) => Promise<void>;
+  /** Damnatio memoriae: every trace of the track's plays, gone. */
+  forget: (id: string) => Promise<void>;
   toggleArtist: (a: SavedArtist) => Promise<void>;
   toggleAlbum: (a: SavedAlbum) => Promise<void>;
   toggleYtPlaylist: (p: SavedYtPlaylist) => Promise<void>;
@@ -132,8 +138,35 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   },
 
   recordPlay: (track) => {
-    set((s) => ({ history: [track, ...s.history.filter((t) => t.id !== track.id)].slice(0, 60) }));
+    set((s) => ({ history: [track, ...s.history.filter((t) => t.id !== track.id)].slice(0, 60), playsVersion: s.playsVersion + 1 }));
     api.pushHistory(track).catch(() => {});
+  },
+
+  playsVersion: 0,
+
+  removeFromHistory: async (id) => {
+    const before = get().history;
+    set((s) => ({ history: s.history.filter((t) => t.id !== id), playsVersion: s.playsVersion + 1 }));
+    try {
+      set({ history: (await api.removeFromHistory(id)).history });
+      toast(getT().forget.removed);
+    } catch (e) {
+      set({ history: before });
+      toast((e as Error).message || getT().forget.failed, "error");
+    }
+  },
+
+  forget: async (id) => {
+    const before = get().history;
+    set((s) => ({ history: s.history.filter((t) => t.id !== id), playsVersion: s.playsVersion + 1 }));
+    try {
+      const { history } = await api.forget(id);
+      set((s) => ({ history, playsVersion: s.playsVersion + 1 }));
+      toast(getT().forget.forgotten);
+    } catch (e) {
+      set({ history: before });
+      toast((e as Error).message || getT().forget.failed, "error");
+    }
   },
 
   createPlaylist: async (name, tracks = []) => {

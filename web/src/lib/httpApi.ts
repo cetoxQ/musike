@@ -12,6 +12,7 @@ import {
   type Prepared,
   type SystemInfo,
   type SystemJob,
+  type TopRange,
   type UserInfo,
 } from "./apiTypes";
 import type {
@@ -140,8 +141,18 @@ export function httpBackend(opts: HttpBackendOptions) {
         artistId ? `/api/plays?artist=${artistId}&name=${encodeURIComponent(name ?? "")}` : "/api/plays",
         { signal },
       ).then((r) => r.plays),
-    topPlays: (range: "3m" | "all", limit = 5, signal?: AbortSignal) =>
-      request<{ plays: PlayEntry[] }>(`/api/profile/top?range=${range}&limit=${limit}`, { signal }).then((r) => r.plays),
+    topPlays: (range: TopRange, limit = 5, signal?: AbortSignal) =>
+      request<{ plays: PlayEntry[]; first: number | null }>(
+        typeof range === "object"
+          ? `/api/profile/top?since=${Math.round(range.since)}&limit=${limit}`
+          : `/api/profile/top?range=${range}&limit=${limit}`,
+        { signal },
+      ),
+    profileImage: (signal?: AbortSignal) => request<{ image: string | null }>("/api/profile/image", { signal }).then((r) => r.image),
+    setProfileImage: (image: string | null) =>
+      request<{ image: string | null }>("/api/profile/image", { method: "PUT", json: { image } }).then((r) => r.image),
+    removeFromHistory: (id: string) => request<{ history: Track[] }>(`/api/history/${id}`, { method: "DELETE" }),
+    forget: (id: string) => request<{ history: Track[] }>(`/api/plays/${id}`, { method: "DELETE" }),
     discover: (signal?: AbortSignal) => request<Discover>("/api/profile/discover", { signal }),
     saveArtist: (a: SavedArtist) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${a.id}`, { method: "PUT", json: a }),
     removeArtist: (id: string) => request<{ artists: SavedArtist[] }>(`/api/library/artists/${id}`, { method: "DELETE" }),

@@ -79,8 +79,8 @@ export default function Artist() {
     if (data?.id === id) pushRecent({ kind: "artist", id, name: data.name || name, thumb: state?.art || data.banner });
   }, [data?.id]);
 
-  // Your own plays of this artist, fetched again whenever a new track starts (it may be one of theirs).
-  const lastPlayed = useLibrary((s) => s.history[0]?.id);
+  // Your own plays of this artist, fetched again whenever your plays change (a new one may be one of theirs).
+  const lastPlayed = useLibrary((s) => s.playsVersion);
   const artistName = data?.name ?? "";
   useEffect(() => {
     if (!artistName) return;

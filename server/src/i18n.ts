@@ -8,6 +8,7 @@ type Params = Record<string, string | number>;
 
 const en = {
   invalidVideoId: "Invalid video ID.",
+  badImage: "That image can't be used: a JPEG, PNG or WebP under 500 KB.",
   emptyQuery: "Type something to search.",
   searchFailed: "Search is unavailable right now ({detail}). Try again in a moment.",
   missingTitle: "Give the song's title.",
@@ -80,6 +81,7 @@ export type MsgKey = keyof typeof en;
 
 const pt: Record<MsgKey, string> = {
   invalidVideoId: "ID de vídeo inválido.",
+  badImage: "Essa imagem não pode ser usada: um JPEG, PNG ou WebP com menos de 500 KB.",
   emptyQuery: "Digite algo para buscar.",
   searchFailed: "A busca está indisponível agora ({detail}). Tente de novo em instantes.",
   missingTitle: "Informe o título da música.",

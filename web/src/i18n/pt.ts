@@ -225,6 +225,27 @@ export const pt: Messages = {
     playlists: "Suas playlists",
     savedPlaylists: "Playlists salvas",
     alsoLike: "Você também pode gostar",
+    custom: "Personalizado",
+    amount: "Quantos",
+    unit: "Unidade",
+    units: { hours: "horas", days: "dias", weeks: "semanas", months: "meses", years: "anos" },
+    since: (date: string) => `Suas reproduções registradas começam em ${date}.`,
+    changeImage: "Mudar foto do perfil",
+    removeImage: "Remover foto do perfil",
+    imageTooBig: "Essa foto é grande demais para guardar no celular.",
+    imageFailed: "Não foi possível usar essa foto.",
+  },
+
+  forget: {
+    menu: "Remover das suas reproduções…",
+    title: (title: string) => `Remover "${title}" das suas reproduções`,
+    body: "Remover a tira de Tocadas recentemente. Damnatio Memoriae apaga todas as reproduções dela: histórico, estatísticas e o que as sugestões aprendem, como se você nunca a tivesse ouvido. Favoritas e playlists ficam.",
+    damnatioHint: "Apagar todo rastro das reproduções",
+    remove: "Remover de Tocadas recentemente",
+    notInHistory: "Ela não está em Tocadas recentemente.",
+    removed: "Removida de Tocadas recentemente",
+    forgotten: "Esquecida: como se nunca tocada",
+    failed: "Não foi possível remover",
   },
 
   share: {

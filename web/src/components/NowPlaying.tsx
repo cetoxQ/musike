@@ -2,6 +2,7 @@ import {
   CaretDownIcon,
   MagnifyingGlassIcon,
   QueueIcon,
+  DotsThreeVerticalIcon,
   RadioIcon,
   ShareNetworkIcon,
   VideoCameraSlashIcon,
@@ -104,9 +105,9 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
           )}
         </div>
       </div>
-      {/* The phone: no room for the panel's Start radio button, so an icon beside the heart. */}
-      {large && <RadioButton track={track} />}
-      <ShareButton track={track} />
+      {/* The phone keeps only the heart here (the title needs the room): Share, Start radio and the rest are in the
+          sheet's "More" menu. */}
+      {!large && <ShareButton track={track} />}
       <FavoriteButton track={track} size={large ? "lg" : "md"} />
     </div>
   );
@@ -125,12 +126,19 @@ function ShareButton({ track }: { track: Track }) {
   );
 }
 
-function RadioButton({ track }: { track: Track }) {
-  const startRadio = usePlayer((s) => s.startRadio);
+/** The phone sheet's "More": the track's menu (Share, Start radio, Add to playlist, Go to artist...). */
+function MoreButton({ track }: { track: Track }) {
+  const openMenu = useUi((s) => s.openMenu);
   const t = useT();
   return (
-    <IconButton label={t.nowPlaying.startRadio} size="md" onClick={() => void startRadio(track)}>
-      <RadioIcon size={24} />
+    <IconButton
+      label={t.trackMenu.actionsFor(track.title)}
+      onClick={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        openMenu({ track, x: r.right, y: r.bottom });
+      }}
+    >
+      <DotsThreeVerticalIcon size={22} weight="bold" />
     </IconButton>
   );
 }
@@ -315,11 +323,12 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
           <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-bg/70 to-bg" />
 
           <div className="overlay-top relative flex flex-1 flex-col px-5">
-            <div className="flex h-14 touch-none items-center justify-between" onPointerDown={(e) => drag.start(e)}>
+            <div className="relative flex h-14 touch-none items-center justify-between" onPointerDown={(e) => drag.start(e)}>
               <IconButton label={t.common.close} onClick={onClose} className="-ml-2 text-fg">
                 <CaretDownIcon size={24} />
               </IconButton>
-              <div className="mx-auto mt-0 h-1 w-10 rounded-full bg-fg-3/50" />
+              {/* In the middle of the sheet, whatever the buttons on either side. */}
+              <div className="pointer-events-none absolute top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-3/50" />
               <div className="-mr-2 flex items-center">
                 <DevicesButton size="md" />
                 <IconButton
@@ -329,6 +338,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                 >
                   <QueueIcon size={22} />
                 </IconButton>
+                <MoreButton track={track} />
               </div>
             </div>
 

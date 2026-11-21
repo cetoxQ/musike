@@ -1,5 +1,5 @@
-import { PlayIcon, ShuffleIcon, UserCircleIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { CameraIcon, PlayIcon, ShuffleIcon, UserIcon, XIcon } from "@phosphor-icons/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { AlbumRow } from "../components/AlbumTiles";
 import { Artwork } from "../components/Artwork";
@@ -16,12 +16,34 @@ import { cn, shuffled } from "../lib/format";
 import { saysLive } from "../lib/live";
 import { paths } from "../lib/routes";
 import type { AlbumCard, Discover, PlayEntry } from "../lib/types";
+import type { TopRange } from "../lib/apiTypes";
 import { usePlayer } from "../player/player";
 import { useAuth } from "../stores/auth";
 import { useLibrary } from "../stores/library";
+import { toast } from "../stores/ui";
 import { RankedTracks } from "./Artist";
 
-type Range = "3m" | "all";
+type Range = "3m" | "all" | "custom";
+type Unit = "hours" | "days" | "weeks" | "months" | "years";
+
+const UNIT_MS: Record<Unit, number> = {
+  hours: 3600_000,
+  days: 86_400_000,
+  weeks: 7 * 86_400_000,
+  months: 30.44 * 86_400_000,
+  years: 365.25 * 86_400_000,
+};
+
+/** A picture from the gallery, cropped square and made small (a few tens of KB). */
+async function squarePicture(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 384;
+  canvas.getContext("2d")!.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 384, 384);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
 
 /**
  * Your profile, laid out like an artist page: your most played, then what you keep (albums, singles and EPs,
@@ -31,17 +53,46 @@ export default function Profile() {
   const t = useT();
   const lang = useI18n((s) => s.lang);
   const user = useAuth((s) => s.user);
-  const { favorites, artists, albums, playlists, ytPlaylists, history } = useLibrary();
+  const { favorites, artists, albums, playlists, ytPlaylists, history, playsVersion } = useLibrary();
   const playList = usePlayer((s) => s.playList);
 
-  // Most played: the last 3 months, unless there's too little there (then ever), or you pick.
+  // Most played: the last 3 months, unless there's too little there (then ever), all time, or a period of your own
+  // (never further back than the first play on record).
   const [range, setRange] = useState<Range>("3m");
   const [picked, setPicked] = useState(false);
-  const top = useRemote<PlayEntry[]>(`profile-top:${range}:${history[0]?.id ?? ""}`, (signal) => api.topPlays(range, 20, signal));
+  const [amount, setAmount] = useState(7);
+  const [unit, setUnit] = useState<Unit>("days");
+  const [first, setFirst] = useState<number | null>(null);
+  const span = first ? Date.now() - first : 0;
+  const maxAmount = Math.max(1, Math.ceil(span / UNIT_MS[unit]));
+  const shownAmount = Math.min(Math.max(1, amount), maxAmount);
+  const asked: TopRange = range === "custom" ? { since: Math.max(first ?? 0, Date.now() - shownAmount * UNIT_MS[unit]) } : range;
+  const key = range === "custom" ? `custom:${shownAmount}:${unit}` : range;
+  const top = useRemote<{ plays: PlayEntry[]; first: number | null }>(`profile-top:${key}:${playsVersion}`, (signal) =>
+    api.topPlays(asked, 20, signal),
+  );
   useEffect(() => {
-    if (!picked && range === "3m" && top.status === "ok" && top.data.length < 5) setRange("all");
+    if (top.status === "ok") setFirst(top.data.first);
+    if (!picked && range === "3m" && top.status === "ok" && top.data.plays.length < 5) setRange("all");
   }, [top.status, picked, range]);
-  const topTracks = top.status === "ok" ? top.data.map((p) => ({ ...p.track, plays: t.artist.yourPlays(p.count) })) : [];
+  const topTracks = top.status === "ok" ? top.data.plays.map((p) => ({ ...p.track, plays: t.artist.yourPlays(p.count) })) : [];
+
+  // The picture: yours from the gallery, or a plain one.
+  const [image, setImage] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    api.profileImage(ctrl.signal).then(setImage, () => {});
+    return () => ctrl.abort();
+  }, []);
+  const choose = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setImage(await api.setProfileImage(await squarePicture(file)));
+    } catch (e) {
+      toast((e as Error).message || t.profile.imageFailed, "error");
+    }
+  };
 
   const found = useRemote<Discover>(`profile-discover:${lang}`, (signal) => api.discover(signal));
   const discover = found.status === "ok" ? found.data : null;
@@ -63,7 +114,7 @@ export default function Profile() {
   }, [favorites, discover]);
 
   const name = user?.username ?? t.profile.you;
-  const banner = topTracks[0]?.art || favorites[0]?.art || "";
+  const banner = image || topTracks[0]?.art || favorites[0]?.art || "";
 
   return (
     <div className="pb-8">
@@ -77,9 +128,39 @@ export default function Profile() {
         )}
         <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-black/80 via-black/35 to-black/10" />
         <div className="relative flex min-h-44 items-end gap-4 p-5 md:min-h-60 md:p-8">
-          <span className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-3 ring-2 ring-white/20 md:size-28">
-            {banner ? <Artwork src={banner} className="size-full" /> : <UserCircleIcon size={48} className="text-fg-3" />}
-          </span>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              aria-label={t.profile.changeImage}
+              onClick={() => picker.current?.click()}
+              className="group relative grid size-20 place-items-center overflow-hidden rounded-full bg-linear-to-br from-accent/80 to-surface-3 ring-2 ring-white/20 md:size-28"
+            >
+              {image ? <img src={image} alt="" className="size-full object-cover" /> : <UserIcon size={40} weight="fill" className="text-white/90 md:size-14" />}
+              <span className="absolute right-1 bottom-1 grid size-7 place-items-center rounded-full bg-black/60 text-white ring-1 ring-white/30">
+                <CameraIcon size={15} weight="fill" />
+              </span>
+            </button>
+            {image && (
+              <button
+                type="button"
+                aria-label={t.profile.removeImage}
+                onClick={() => void api.setProfileImage(null).then(() => setImage(null), (e: Error) => toast(e.message, "error"))}
+                className="absolute -top-1 -right-1 grid size-7 place-items-center rounded-full bg-black/70 text-white ring-1 ring-white/30"
+              >
+                <XIcon size={14} weight="bold" />
+              </button>
+            )}
+            <input
+              ref={picker}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                void choose(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
           <div className="flex min-w-0 flex-col gap-1">
             <span className="text-xs font-medium text-white/75">{t.profile.label}</span>
             <h1 className="truncate text-[28px] leading-[1.1] font-bold tracking-tight text-white md:text-5xl">{name}</h1>
@@ -108,6 +189,7 @@ export default function Profile() {
             [
               ["3m", t.profile.lately],
               ["all", t.profile.ever],
+              ["custom", t.profile.custom],
             ] as [Range, string][]
           ).map(([value, label]) => (
             <button
@@ -129,6 +211,35 @@ export default function Profile() {
           ))}
         </div>
       </div>
+      {range === "custom" && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-2 md:px-6">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={maxAmount}
+            value={shownAmount}
+            aria-label={t.profile.amount}
+            onChange={(e) => setAmount(Math.trunc(Number(e.target.value)) || 1)}
+            className="h-9 w-20 rounded-full bg-surface-1 px-3 text-sm tabular-nums ring-1 ring-line focus:ring-accent focus:outline-none"
+          />
+          <select
+            value={unit}
+            aria-label={t.profile.unit}
+            onChange={(e) => setUnit(e.target.value as Unit)}
+            className="h-9 rounded-full bg-surface-1 px-3 text-sm ring-1 ring-line focus:ring-accent focus:outline-none"
+          >
+            {(Object.keys(UNIT_MS) as Unit[]).map((u) => (
+              <option key={u} value={u}>
+                {t.profile.units[u]}
+              </option>
+            ))}
+          </select>
+          {first && (
+            <span className="text-xs text-fg-3">{t.profile.since(new Date(first).toLocaleDateString([], { dateStyle: "medium" }))}</span>
+          )}
+        </div>
+      )}
       {top.status === "loading" && <TrackListSkeleton rows={5} />}
       {top.status === "ok" &&
         (topTracks.length ? (
@@ -136,7 +247,7 @@ export default function Profile() {
         ) : (
           <p className="px-4 pt-2 text-sm text-fg-2 md:px-6">{t.profile.noTop}</p>
         ))}
-      {range === "3m" && !capabilities.playLog && topTracks.length > 0 && (
+      {range !== "all" && !capabilities.playLog && topTracks.length > 0 && (
         <p className="px-4 pt-1 text-xs text-fg-3 md:px-6">{t.profile.standaloneTop}</p>
       )}
 

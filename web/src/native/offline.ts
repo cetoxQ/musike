@@ -58,6 +58,8 @@ const WRITES = [
   "pushRecent",
   "removeRecent",
   "clearRecent",
+  "removeFromHistory",
+  "forget",
 ] as const;
 type Writes = (typeof WRITES)[number];
 
@@ -78,6 +80,7 @@ const CATALOG = [
   "system",
   "topPlays",
   "discover",
+  "profileImage",
 ] as const;
 
 /** Changes that name a playlist by its id (first argument): one created offline gets the server's id. */
@@ -398,7 +401,7 @@ export function offlineCapable({ url, server, phone }: Options) {
   };
 
   // Everything else (accounts, imports, yt-dlp) needs the server: offline it says so.
-  const needsServer = ["setup", "login", "changePassword", "users", "createUser", "setUserRole", "resetUserPassword", "deleteUser", "importLibrary", "updateYtdlp"] as const;
+  const needsServer = ["setup", "login", "changePassword", "users", "createUser", "setUserRole", "resetUserPassword", "deleteUser", "importLibrary", "updateYtdlp", "setProfileImage"] as const;
   for (const k of needsServer) {
     const ask = bind(k);
     (api as unknown as Record<string, unknown>)[k] = async (...a: unknown[]) => {

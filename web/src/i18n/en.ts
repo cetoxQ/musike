@@ -231,6 +231,27 @@ export const en = {
     playlists: "Your playlists",
     savedPlaylists: "Saved playlists",
     alsoLike: "You might also like",
+    custom: "Custom",
+    amount: "How many",
+    unit: "Unit",
+    units: { hours: "hours", days: "days", weeks: "weeks", months: "months", years: "years" },
+    since: (date: string) => `Your plays on record start on ${date}.`,
+    changeImage: "Change profile picture",
+    removeImage: "Remove profile picture",
+    imageTooBig: "That picture is too big to keep on this phone.",
+    imageFailed: "Couldn't use that picture.",
+  },
+
+  forget: {
+    menu: "Remove from your listening…",
+    title: (title: string) => `Remove "${title}" from your listening`,
+    body: "Remove takes it off Recently played. Damnatio Memoriae erases every play of it: history, statistics and what suggestions learn from, as if you had never listened to it. Favorites and playlists stay.",
+    damnatioHint: "Erase every trace of its plays",
+    remove: "Remove from Recently played",
+    notInHistory: "It isn't in Recently played.",
+    removed: "Removed from Recently played",
+    forgotten: "Forgotten: as if never played",
+    failed: "Couldn't remove it",
   },
 
   share: {

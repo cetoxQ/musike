@@ -75,6 +75,9 @@ export interface ServerLink {
   check(): Promise<boolean>;
 }
 
+/** The profile's period: the last 3 months, all time, or since a time (ms). */
+export type TopRange = "3m" | "all" | { since: number };
+
 /** Settings > Android Auto (the Android app only). */
 export interface CarSettings {
   /** Whether the app may open itself from the car, and what happened with the car lately. */
@@ -190,8 +193,15 @@ export interface MusikeApi {
   pushHistory(t: Track, at?: number): Promise<{ history: Track[] }>;
   /** One artist's tracks played here, most played first; without an artist, the whole play log. */
   plays(artistId?: string, name?: string, signal?: AbortSignal): Promise<PlayEntry[]>;
-  /** The profile: the most played in the last 3 months, or ever. */
-  topPlays(range: "3m" | "all", limit?: number, signal?: AbortSignal): Promise<PlayEntry[]>;
+  /** The profile: the most played in the last 3 months, ever, or since a time; first: the oldest play on record. */
+  topPlays(range: TopRange, limit?: number, signal?: AbortSignal): Promise<{ plays: PlayEntry[]; first: number | null }>;
+  /** The profile picture (a data: URL), or null for the default. */
+  profileImage(signal?: AbortSignal): Promise<string | null>;
+  setProfileImage(image: string | null): Promise<string | null>;
+  /** Off Recently played only. */
+  removeFromHistory(id: string): Promise<{ history: Track[] }>;
+  /** Damnatio memoriae: no trace left of the track's plays (history, statistics, suggestions). */
+  forget(id: string): Promise<{ history: Track[] }>;
   /** The profile: artists to try, from the pages of the ones you play and follow. */
   discover(signal?: AbortSignal): Promise<Discover>;
   saveArtist(a: SavedArtist): Promise<{ artists: SavedArtist[] }>;

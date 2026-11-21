@@ -8,6 +8,50 @@ import { useUi } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { Modal } from "./Modal";
 
+/**
+ * Taking a track off your listening: off Recently played only ("Remove"), or damnatio memoriae, every trace of
+ * its plays erased (history, statistics, what suggestions learn from), as if never played.
+ */
+export function ForgetDialog() {
+  const track = useUi((s) => s.forgetting);
+  const openForget = useUi((s) => s.openForget);
+  const inHistory = useLibrary((s) => !!track && s.history.some((h) => h.id === track.id));
+  const t = useT();
+  const close = () => openForget(null);
+  return (
+    <Modal open={!!track} onClose={close} title={track ? t.forget.title(track.title) : ""}>
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-fg-2">{t.forget.body}</p>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (track) void useLibrary.getState().forget(track.id);
+              close();
+            }}
+            className="flex flex-col items-center justify-center rounded-[16px] bg-danger px-4 py-3 text-white transition-transform active:scale-[0.98]"
+          >
+            <span className="text-[15px] font-bold tracking-wide">Damnatio Memoriae</span>
+            <span className="text-xs text-white/85">{t.forget.damnatioHint}</span>
+          </button>
+          <button
+            type="button"
+            disabled={!inHistory}
+            onClick={() => {
+              if (track) void useLibrary.getState().removeFromHistory(track.id);
+              close();
+            }}
+            className="flex h-11 items-center justify-center rounded-full bg-surface-3 text-[15px] font-medium hover:bg-surface-4 disabled:opacity-40"
+          >
+            {t.forget.remove}
+          </button>
+          {!inHistory && <p className="text-center text-xs text-fg-3">{t.forget.notInHistory}</p>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /** The first share: YouTube or YouTube Music links (kept; Settings changes it). */
 export function ShareDialog() {
   const asking = useShare((s) => s.asking);

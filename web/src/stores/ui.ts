@@ -36,6 +36,8 @@ interface UiState {
   menu: TrackMenuState | null;
   /** Tracks waiting for the "add to playlist" dialog: one from a track menu, many from the list search. */
   addToPlaylist: Track[] | null;
+  /** A track to take off your listening (the "remove or damnatio memoriae" dialog). */
+  forgetting: Track | null;
   shortcutsOpen: boolean;
   settingsOpen: boolean;
   /** Cinema view: the video maximized over everything. */
@@ -52,6 +54,7 @@ interface UiState {
   openMenu: (m: TrackMenuState) => void;
   closeMenu: () => void;
   openAddToPlaylist: (tracks: Track[] | null) => void;
+  openForget: (track: Track | null) => void;
   setShortcutsOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   setTheater: (open: boolean) => void;
@@ -76,6 +79,7 @@ export const useUi = create<UiState>((set, get) => ({
   toasts: [],
   menu: null,
   addToPlaylist: null,
+  forgetting: null,
   shortcutsOpen: false,
   settingsOpen: false,
   theater: false,
@@ -132,6 +136,7 @@ export const useUi = create<UiState>((set, get) => ({
   openMenu: (menu) => set({ menu }),
   closeMenu: () => set({ menu: null }),
   openAddToPlaylist: (addToPlaylist) => set({ addToPlaylist, menu: null }),
+  openForget: (forgetting) => set({ forgetting, menu: null }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setTheater: (theater) => set({ theater }),
