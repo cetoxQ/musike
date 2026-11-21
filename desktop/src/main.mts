@@ -90,7 +90,7 @@ function writeSettings(change: Settings) {
   }
 }
 
-/** "musike.home.arpa" or "http://192.168.1.240:4180/" → the origin (http(s) only), or null. */
+/** "musike.home.arpa" or "http://192.168.1.10:4180/" → the origin (http(s) only), or null. */
 function serverAddress(input: unknown): string | null {
   if (typeof input !== "string" || !input.trim()) return null;
   const raw = input.trim();

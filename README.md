@@ -345,7 +345,7 @@ services:
       VPN_SERVICE_PROVIDER: nordvpn
       VPN_TYPE: wireguard
       WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
-      SERVER_CITIES: Milan
+      SERVER_COUNTRIES: Netherlands # or SERVER_CITIES, see gluetun's wiki
     ports:
       - "4180:4180" # Musike, published by gluetun: Musike has no network of its own
     restart: unless-stopped
