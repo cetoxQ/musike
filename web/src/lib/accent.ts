@@ -60,3 +60,14 @@ export function accentCss(hex: string): string {
     `html[data-theme="light"]{--accent:${hex};--accent-ink:${ink};--accent-text:${toHex(lightText)};--accent-soft:rgb(${rgb(lightText)} / 0.12)}`
   );
 }
+
+/** The accent as text on the dark theme's surfaces: lightened until it reads well (the shared report image). */
+export function accentOnDark(hex: string): string {
+  return toHex(readable(toRgb(hex), WHITE, DARK_SURFACE));
+}
+
+/** `hex` with an alpha, for canvas gradients. */
+export function withAlpha(hex: string, alpha: number): string {
+  const [r, g, b] = toRgb(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}

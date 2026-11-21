@@ -13,6 +13,7 @@ import { maxAmount, PERIODS, periodName, sinceOf, UNIT_MS, type PeriodId, type U
 import { reportImage } from "../lib/report";
 import { paths } from "../lib/routes";
 import { computeStats, type Bucket, type Stats as Numbers } from "../lib/stats";
+import { useAppearance } from "../stores/appearance";
 import { useAuth } from "../stores/auth";
 import { useLibrary } from "../stores/library";
 import { toast } from "../stores/ui";
@@ -54,16 +55,52 @@ export default function Stats() {
   const share = async () => {
     if (!stats) return;
     try {
-      const blob = await reportImage(stats, {
-        title: t.stats.title,
-        period: periodLabel,
-        name: user?.username ?? t.profile.you,
-        numbers: numbersOf(stats, t).map(([label, value]) => [value, label]),
-        artists: t.stats.topArtists,
-        tracks: t.stats.topTracks,
-        overTime: t.stats.overTime,
-        plays: t.stats.playsN,
-      });
+      const deltas = deltasOf(stats);
+      const weekdayNames = weekdaysOf(lang);
+      const peakHour = stats.hours.indexOf(Math.max(...stats.hours));
+      const peakDay = stats.weekdays.indexOf(Math.max(...stats.weekdays));
+      const blob = await reportImage(
+        stats,
+        {
+          title: t.stats.title,
+          period: periodLabel,
+          name: user?.username ?? t.profile.you,
+          numbers: numbersOf(stats, t).map(([label, value], i) => ({
+            value,
+            label,
+            delta: deltas[i] != null ? `${deltas[i]! >= 0 ? "+" : ""}${deltas[i]}%` : undefined,
+          })),
+          deltaNote: t.stats.vsBefore,
+          artists: t.stats.topArtists,
+          tracks: t.stats.topTracks,
+          albums: t.stats.topAlbums,
+          plays: t.stats.playsN,
+          // The parts that need a time per play: only with a server.
+          ...(stats.dated
+            ? {
+                facts: [
+                  ...(stats.bestDay
+                    ? [
+                        {
+                          label: t.stats.bestDay,
+                          value: new Date(stats.bestDay.day).toLocaleDateString(lang, { day: "numeric", month: "short" }),
+                          sub: t.stats.playsN(stats.bestDay.plays),
+                        },
+                      ]
+                    : []),
+                  { label: t.stats.peakHour, value: `${peakHour}:00`, sub: weekdayNames[peakDay] },
+                  { label: t.stats.longestStreak, value: t.stats.daysN(stats.streak.longest) },
+                  { label: t.stats.currentStreak, value: t.stats.daysN(stats.streak.current) },
+                ],
+                overTime: t.stats.overTime,
+                byHour: t.stats.byHour,
+                byWeekday: t.stats.byWeekday,
+                weekdayNames,
+              }
+            : {}),
+        },
+        useAppearance.getState().accent,
+      );
       const result = await shareImage(blob, `musike-${new Date().toISOString().slice(0, 10)}.png`, t.stats.title);
       if (result === "saved") toast(t.stats.reportSaved);
     } catch {
@@ -167,20 +204,27 @@ function numbersOf(s: Numbers, t: T): [string, string][] {
 
 const change = (now: number, before: number) => (before > 0 ? Math.round(((now - before) / before) * 100) : null);
 
+/** Against the period before: plays and hours (the first two numbers). */
+const deltasOf = (stats: Numbers): (number | null)[] => [
+  stats.previous ? change(stats.plays, stats.previous.plays) : null,
+  stats.previous ? change(stats.minutes, stats.previous.minutes) : null,
+];
+
+/** Short weekday names, Monday first. */
+const weekdaysOf = (lang: string) =>
+  Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(lang, { weekday: "short" }));
+
 function Report({ stats, lang }: { stats: Numbers; lang: string }) {
   const t = useT();
   const numbers = numbersOf(stats, t);
-  const deltas: (number | null)[] = [
-    stats.previous ? change(stats.plays, stats.previous.plays) : null,
-    stats.previous ? change(stats.minutes, stats.previous.minutes) : null,
-  ];
+  const deltas = deltasOf(stats);
   const fmt = (start: number, bucket: Bucket) =>
     bucket === "hour"
       ? new Date(start).toLocaleTimeString(lang, { hour: "2-digit" })
       : bucket === "month"
         ? new Date(start).toLocaleDateString(lang, { month: "short", year: "2-digit" })
         : new Date(start).toLocaleDateString(lang, { day: "numeric", month: "numeric" });
-  const weekdayNames = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(lang, { weekday: "short" }));
+  const weekdayNames = weekdaysOf(lang);
   const peakHour = stats.hours.indexOf(Math.max(...stats.hours));
   const peakDay = stats.weekdays.indexOf(Math.max(...stats.weekdays));
 

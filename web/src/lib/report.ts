@@ -1,31 +1,45 @@
+import { accentOnDark, DEFAULT_ACCENT, isHex, withAlpha } from "./accent";
 import type { Stats } from "./stats";
 
-// The listening report as a picture (1080 x 1350), to share: the period, the big numbers, top artists and tracks,
-// and the plays over time. Drawn on a canvas, in the app's dark colours.
+// The listening report as a picture to share, in the app's dark colours and the user's accent. As much as the
+// numbers allow: on a phone on its own (no time per play) the totals and the top artists, tracks and albums; with a
+// server, also the highlights, when you listen (by hour and weekday) and the plays over time, in a taller picture.
 
 export interface ReportText {
   title: string;
   period: string;
   name: string;
-  numbers: [string, string][];
+  /** Up to 6: value, label and, against the period before, a change ("+12%"). */
+  numbers: { value: string; label: string; delta?: string }[];
+  /** Under the numbers when some have a change: what the change is against. */
+  deltaNote: string;
   artists: string;
   tracks: string;
-  overTime: string;
+  albums: string;
   plays: (n: number) => string;
+  /** With a time per play (a server): */
+  facts?: { label: string; value: string; sub?: string }[];
+  overTime?: string;
+  byHour?: string;
+  byWeekday?: string;
+  weekdayNames?: string[];
 }
 
+const W = 1080;
+const M = 72;
 const BG = "#0d0f0c";
 const CARD = "#171a15";
 const INK = "#f2f4ef";
 const INK2 = "#a9ae9f";
-const ACCENT = "#c3ec52";
+const INK3 = "#6f7466";
 
-export async function reportImage(stats: Stats, text: ReportText): Promise<Blob> {
-  const W = 1080;
-  const H = 1350;
+export async function reportImage(stats: Stats, text: ReportText, accentHex: string): Promise<Blob> {
+  const accent = isHex(accentHex) ? accentHex : DEFAULT_ACCENT;
+  const accentText = accentOnDark(accent);
+  // Drawn on a tall canvas, then cut where the content ends.
   const canvas = document.createElement("canvas");
   canvas.width = W;
-  canvas.height = H;
+  canvas.height = 2400;
   const c = canvas.getContext("2d")!;
   const font = (size: number, weight = 400) => `${weight} ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
   const fit = (s: string, max: number) => {
@@ -34,88 +48,174 @@ export async function reportImage(stats: Stats, text: ReportText): Promise<Blob>
     while (t.length > 1 && c.measureText(`${t}...`).width > max) t = t.slice(0, -1);
     return `${t}...`;
   };
-
-  c.fillStyle = BG;
-  c.fillRect(0, 0, W, H);
-  const glow = c.createRadialGradient(W * 0.85, 0, 0, W * 0.85, 0, 700);
-  glow.addColorStop(0, "rgba(195,236,82,0.22)");
-  glow.addColorStop(1, "rgba(195,236,82,0)");
-  c.fillStyle = glow;
-  c.fillRect(0, 0, W, H);
-
-  c.fillStyle = ACCENT;
-  c.font = font(30, 700);
-  c.fillText("musike", 72, 100);
-  c.fillStyle = INK;
-  c.font = font(64, 800);
-  c.fillText(fit(text.title, W - 144), 72, 190);
-  c.fillStyle = INK2;
-  c.font = font(32, 500);
-  c.fillText(fit(`${text.name} · ${text.period}`, W - 144), 72, 240);
-
-  // The big numbers, three by row.
-  const cols = 3;
-  const cw = (W - 144 - (cols - 1) * 20) / cols;
-  text.numbers.slice(0, 6).forEach(([value, label], i) => {
-    const x = 72 + (i % cols) * (cw + 20);
-    const y = 290 + Math.floor(i / cols) * 150;
+  const card = (x: number, y: number, w: number, h: number) => {
     c.fillStyle = CARD;
     c.beginPath();
-    c.roundRect(x, y, cw, 130, 24);
+    c.roundRect(x, y, w, h, 24);
     c.fill();
-    c.fillStyle = INK;
-    c.font = font(52, 800);
-    c.fillText(fit(value, cw - 48), x + 24, y + 70);
-    c.fillStyle = INK2;
-    c.font = font(26, 500);
-    c.fillText(fit(label, cw - 48), x + 24, y + 108);
-  });
-
-  // Top 5 artists and tracks, side by side.
-  const listY = 640;
-  const colW = (W - 144 - 40) / 2;
-  const list = (x: number, heading: string, rows: [string, string][]) => {
-    c.fillStyle = ACCENT;
-    c.font = font(28, 700);
-    c.fillText(heading, x, listY);
-    rows.slice(0, 5).forEach(([name, sub], i) => {
-      const y = listY + 56 + i * 76;
-      c.fillStyle = INK2;
-      c.font = font(28, 700);
-      c.fillText(String(i + 1), x, y);
-      c.fillStyle = INK;
-      c.font = font(30, 600);
-      c.fillText(fit(name, colW - 50), x + 44, y);
-      c.fillStyle = INK2;
-      c.font = font(22, 400);
-      c.fillText(fit(sub, colW - 50), x + 44, y + 30);
-    });
   };
-  list(72, text.artists, stats.topArtists.map((a) => [a.name, text.plays(a.count)]));
-  list(72 + colW + 40, text.tracks, stats.topTracks.map((t) => [t.track.title, t.track.artist]));
-
-  // Plays over time.
-  const series = stats.series;
-  if (series.length > 1) {
-    const top = 1130;
-    const height = 150;
-    c.fillStyle = ACCENT;
+  const heading = (s: string, x: number, y: number) => {
+    c.fillStyle = accentText;
     c.font = font(28, 700);
-    c.fillText(text.overTime, 72, top - 20);
-    const max = Math.max(1, ...series.map((s) => s.plays));
-    const gap = series.length > 120 ? 0 : 2;
-    const bw = (W - 144 - gap * (series.length - 1)) / series.length;
-    c.fillStyle = ACCENT;
-    series.forEach((s, i) => {
-      if (!s.plays) return;
-      const h = Math.max(3, (s.plays / max) * height);
+    c.fillText(s, x, y);
+  };
+  const bars = (values: number[], x: number, y: number, w: number, h: number, labels?: (i: number) => string | null) => {
+    const max = Math.max(1, ...values);
+    const gap = values.length > 120 ? 0 : values.length > 40 ? 1 : 4;
+    const bw = (w - gap * (values.length - 1)) / values.length;
+    c.fillStyle = accent;
+    values.forEach((v, i) => {
+      if (!v) return;
+      const bh = Math.max(3, (v / max) * h);
+      const r = Math.min(4, bw / 2);
       c.beginPath();
-      c.roundRect(72 + i * (bw + gap), top + height - h, Math.max(1, bw), h, [Math.min(4, bw / 2), Math.min(4, bw / 2), 0, 0]);
+      c.roundRect(x + i * (bw + gap), y + h - bh, Math.max(1, bw), bh, [r, r, 0, 0]);
       c.fill();
     });
     c.fillStyle = "rgba(255,255,255,0.12)";
-    c.fillRect(72, top + height, W - 144, 2);
+    c.fillRect(x, y + h, w, 2);
+    if (!labels) return;
+    c.fillStyle = INK3;
+    c.font = font(20, 500);
+    values.forEach((_, i) => {
+      const label = labels(i);
+      if (label) c.fillText(label, x + i * (bw + gap), y + h + 30);
+    });
+  };
+  const list = (x: number, y: number, w: number, title: string, rows: [string, string][], step = 76) => {
+    heading(title, x, y);
+    rows.slice(0, 5).forEach(([name, sub], i) => {
+      const ry = y + 56 + i * step;
+      c.fillStyle = INK3;
+      c.font = font(28, 700);
+      c.fillText(String(i + 1), x, ry);
+      c.fillStyle = INK;
+      c.font = font(30, 600);
+      c.fillText(fit(name, w - 50), x + 44, ry);
+      c.fillStyle = INK2;
+      c.font = font(22, 400);
+      c.fillText(fit(sub, w - 50), x + 44, ry + 30);
+    });
+    return y + 56 + Math.min(5, rows.length) * step - 20;
+  };
+
+  c.fillStyle = BG;
+  c.fillRect(0, 0, W, canvas.height);
+  const glow = c.createRadialGradient(W * 0.85, 0, 0, W * 0.85, 0, 760);
+  glow.addColorStop(0, withAlpha(accent, 0.24));
+  glow.addColorStop(1, withAlpha(accent, 0));
+  c.fillStyle = glow;
+  c.fillRect(0, 0, W, 900);
+
+  c.fillStyle = accentText;
+  c.font = font(30, 700);
+  c.fillText("musike", M, 100);
+  c.fillStyle = INK;
+  c.font = font(64, 800);
+  c.fillText(fit(text.title, W - 2 * M), M, 190);
+  c.fillStyle = INK2;
+  c.font = font(32, 500);
+  c.fillText(fit(`${text.name} · ${text.period}`, W - 2 * M), M, 240);
+
+  // The big numbers, three by row.
+  let y = 290;
+  const cols = 3;
+  const cw = (W - 2 * M - (cols - 1) * 20) / cols;
+  const numbers = text.numbers.slice(0, 6);
+  const tileH = numbers.some((n) => n.delta) ? 160 : 130;
+  numbers.forEach((n, i) => {
+    const x = M + (i % cols) * (cw + 20);
+    const ty = y + Math.floor(i / cols) * (tileH + 20);
+    card(x, ty, cw, tileH);
+    c.fillStyle = INK;
+    c.font = font(52, 800);
+    c.fillText(fit(n.value, cw - 48), x + 24, ty + 70);
+    c.fillStyle = INK2;
+    c.font = font(26, 500);
+    c.fillText(fit(n.label, cw - 48), x + 24, ty + 108);
+    if (n.delta) {
+      c.fillStyle = n.delta.startsWith("-") ? INK3 : accentText;
+      c.font = font(24, 700);
+      c.fillText(n.delta, x + 24, ty + 142);
+    }
+  });
+  y += Math.ceil(numbers.length / cols) * (tileH + 20);
+  if (numbers.some((n) => n.delta)) {
+    c.fillStyle = INK3;
+    c.font = font(22, 400);
+    c.fillText(fit(`%: ${text.deltaNote}`, W - 2 * M), M, y + 10);
+    y += 30;
   }
 
-  return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error("image"))), "image/png"));
+  // Highlights: best day, peak hour, streaks.
+  const facts = text.facts ?? [];
+  if (facts.length) {
+    y += 20;
+    const fw = (W - 2 * M - (facts.length - 1) * 16) / facts.length;
+    facts.forEach((f, i) => {
+      const x = M + i * (fw + 16);
+      card(x, y, fw, 140);
+      c.fillStyle = INK2;
+      c.font = font(22, 500);
+      c.fillText(fit(f.label, fw - 40), x + 20, y + 40);
+      c.fillStyle = INK;
+      c.font = font(36, 800);
+      c.fillText(fit(f.value, fw - 40), x + 20, y + 88);
+      if (f.sub) {
+        c.fillStyle = INK3;
+        c.font = font(22, 400);
+        c.fillText(fit(f.sub, fw - 40), x + 20, y + 120);
+      }
+    });
+    y += 140;
+  }
+
+  // Top artists and tracks, side by side.
+  const colW = (W - 2 * M - 40) / 2;
+  y += 90;
+  const endArtists = list(M, y, colW, text.artists, stats.topArtists.map((a) => [a.name, text.plays(a.count)]));
+  const endTracks = list(M + colW + 40, y, colW, text.tracks, stats.topTracks.map((t) => [t.track.title, t.track.artist]));
+  y = Math.max(endArtists, endTracks);
+
+  // Top albums; with a server, when you listen beside them.
+  const albums: [string, string][] = stats.topAlbums.map((a) => [a.title, `${a.artist} · ${text.plays(a.count)}`]);
+  const when = stats.dated && text.byHour && text.byWeekday;
+  if (albums.length || when) {
+    y += 80;
+    const start = y;
+    let end = y;
+    if (albums.length) end = list(M, start, when ? colW : W - 2 * M, text.albums, albums, 70);
+    if (when) {
+      const x = albums.length ? M + colW + 40 : M;
+      const w = albums.length ? colW : W - 2 * M;
+      heading(text.byHour!, x, start);
+      bars(stats.hours, x, start + 24, w, 110, (h) => (h % 6 === 0 ? String(h) : null));
+      heading(text.byWeekday!, x, start + 210);
+      const names = text.weekdayNames ?? [];
+      bars(stats.weekdays, x, start + 234, w, 110, (d) => names[d] ?? null);
+      end = Math.max(end, start + 234 + 110 + 30);
+    }
+    y = end;
+  }
+
+  // Plays over time.
+  if (stats.dated && text.overTime && stats.series.length > 1) {
+    y += 80;
+    heading(text.overTime, M, y);
+    bars(
+      stats.series.map((s) => s.plays),
+      M,
+      y + 24,
+      W - 2 * M,
+      150,
+    );
+    y += 24 + 150;
+  }
+
+  const height = Math.round(y + 72);
+  const out = document.createElement("canvas");
+  out.width = W;
+  out.height = height;
+  out.getContext("2d")!.drawImage(canvas, 0, 0, W, height, 0, 0, W, height);
+  return new Promise((done, fail) => out.toBlob((b) => (b ? done(b) : fail(new Error("image"))), "image/png"));
 }
