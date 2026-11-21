@@ -198,7 +198,7 @@ export const en = {
     error: "Couldn't load the lyrics. Check your connection and try again.",
     retry: "Try again",
     instrumental: "Instrumental track: there are no lyrics to sing along.",
-    unsynced: "These lyrics have no timing, so the app can't follow the song. Click a line to play from it.",
+    unsynced: "These lyrics have no timing, so they can't follow the song.",
     source: "Lyrics from",
   },
 

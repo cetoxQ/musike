@@ -192,7 +192,7 @@ export const it: Messages = {
     error: "Impossibile caricare il testo. Controlla la connessione e riprova.",
     retry: "Riprova",
     instrumental: "Brano strumentale: non c'è un testo da cantare.",
-    unsynced: "Questo testo non ha i tempi, quindi l'app non può seguire il brano. Tocca una riga per riprodurre da lì.",
+    unsynced: "Questo testo non ha i tempi, quindi non segue il brano.",
     source: "Testo da",
   },
 

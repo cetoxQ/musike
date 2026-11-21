@@ -192,7 +192,7 @@ export const pt: Messages = {
     error: "Não consegui carregar a letra. Verifique a conexão e tente de novo.",
     retry: "Tentar de novo",
     instrumental: "Faixa instrumental: não há letra para acompanhar.",
-    unsynced: "Esta letra não tem marcação de tempo, então o app não consegue acompanhar a música. Clique numa linha para tocar a partir dela.",
+    unsynced: "Esta letra não tem marcação de tempo, então não acompanha a música.",
     source: "Letra de",
   },
 

@@ -1,5 +1,6 @@
 import {
   CaretDownIcon,
+  MicrophoneStageIcon,
   MagnifyingGlassIcon,
   QueueIcon,
   DotsThreeVerticalIcon,
@@ -296,13 +297,30 @@ export function PanelDrawer() {
 }
 
 /** Full-screen Now Playing for phones. Drag down (or Back) to close. */
+type SheetView = "player" | "queue" | "lyrics";
+
+/**
+ * Lyrics and queue on the phone: two buttons at the bottom of the sheet, either side of Audio/Video, like Apple
+ * Music. The header already holds devices and the track's menu, and a fourth button there would reach the grabber.
+ */
+function SheetViewButton({ target, view, setView }: { target: "queue" | "lyrics"; view: SheetView; setView: (v: SheetView) => void }) {
+  const t = useT();
+  const on = view === target;
+  const label = on ? t.nowPlaying.backToPlayer : target === "queue" ? t.nowPlaying.showQueue : t.lyrics.show;
+  return (
+    <IconButton label={label} active={on} onClick={() => setView(on ? "player" : target)} className="shrink-0">
+      {target === "queue" ? <QueueIcon size={22} /> : <MicrophoneStageIcon size={22} />}
+    </IconButton>
+  );
+}
+
 export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const track = usePlayer(selectShown);
   // On a phone the buttons on its side set its own volume; the other device's needs a slider.
   const elsewhere = usePlayer((s) => !!s.remote);
   const reduce = useReducedMotion();
   const drag = useDragControls();
-  const [view, setView] = useState<"player" | "queue">("player");
+  const [view, setView] = useState<SheetView>("player");
   const t = useT();
 
   return createPortal(
@@ -343,21 +361,26 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
               <div className="pointer-events-none absolute top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-3/50" />
               <div className="-mr-2 flex items-center">
                 <DevicesButton size="md" />
-                <IconButton
-                  label={view === "queue" ? t.nowPlaying.backToPlayer : t.nowPlaying.showQueue}
-                  active={view === "queue"}
-                  onClick={() => setView(view === "queue" ? "player" : "queue")}
-                >
-                  <QueueIcon size={22} />
-                </IconButton>
                 <MoreButton track={track} />
               </div>
             </div>
 
-            {view === "queue" ? (
-              <div className="scroll-area -mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6">
-                <QueueList />
-              </div>
+            {view !== "player" ? (
+              <>
+                {view === "queue" ? (
+                  <div className="scroll-area -mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6">
+                    <QueueList />
+                  </div>
+                ) : (
+                  <LyricsView mode="sheet" className="-mx-3 flex-1" />
+                )}
+                {/* The same two buttons as under the player, with the controls between them. */}
+                <div className="flex items-center justify-between gap-2 pt-2 pb-[calc(12px+env(safe-area-inset-bottom))]">
+                  <SheetViewButton target="lyrics" view={view} setView={setView} />
+                  <Transport />
+                  <SheetViewButton target="queue" view={view} setView={setView} />
+                </div>
+              </>
             ) : (
               <div className="flex flex-1 flex-col justify-evenly gap-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
                 <div className="touch-none" onPointerDown={(e) => drag.start(e)}>
@@ -368,7 +391,11 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   {elsewhere && <Volume wide className="w-full" />}
-                  <ModeSwitch className="justify-center" />
+                  <div className="flex items-center justify-between gap-2">
+                    <SheetViewButton target="lyrics" view={view} setView={setView} />
+                    <ModeSwitch className="min-w-0 flex-1 justify-center" />
+                    <SheetViewButton target="queue" view={view} setView={setView} />
+                  </div>
                   <ElsewhereNote className="justify-center" />
                 </div>
               </div>

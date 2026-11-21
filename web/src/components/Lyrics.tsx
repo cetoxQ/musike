@@ -7,7 +7,7 @@ import { api, type Lyrics, type LyricLine } from "../lib/api";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { Track } from "../lib/types";
-import { selectCurrent, usePlayer } from "../player/player";
+import { selectHasShown, selectShown, selectShownPosition, selectShownStatus, usePlayer } from "../player/player";
 import { FavoriteButton } from "./Controls";
 import { IconButton } from "./IconButton";
 
@@ -84,7 +84,7 @@ function lineAt(position: number, lines: LyricLine[]): number {
 
 /** How far into a line playback is, 0 to 1, read when the line is drawn (paused: no animation). */
 function lineFraction(line: LyricLine, length: number): number {
-  const into = usePlayer.getState().position - line.time;
+  const into = selectShownPosition(usePlayer.getState()) - line.time;
   return Math.max(0, Math.min(1, into / length));
 }
 
@@ -96,7 +96,8 @@ function useActiveLine(lines: LyricLine[], synced: boolean): number {
       setActive(-1);
       return;
     }
-    const update = () => setActive(lineAt(usePlayer.getState().position, lines));
+    // The position of this device, or of the one it controls (ticking twice a second).
+    const update = () => setActive(lineAt(selectShownPosition(usePlayer.getState()), lines));
     update();
     return usePlayer.subscribe(update);
   }, [lines, synced]);
@@ -149,15 +150,17 @@ function Notice({ icon, text, children }: { icon: ReactNode; text: string; child
  * jump there when a line is clicked; plain lyrics are shown as text.
  *
  * `panel` scrolls on its own (the side panel, the drawer); `page` is the full middle area and lets the page
- * scroll instead, like the rest of the app's pages.
+ * scroll instead, like the rest of the app's pages; `sheet` (the phone's Now Playing) scrolls on its own, big.
  */
-export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "page"; className?: string }) {
+export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "page" | "sheet"; className?: string }) {
   const t = useT();
-  const track = usePlayer(selectCurrent);
+  const track = usePlayer(selectShown);
   const { status, lyrics, reload } = useLyrics(track);
   const seek = usePlayer((s) => s.seek);
-  const playing = usePlayer((s) => s.status === "playing");
+  const playing = usePlayer((s) => selectShownStatus(s) === "playing");
   const page = mode === "page";
+  // The phone sheet scrolls on its own, like the panel, with the page's big lines.
+  const big = mode !== "panel";
 
   const lines = lyrics?.lines ?? NO_LINES;
   const synced = !!lyrics?.synced && lines.length > 1;
@@ -219,7 +222,8 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
     window.clearTimeout(idle.current);
     seek(Math.max(0, time - 0.2));
     const player = usePlayer.getState();
-    if (player.status === "paused" || player.status === "idle") player.toggle();
+    const status = selectShownStatus(player);
+    if (status === "paused" || status === "idle") player.toggle();
   };
 
   const letGo = () => {
@@ -227,7 +231,7 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
     window.clearTimeout(idle.current);
     idle.current = window.setTimeout(() => {
       pinned.current = true;
-      scrollToLine(lineAt(usePlayer.getState().position, lines));
+      scrollToLine(lineAt(selectShownPosition(usePlayer.getState()), lines));
     }, 6000);
   };
 
@@ -258,12 +262,12 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
       onPointerDown={letGo}
       className={cn(
         "px-1 [scrollbar-width:thin]",
-        page ? "py-[45vh]" : "scroll-area min-h-0 overflow-y-auto",
+        page ? "py-[45vh]" : "scroll-area min-h-0 overflow-y-auto overscroll-contain",
         className,
       )}
     >
       {synced ? (
-        <div className={cn("flex flex-col", page ? "gap-3 md:gap-4" : "gap-0.5 py-[30%]")}>
+        <div className={cn("flex flex-col", page ? "gap-3 md:gap-4" : big ? "gap-3 py-[35%]" : "gap-0.5 py-[30%]")}>
           {lines.map((line, i) => {
             const isActive = i === active;
             const length = Math.max(0, (lines[i + 1]?.time ?? 0) - line.time);
@@ -278,7 +282,7 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
                 onClick={() => jumpTo(line.time)}
                 className={cn(
                   "relative block w-full rounded-lg text-left font-semibold transition-[color,opacity] duration-300",
-                  page
+                  big
                     ? "px-2 py-0.5 text-[26px] leading-[1.32] md:text-[34px] md:leading-[1.28]"
                     : "px-2 py-1 text-[16px] leading-snug",
                   isActive ? "text-accent-text opacity-100" : "text-fg-2 opacity-45 hover:text-fg hover:opacity-100",
@@ -311,7 +315,7 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
           })}
         </div>
       ) : (
-        <div className={cn("px-2", page ? "py-12 text-[17px] leading-relaxed" : "py-8 text-[15px] leading-relaxed")}>
+        <div className={cn("px-2", big ? "py-12 text-[17px] leading-relaxed" : "py-8 text-[15px] leading-relaxed")}>
           {lyrics?.instrumental ? (
             <p className="text-fg-2">{t.lyrics.instrumental}</p>
           ) : (
@@ -341,7 +345,7 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
 /** The middle column, showing the lyrics of the track being played. The panels around it stay where they are. */
 export function LyricsPage() {
   const t = useT();
-  const track = usePlayer(selectCurrent);
+  const track = usePlayer(selectShown);
   const { goBack } = useLyricsNavigation();
 
   return (
@@ -367,7 +371,7 @@ export function LyricsPage() {
 export function LyricsButton({ size = "sm", className }: { size?: "sm" | "md"; className?: string }) {
   const t = useT();
   const { atLyrics, toggle } = useLyricsNavigation();
-  const hasTrack = usePlayer((s) => s.queue.length > 0);
+  const hasTrack = usePlayer(selectHasShown);
   return (
     <IconButton
       label={t.lyrics.show}
