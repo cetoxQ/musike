@@ -164,6 +164,8 @@ export const pt: Messages = {
     startingRadio: (title) => `Montando rádio de "${title}"`,
     cantPlay: (title, reason) => `Não foi possível tocar "${title}". ${reason}`,
     aTrack: "esta faixa",
+    botRetry: (minutes) => `Tentando de novo em ${minutes} min.`,
+    videoBotCheck: "O YouTube está pedindo verificação de robô no vídeo: tocando o áudio por enquanto.",
     browserCantPlay: "O navegador não conseguiu reproduzir este formato.",
     serverDown: "Servidor do Musike inacessível. Ele está rodando?",
     streamFailed: "O YouTube parou de entregar esta faixa. Tente de novo daqui a pouco.",

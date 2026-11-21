@@ -12,7 +12,11 @@ import { text, withClient } from "./search.js";
  */
 
 export const DEFAULT_CLIENTS = ["VISIONOS"];
-const REMOTE_CONFIG = "https://raw.githubusercontent.com/Ernani1234/musike/main/mobile/streaming.json";
+// This fork's list first, so it can add or swap clients itself; the original's if this fork's can't be read.
+const REMOTE_CONFIGS = [
+  "https://raw.githubusercontent.com/yourboiava/musike/local/mobile/streaming.json",
+  "https://raw.githubusercontent.com/Ernani1234/musike/main/mobile/streaming.json",
+];
 
 export interface DirectAudio {
   url: string;
@@ -31,12 +35,16 @@ export const validClients = (v: unknown): string[] | null =>
  * and Android; a platform can have its own (`ios`).
  */
 export async function fetchRemoteClients(key: "clients" | "ios" = "clients"): Promise<string[] | null> {
-  try {
-    const res = await fetch(REMOTE_CONFIG, { signal: AbortSignal.timeout(6000) });
-    return validClients(((await res.json()) as Record<string, unknown>)[key]);
-  } catch {
-    return null; // offline or no config: keep what we have
+  for (const url of REMOTE_CONFIGS) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const clients = validClients(((await res.json()) as Record<string, unknown>)[key]);
+      if (clients) return clients;
+    } catch {
+      // offline or no config there: try the next one
+    }
   }
+  return null; // keep what we have
 }
 
 /** Tries each client in turn. Throws with YouTube's reason (or an empty message) when none of them has audio. */

@@ -152,6 +152,11 @@ const mediaFor = (k: Kind): HTMLMediaElement => (k === "video" ? videoEl : audio
 let loaded: { id: string; kind: Kind; quality: Quality } | null = null;
 let pendingSeek = 0;
 let token = 0;
+/** YouTube's bot check (see botCheck): until when video waits, the retries left for audio and their timer. */
+let videoBlockedUntil = 0;
+let botRetries = 0;
+let botTimer: ReturnType<typeof setTimeout> | undefined;
+const BOT_RETRY_MINUTES = [1, 3];
 /** The load that has started playing (warming the next track, and telling a pause mid-buffering from one at start). */
 let recordedToken = -1;
 
@@ -228,7 +233,12 @@ export const usePlayer = create<PlayerState>((set, get) => {
   const elsewhere = () => (!localOnly && get().remote ? remoteControl : null);
 
   const kindFor = (track: Track): Kind =>
-    capabilities.video && get().preferVideo && (track.kind === "video" || !!clipFor.get(track.id)) ? "video" : "audio";
+    capabilities.video &&
+    get().preferVideo &&
+    Date.now() > videoBlockedUntil &&
+    (track.kind === "video" || !!clipFor.get(track.id))
+      ? "video"
+      : "audio";
   /** The YouTube id to stream: the song itself, or its music video in Video mode. */
   const mediaIdFor = (track: Track, kind: Kind) =>
     kind === "video" && track.kind !== "video" ? clipFor.get(track.id)! : track.id;
@@ -389,6 +399,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
   /** Shows why a track can't play, then moves on (unless every track would fail the same way). */
   function report(message: string, code?: ErrorCode) {
+    if (code === "bot_check") return botCheck(message);
     const mine = token;
     set({ status: "error", statusText: { error: message } });
     const track = get().queue[get().index];
@@ -403,6 +414,33 @@ export const usePlayer = create<PlayerState>((set, get) => {
     if (code !== "tool_missing" && get().index < get().queue.length - 1) {
       setTimeout(() => mine === token && get().next(), 2500);
     }
+  }
+
+  /**
+   * YouTube asking this connection to prove it's not a bot. Every track would hit it, and each new try makes it stick,
+   * so never skip through the queue. Video (the server's yt-dlp) waits 10 minutes and the song plays as audio, which
+   * comes another way and usually still works. Audio stops on this track and tries it again in 1, then 3 minutes.
+   */
+  function botCheck(message: string) {
+    const t = getT();
+    const s = get();
+    if (s.mediaKind === "video") {
+      videoBlockedUntil = Date.now() + 10 * 60_000;
+      toast(t.player.videoBotCheck);
+      return load(s.index, { startAt: s.position, autoplay: true });
+    }
+    const mine = token;
+    const wait = BOT_RETRY_MINUTES[botRetries];
+    set({ status: "error", statusText: { error: wait ? `${message} ${t.player.botRetry(wait)}` : message } });
+    const track = s.queue[s.index];
+    toast(t.player.cantPlay(track?.title ?? t.player.aTrack, message), "error", {
+      label: t.common.retry,
+      run: () => load(get().index, { autoplay: true }),
+    });
+    clearTimeout(botTimer);
+    if (!wait) return;
+    botRetries++;
+    botTimer = setTimeout(() => mine === token && load(get().index, { autoplay: true }), wait * 60_000);
   }
 
   // A stream URL that expired mid-song gets one fresh try from the same spot before giving up.
@@ -444,6 +482,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     });
     media.addEventListener("playing", () => {
       if (!isActive()) return;
+      botRetries = 0;
       set({ status: "playing", statusText: null });
       onStarted();
       syncPlaybackState();

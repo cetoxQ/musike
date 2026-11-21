@@ -164,6 +164,8 @@ export const it: Messages = {
     startingRadio: (title) => `Creazione radio da "${title}"`,
     cantPlay: (title, reason) => `Impossibile riprodurre "${title}". ${reason}`,
     aTrack: "questo brano",
+    botRetry: (minutes) => `Riprovo tra ${minutes} min.`,
+    videoBotCheck: "YouTube chiede il controllo anti-bot per i video: per un po' suona l'audio.",
     browserCantPlay: "Il browser non è riuscito a riprodurre questo formato.",
     serverDown: "Impossibile raggiungere il server di Musike. È in esecuzione?",
     streamFailed: "YouTube ha interrotto l'invio di questo brano. Riprova tra un momento.",

@@ -242,7 +242,15 @@ export const api: MusikeApi = offline ? offline.api : onThePhone;
 /** Whether the server answers (connected to one), for Settings and to reload when it's back. */
 export const link: ServerLink | null = offline?.link ?? null;
 
-const phoneStream = (id: string) => resolveAudio(id).then((r) => r.url);
+// YouTube's own words for its bot check, from any client; the player then stops instead of skipping (see botCheck).
+const BOT_CHECK = /confirm you.?re not a bot|sign in to confirm/i;
+const phoneStream = (id: string) =>
+  resolveAudio(id).then(
+    (r) => r.url,
+    (e: Error) => {
+      throw BOT_CHECK.test(e.message) ? new ApiError(503, tr(getLang(), msg("botCheck")), "bot_check") : e;
+    },
+  );
 
 /**
  * On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. Connected to a

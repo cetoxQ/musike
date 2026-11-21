@@ -170,6 +170,8 @@ export const en = {
     startingRadio: (title: string) => `Building radio from "${title}"`,
     cantPlay: (title: string, reason: string) => `Couldn't play "${title}". ${reason}`,
     aTrack: "this track",
+    botRetry: (minutes: number) => `Trying again in ${minutes} min.`,
+    videoBotCheck: "YouTube is asking for a bot check on video: playing the audio for a while.",
     browserCantPlay: "The browser couldn't play this format.",
     serverDown: "Can't reach the Musike server. Is it running?",
     streamFailed: "YouTube stopped serving this track. Try it again in a moment.",
