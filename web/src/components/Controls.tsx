@@ -224,7 +224,8 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
 }
 
 /** Audio / Video segmented switch. For songs, Video plays the song's music video when YouTube has one. */
-export function ModeSwitch({ className }: { className?: string }) {
+/** `compact`: icons only, for the row at the bottom of the phone's sheet. */
+export function ModeSwitch({ className, compact = false }: { className?: string; compact?: boolean }) {
   const t = useT();
   // This device's mode, or the one of the device it controls (which may not play videos: the phone's own library).
   const preferVideo = usePlayer((s) => s.remote?.preferVideo ?? s.preferVideo);
@@ -237,25 +238,35 @@ export function ModeSwitch({ className }: { className?: string }) {
 
   const seg = (on: boolean) =>
     cn(
-      "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-200",
+      "flex items-center gap-1.5 rounded-full text-[13px] font-medium transition-colors duration-200",
+      compact ? "size-8 justify-center" : "h-9 px-3.5",
       on ? "bg-surface-4 text-fg shadow-[inset_0_1px_0_var(--highlight)]" : "text-fg-2 hover:text-fg",
     );
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex items-center", compact ? "gap-1" : "gap-2", className)}>
       <div role="radiogroup" aria-label={t.player.mode} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
-        <button type="button" role="radio" aria-checked={!preferVideo} className={seg(!preferVideo)} onClick={() => setPreferVideo(false)}>
-          <MusicNotesIcon size={15} /> {t.player.audio}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!preferVideo}
+          aria-label={compact ? t.player.audio : undefined}
+          title={compact ? t.player.audio : undefined}
+          className={seg(!preferVideo)}
+          onClick={() => setPreferVideo(false)}
+        >
+          <MusicNotesIcon size={compact ? 17 : 15} /> {!compact && t.player.audio}
         </button>
         <button
           type="button"
           role="radio"
           aria-checked={preferVideo}
+          aria-label={compact ? t.player.video : undefined}
           className={seg(preferVideo)}
           onClick={() => setPreferVideo(true)}
           title={t.player.watchClip}
         >
-          <VideoCameraIcon size={15} /> {t.player.video}
+          <VideoCameraIcon size={compact ? 17 : 15} /> {!compact && t.player.video}
         </button>
       </div>
       {showingVideo && (
@@ -264,7 +275,8 @@ export function ModeSwitch({ className }: { className?: string }) {
           onClick={() => setQuality(quality === "sd" ? "hd" : "sd")}
           title={quality === "sd" ? t.player.toHd : t.player.toSd}
           className={cn(
-            "h-9 rounded-full px-3 font-mono text-[12px] font-semibold ring-1 transition-colors",
+            "rounded-full font-mono text-[12px] font-semibold ring-1 transition-colors",
+            compact ? "h-8 px-2" : "h-9 px-3",
             quality === "hd" ? "bg-accent-soft text-accent-text ring-accent/40" : "text-fg-2 ring-line hover:text-fg",
           )}
         >

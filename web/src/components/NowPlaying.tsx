@@ -107,8 +107,8 @@ function TrackHeading({ track, large = false }: { track: Track; large?: boolean 
           )}
         </div>
       </div>
-      {/* The phone keeps only the heart here (the title needs the room): Share, Start radio and the rest are in the
-          sheet's "More" menu. */}
+      {/* The phone keeps only the heart here (the title needs the room): Share and the track's menu are in the row
+          at the bottom of the sheet. */}
       {!large && <ShareButton track={track} />}
       <FavoriteButton track={track} size={large ? "lg" : "md"} />
     </div>
@@ -296,13 +296,9 @@ export function PanelDrawer() {
   );
 }
 
-/** Full-screen Now Playing for phones. Drag down (or Back) to close. */
 type SheetView = "player" | "queue" | "lyrics";
 
-/**
- * Lyrics and queue on the phone: two buttons at the bottom of the sheet, either side of Audio/Video, like Apple
- * Music. The header already holds devices and the track's menu, and a fourth button there would reach the grabber.
- */
+/** Lyrics and queue on the phone: the two ends of the row at the bottom of the sheet, within reach of the thumb. */
 function SheetViewButton({ target, view, setView }: { target: "queue" | "lyrics"; view: SheetView; setView: (v: SheetView) => void }) {
   const t = useT();
   const on = view === target;
@@ -314,6 +310,7 @@ function SheetViewButton({ target, view, setView }: { target: "queue" | "lyrics"
   );
 }
 
+/** Full-screen Now Playing for phones. Drag down (or Back) to close. */
 export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const track = usePlayer(selectShown);
   // On a phone the buttons on its side set its own volume; the other device's needs a slider.
@@ -359,10 +356,6 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
               </IconButton>
               {/* In the middle of the sheet, whatever the buttons on either side. */}
               <div className="pointer-events-none absolute top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-3/50" />
-              <div className="-mr-2 flex items-center">
-                <DevicesButton size="md" />
-                <MoreButton track={track} />
-              </div>
             </div>
 
             {view !== "player" ? (
@@ -391,9 +384,13 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   {elsewhere && <Volume wide className="w-full" />}
-                  <div className="flex items-center justify-between gap-2">
+                  {/* Everything for the track within reach of the thumb: the header keeps only Close. */}
+                  <div className="-mx-2 flex items-center justify-between">
                     <SheetViewButton target="lyrics" view={view} setView={setView} />
-                    <ModeSwitch className="min-w-0 flex-1 justify-center" />
+                    <DevicesButton size="md" />
+                    <ModeSwitch compact />
+                    <ShareButton track={track} />
+                    <MoreButton track={track} />
                     <SheetViewButton target="queue" view={view} setView={setView} />
                   </div>
                   <ElsewhereNote className="justify-center" />
