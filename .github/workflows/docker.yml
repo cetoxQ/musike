@@ -1,5 +1,6 @@
 # Builds the Docker image for every release tag (v1.2.0 → :1.2.0, :1.2 and :latest) and publishes it
-# to GitHub Container Registry as ghcr.io/<owner>/musike. Can also be started by hand from the Actions tab.
+# to GitHub Container Registry as ghcr.io/<owner>/musike. Can also be started by hand from the Actions tab:
+# started on the "local" branch, it is :latest too (this fork publishes its image that way).
 name: Docker image
 
 on:
@@ -37,7 +38,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/local' }}
             type=sha,enable=${{ !startsWith(github.ref, 'refs/tags/v') }}
 
       - uses: docker/build-push-action@v6

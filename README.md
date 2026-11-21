@@ -72,6 +72,16 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search and save a copy as your own playlist
 - Recent searches remember what you opened (song, video, artist, album, playlist), each removable
 - **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
+- **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
+
+**Player**
+- The loading spinner is a stop button: a track stuck loading can be let go
+- In a narrow window (half a screen) the volume stays reachable: the speaker opens the slider
+
+**Phone**
+- The Now Playing sheet has everything for the track in one row under the controls: Start radio, lyrics, devices, Audio/Video, share, the queue and the track's menu. A long title slides along
+- The sheets coming up from the bottom (the track's menu, Settings and the other dialogs) close when pulled down
+- Connected to a server it can't reach, the phone plays audio with the artwork instead of offering video
 
 **Android**
 - **Android Auto:** your favorites, playlists, recently played and the queue in the car. With "Display over other apps" allowed, opening Musike in the car with the app closed starts it in the background and resumes the last track. A log of the car's requests (**Settings > Android Auto**) helps when something doesn't show
@@ -79,7 +89,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 
 **Server**
 - A track YouTube holds back for a few seconds (it answers 403 until then) starts as soon as YouTube serves it, instead of failing
-- `MUSIKE_DIRECT_AUDIO=first`: audio straight from YouTube's API, about half a second to start
+- `MUSIKE_DIRECT_AUDIO=first`: audio straight from YouTube's API, about half a second to start. Without it, audio still comes from there when YouTube refuses yt-dlp's URL
 - Can run behind a VPN, see [Docker behind a VPN](#docker-behind-a-vpn)
 
 ## Features
@@ -194,9 +204,18 @@ The releases linked above are the original Musike. This fork's own builds come f
 
 - **Android:** Actions > **Android APK** > the latest run > `musike-android-…` artifact. Signed with this fork's key and installed as `app.musike.android.fork`, next to the original app, not over it. Updates install over the previous build of the fork.
 - **Windows:** Actions > **Windows app** > `musike-windows-…` artifact. Same app ID as the original: it replaces it and keeps its library.
-- **Server:** build the image from source, `docker compose up -d --build` with `build: .` in the compose file (below).
+- **Server:** the image `ghcr.io/yourboiava/musike:latest` (amd64 and arm64), with the compose file of [Option 6](#option-6-docker). Or built from source:
 
-Artifacts are kept for 14 days. To build by hand, **Run workflow** on the same pages.
+  ```bash
+  git clone -b local https://github.com/yourboiava/musike.git
+  cd musike
+  sed -i 's|^    # build: \.|    build: .|' docker-compose.yml
+  docker compose up -d --build   # then open http://<this machine>:4180
+  ```
+
+  Built from source, `git pull && docker compose up -d --build` updates it.
+
+Artifacts are kept for 14 days. To build by hand, **Run workflow** on the same pages. The releases of this fork are on [its own page](https://github.com/yourboiava/musike/releases); the latest APK is always at `https://github.com/yourboiava/musike/releases/latest/download/Musike-Setup-1.5.1-Android.apk` while the version stays 1.5.1.
 
 ### Option 1: Windows app
 
@@ -287,7 +306,7 @@ For a home server, NAS or Raspberry Pi. The image (amd64 and arm64) includes yt-
 # docker-compose.yml
 services:
   musike:
-    image: ghcr.io/ernani1234/musike:latest
+    image: ghcr.io/yourboiava/musike:latest # this fork; ghcr.io/ernani1234/musike is the original
     ports:
       - "4180:4180"
     volumes:
@@ -303,7 +322,7 @@ volumes:
 docker compose up -d   # then open http://<that machine>:4180
 ```
 
-Or with plain Docker: `docker run -d -p 4180:4180 -v musike-data:/data -v musike-cache:/cache ghcr.io/ernani1234/musike`. To build the image from source instead: `docker build -t musike .`
+Or with plain Docker: `docker run -d -p 4180:4180 -v musike-data:/data -v musike-cache:/cache ghcr.io/yourboiava/musike`. To build the image from source instead: `docker build -t musike .`
 
 - A new image is published for every release; `docker compose pull && docker compose up -d` updates it. The library stays in the `/data` volume.
 - To back up the database itself, copy `/data` while the container is stopped (with it running, `musike.db-wal` may hold the latest changes). [Export](#moving-your-library-backup) works any time.
