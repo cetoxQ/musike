@@ -610,7 +610,7 @@ YouTube changes often and yt-dlp keeps up. Open **Settings** and click **Update*
 YouTube asks this of some connections, mostly VPNs and shared networks (offices, universities, some providers). Musike first tries to get the audio another way, so you only see this message when that fails too.
 
 - If you use a VPN, turn it off and try again.
-- In Docker, run the `pot` service of this fork's [docker-compose.yml](docker-compose.yml): it gives yt-dlp the proof-of-origin tokens YouTube looks for, which makes the check much rarer.
+- In Docker, run the `pot` service of this fork's [docker-compose.yml](docker-compose.yml): it gives yt-dlp the proof-of-origin tokens YouTube looks for, which makes the check much rarer. The tokens are for YouTube's web clients, so don't force another client with `player_client` in `YTDLP_EXTRA_ARGS`: yt-dlp would never ask for them. To check, `docker exec musike yt-dlp -v --simulate --extractor-args "youtube:player_client=web;fetch_pot=always" "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | grep pot:bgutil:http` should show a token being fetched.
 - On the phone on its own (mobile data in particular: carrier addresses are shared by many people), turning airplane mode on and off usually gets a new address. Musike stops on the track and tries again after a minute instead of skipping through the queue, since each try makes the check stick.
 - Running the server yourself, you can pass cookies from a signed-in browser (Firefox works best on Windows). YouTube may flag an account used this way, so prefer one you don't mind losing:
 
