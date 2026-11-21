@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { LogoMark } from "../components/Brand";
 import { PageHeader, Section } from "../components/Page";
+import { ROW_CLASS, RowArrows, useRowScroll } from "../components/ScrollRow";
 import { TrackList, TrackListSkeleton } from "../components/TrackList";
 import { useT } from "../i18n";
 import { paths } from "../lib/routes";
@@ -65,7 +66,7 @@ function useStartOnNewFirst(first: string | undefined) {
 
 export default function Home() {
   const { favorites, playlists, history, status } = useLibrary();
-  const recentRow = useStartOnNewFirst(history[0]?.id);
+  const recentRow = useRowScroll(useStartOnNewFirst(history[0]?.id));
   const playList = usePlayer((s) => s.playList);
   const navigate = useNavigate();
   const t = useT();
@@ -139,15 +140,15 @@ export default function Home() {
             <Section
               title={t.nav.recentlyPlayed}
               action={
-                <Link to={paths.history} className="text-sm font-medium text-fg-2 hover:text-fg">
-                  {t.home.seeAll}
-                </Link>
+                <div className="flex items-center gap-3">
+                  <RowArrows row={recentRow} />
+                  <Link to={paths.history} className="text-sm font-medium text-fg-2 hover:text-fg">
+                    {t.home.seeAll}
+                  </Link>
+                </div>
               }
             >
-              <div
-                ref={recentRow}
-                className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 md:scroll-px-6 md:px-6"
-              >
+              <div ref={recentRow.ref} className={ROW_CLASS}>
                 {history.slice(0, 16).map((t, i) => (
                   <RecentCard key={t.id} track={t} onPlay={() => playList(history, i)} />
                 ))}

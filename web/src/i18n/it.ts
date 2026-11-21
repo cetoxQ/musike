@@ -6,6 +6,8 @@ export const it: Messages = {
   locale: "it-IT",
 
   common: {
+    scrollBack: "Scorri indietro",
+    scrollForward: "Scorri avanti",
     close: "Chiudi",
     back: "Indietro",
     cancel: "Annulla",

@@ -9,6 +9,8 @@ export const en = {
   locale: "en-US",
 
   common: {
+    scrollBack: "Scroll back",
+    scrollForward: "Scroll forward",
     close: "Close",
     back: "Back",
     cancel: "Cancel",

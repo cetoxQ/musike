@@ -6,6 +6,8 @@ export const pt: Messages = {
   locale: "pt-BR",
 
   common: {
+    scrollBack: "Rolar para trás",
+    scrollForward: "Rolar para frente",
     close: "Fechar",
     back: "Voltar",
     cancel: "Cancelar",

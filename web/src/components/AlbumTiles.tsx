@@ -3,6 +3,7 @@ import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { AlbumCard } from "../lib/types";
 import { Artwork } from "./Artwork";
+import { ScrollRow } from "./ScrollRow";
 
 /** An album cover with its title; opens the album. */
 export function AlbumTile({ album, className }: { album: AlbumCard; className?: string }) {
@@ -27,16 +28,13 @@ export function AlbumTile({ album, className }: { album: AlbumCard; className?: 
 /** A titled, horizontally scrolling row of albums (an artist's albums or singles). */
 export function AlbumRow({ title, albums }: { title: string; albums: AlbumCard[] }) {
   return (
-    <section className="flex flex-col gap-3 pt-6">
-      <h2 className="px-4 text-xl font-semibold tracking-tight md:px-6">{title}</h2>
-      <ul className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 md:scroll-px-6 md:px-6">
-        {albums.map((a) => (
-          <li key={a.id} className="w-36 shrink-0 snap-start md:w-44">
-            <AlbumTile album={a} />
-          </li>
-        ))}
-      </ul>
-    </section>
+    <ScrollRow title={title}>
+      {albums.map((a) => (
+        <li key={a.id} className="w-36 shrink-0 snap-start md:w-44">
+          <AlbumTile album={a} />
+        </li>
+      ))}
+    </ScrollRow>
   );
 }
 

@@ -1,6 +1,7 @@
 import { PlayIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { ScrollRow } from "./ScrollRow";
 import { paths } from "../lib/routes";
 import type { ArtistCard, PlaylistCard, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
@@ -8,12 +9,7 @@ import { Artwork } from "./Artwork";
 
 /** A titled row that scrolls sideways, like the album rows: the frame for an artist page's other shelves. */
 export function Shelf({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3 pt-6">
-      <h2 className="px-4 text-xl font-semibold tracking-tight md:px-6">{title}</h2>
-      <ul className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 md:scroll-px-6 md:px-6">{children}</ul>
-    </section>
-  );
+  return <ScrollRow title={title}>{children}</ScrollRow>;
 }
 
 /** Videos as wide tiles; a tile plays the shelf from that video on. */
