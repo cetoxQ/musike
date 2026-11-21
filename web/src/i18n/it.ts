@@ -287,7 +287,7 @@ export const it: Messages = {
     topAlbums: "Album più ascoltati",
     empty: "Nessun ascolto in questo periodo: un brano conta dopo 30 secondi.",
     standalone:
-      "Su questo telefono da solo gli ascolti non sono conservati con l'orario, solo i totali: i grafici nel tempo, le ore, i giorni e le serie arrivano con un server Musike, che conserva ogni ascolto.",
+      "Su questo dispositivo da solo gli ascolti non sono conservati con l'orario, solo i totali: i grafici nel tempo, le ore, i giorni e le serie arrivano con un server Musike, che conserva ogni ascolto.",
     shareReport: "Condividi",
     reportSaved: "Report salvato",
     reportFailed: "Impossibile creare il report",

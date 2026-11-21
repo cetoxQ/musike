@@ -287,7 +287,7 @@ export const pt: Messages = {
     topAlbums: "Álbuns mais ouvidos",
     empty: "Nenhuma reprodução neste período: uma faixa conta depois de 30 segundos.",
     standalone:
-      "Só no celular, as reproduções não ficam com horário, só os totais: os gráficos no tempo, as horas, dias e sequências vêm com um servidor Musike, que guarda cada reprodução.",
+      "Só neste aparelho, as reproduções não ficam com horário, só os totais: os gráficos no tempo, as horas, dias e sequências vêm com um servidor Musike, que guarda cada reprodução.",
     shareReport: "Compartilhar",
     reportSaved: "Relatório salvo",
     reportFailed: "Não foi possível fazer o relatório",

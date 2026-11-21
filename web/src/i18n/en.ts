@@ -293,7 +293,7 @@ export const en = {
     topAlbums: "Top albums",
     empty: "No plays in this period: a track counts after 30 seconds.",
     standalone:
-      "On this phone on its own, plays aren't kept with their time, only totals: the charts over time, the hours, days and streaks come with a Musike server, which keeps every play.",
+      "On this device on its own, plays aren't kept with their time, only totals: the charts over time, the hours, days and streaks come with a Musike server, which keeps every play.",
     shareReport: "Share",
     reportSaved: "Report saved",
     reportFailed: "Couldn't make the report",
