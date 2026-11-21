@@ -1,8 +1,8 @@
 # The Windows installer alone, for this fork: on every push to the "local" branch that touches the app, or by hand
 # (Actions > Windows app > Run workflow). The installer is in the run's artifacts.
 #
-# It is the desktop app as it ships: Musike with its own library on the PC (no accounts, no Musike server, no
-# devices in step). Same app ID as the official app: installing it replaces that one, and keeps its library.
+# It is the desktop app as it ships: its own library on the PC, or a Musike server's (Settings > Server, with the
+# account, the devices in step). Same app ID as the official app: installing it replaces that one, and keeps its library.
 name: Windows app
 
 on:

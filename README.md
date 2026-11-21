@@ -22,11 +22,14 @@ Runs as a **Windows**, **macOS** and **Linux** app, as an **Android**, **Android
 
 </div>
 
+> **This is a fork** of [Ernani1234/musike](https://github.com/Ernani1234/musike), built around one library shared by every device through your own Musike server: accounts, the phone and the PC in step, a profile with your listening statistics, other devices as remotes, Android Auto. [What this fork adds](#what-this-fork-adds) · [Builds of this fork](#builds-of-this-fork). The `community` branch collects upstream pull requests and fixes for upstream issues, to try before they reach `local`.
+
 ---
 
 ## Contents
 
 - [What it is](#what-it-is)
+- [What this fork adds](#what-this-fork-adds)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -50,6 +53,34 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **Song or music video:** switch between Audio and Video at any time, from the same point in the track. For songs, Musike finds the artist's official music video.
 - **Any screen:** designed for phones of every size, tablets, laptops and big monitors.
 - **Yours:** it runs on your own computer. Playlists and favorites live in a local file you can export and take to any other Musike.
+
+## What this fork adds
+
+**One library, every device**
+- A Musike server with [accounts](#accounts) is the library: the browser, the Android app and the Windows app connect to it (**Settings > Server**) and show the same favorites, playlists, history and play counts
+- **Live:** a change on one device (a favorite, a playlist, a track played) shows up on the others within seconds, without reloading
+- **Offline on the phone:** when the server can't be reached, the Android app keeps playing and searching from its own copy of your library, queues your changes and sends them when the server is back. It tries 5 times in the first seconds, then every 20 seconds; **Try now** in Settings says what happened
+- **Devices:** every device open with your account appears in the Devices button. One plays at a time and the others are its remote: play, pause, seek, skip, volume, the queue, or move playback to this device
+
+**You**
+- **Profile,** laid out like an artist's page: your most played tracks for a period you choose (7 days to all time, or a custom range), your albums, singles and live recordings, the artists you follow, your playlists and saved playlists, and **You might also like**, from what you listen to. A profile picture from the gallery, and an accent color that follows your account on every device
+- **Your listening:** plays, hours, tracks, artists, albums and days with music, compared with the period before; charts over time, by hour, by weekday and a day-by-hour map; busiest day, favourite hour and streaks; top artists, tracks and albums. **Share** makes an image of the report
+- A play counts after **30 seconds** of real listening (half of a track shorter than a minute), and the server keeps the time it happened
+- **Remove from your listening:** take a track off Recently played, or **Damnatio Memoriae**: erase every play of it, from the history, the statistics and the suggestions, as if it had never played
+
+**Library**
+- Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search and save a copy as your own playlist
+- Recent searches remember what you opened (song, video, artist, album, playlist), each removable
+- **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
+
+**Android**
+- **Android Auto:** your favorites, playlists, recently played and the queue in the car. With "Display over other apps" allowed, opening Musike in the car with the app closed starts it in the background and resumes the last track. A log of the car's requests (**Settings > Android Auto**) helps when something doesn't show
+- Connected to the server, the phone also plays video, streamed by the server
+
+**Server**
+- A track YouTube holds back for a few seconds (it answers 403 until then) starts as soon as YouTube serves it, instead of failing
+- `MUSIKE_DIRECT_AUDIO=first`: audio straight from YouTube's API, about half a second to start
+- Can run behind a VPN, see [Docker behind a VPN](#docker-behind-a-vpn)
 
 ## Features
 
@@ -155,6 +186,16 @@ flowchart LR
 5. **Web:** a single `<video>` element moves around the page (panel, full screen, mini player, cinema mode) without interrupting playback.
 
 ## Installation
+
+### Builds of this fork
+
+The releases linked above are the original Musike. This fork's own builds come from GitHub Actions on every push to `local` (and to `community`):
+
+- **Android:** Actions > **Android APK** > the latest run > `musike-android-…` artifact. Signed with this fork's key and installed as `app.musike.android.fork`, next to the original app, not over it. Updates install over the previous build of the fork.
+- **Windows:** Actions > **Windows app** > `musike-windows-…` artifact. Same app ID as the original: it replaces it and keeps its library.
+- **Server:** build the image from source, `docker compose up -d --build` with `build: .` in the compose file (below).
+
+Artifacts are kept for 14 days. To build by hand, **Run workflow** on the same pages.
 
 ### Option 1: Windows app
 
@@ -269,6 +310,45 @@ Or with plain Docker: `docker run -d -p 4180:4180 -v musike-data:/data -v musike
 - All the [environment variables](#configuration) work, e.g. `YTDLP_EXTRA_ARGS="--cookies /data/cookies.txt"` for YouTube's bot checks.
 
 > **Run it at home, not on a VPS:** YouTube blocks datacenter IPs ("Sign in to confirm you're not a bot"). A home server uses your residential IP.
+
+#### Docker behind a VPN
+
+To send Musike's traffic to YouTube through a VPN, put it in the network of a [gluetun](https://github.com/qdm12/gluetun) container. Example with NordVPN over WireGuard (the private key goes in an `.env` file next to the compose file, never in the compose file itself):
+
+```yaml
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    cap_add: [NET_ADMIN]
+    devices: [/dev/net/tun:/dev/net/tun]
+    environment:
+      VPN_SERVICE_PROVIDER: nordvpn
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      SERVER_CITIES: Milan
+    ports:
+      - "4180:4180" # Musike, published by gluetun: Musike has no network of its own
+    restart: unless-stopped
+  musike:
+    build: .
+    network_mode: "service:gluetun"
+    depends_on: [gluetun]
+    volumes:
+      - musike-data:/data
+      - musike-cache:/cache
+    environment:
+      MUSIKE_AUTH: "on"
+      MUSIKE_DIRECT_AUDIO: "first"
+    restart: unless-stopped
+volumes:
+  musike-data:
+  musike-cache:
+```
+
+- When the tunnel is down Musike has no internet at all, so nothing leaks outside it; the library still opens.
+- If gluetun is recreated, recreate Musike too (`docker compose up -d`): it keeps the network of the old container.
+- **The catch:** a VPN exit is shared by many people, so YouTube asks it to prove it's not a bot more often than a home connection. Direct audio often still works; if tracks keep failing, pick another city or server.
+- Don't publish the port to the internet without accounts and HTTPS in front (a reverse proxy, or Tailscale).
 
 ### Option 7: Node server + browser
 
@@ -534,7 +614,7 @@ iOS limits background playback for PWAs; Audio mode works better than Video.
 - [ ] Video mode on Android
 - [ ] Automatic updates for the desktop app
 
-Ideas and bug reports are welcome in [Issues](https://github.com/Ernani1234/musike/issues).
+Ideas and bug reports are welcome in [Issues](https://github.com/Ernani1234/musike/issues). For this fork's own features, open them [here](https://github.com/yourboiava/musike/issues).
 
 ## Legal notice
 
