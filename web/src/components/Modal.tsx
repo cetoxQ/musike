@@ -1,8 +1,9 @@
 import { XIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MD, useMediaQuery } from "../hooks/useMediaQuery";
+import { useSwipeDown } from "../hooks/useSwipeDown";
 import { useT } from "../i18n";
 import { IconButton } from "./IconButton";
 
@@ -21,6 +22,9 @@ export function Modal({ open, onClose, title, children }: Props) {
   const isMd = useMediaQuery(MD);
   const reduce = useReducedMotion();
   const t = useT();
+  const sheet = useRef<HTMLDivElement>(null);
+  // On a phone the dialog is a sheet from the bottom: pulling it down closes it, like the Now Playing sheet.
+  const y = useSwipeDown(sheet, onClose, open && !isMd);
 
   useEffect(() => {
     if (!open) return;
@@ -51,17 +55,20 @@ export function Modal({ open, onClose, title, children }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={from}
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="island safe-bottom relative w-full rounded-b-none md:mx-4 md:max-w-md md:rounded-[20px]"
+            className="relative w-full md:mx-4 md:max-w-md"
           >
-            <div className="island-core p-4 md:p-5">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-                <IconButton label={t.common.close} size="sm" onClick={onClose}>
-                  <XIcon size={18} />
-                </IconButton>
+            <motion.div ref={sheet} style={{ y }} className="island safe-bottom rounded-b-none md:rounded-[20px]">
+              <div className="island-core p-4 md:p-5">
+                {!isMd && <div aria-hidden="true" className="mx-auto -mt-1.5 mb-2.5 h-1 w-9 rounded-full bg-surface-4" />}
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+                  <IconButton label={t.common.close} size="sm" onClick={onClose}>
+                    <XIcon size={18} />
+                  </IconButton>
+                </div>
+                {children}
               </div>
-              {children}
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       )}

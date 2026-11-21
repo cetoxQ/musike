@@ -19,6 +19,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { MD, useMediaQuery } from "../hooks/useMediaQuery";
+import { useSwipeDown } from "../hooks/useSwipeDown";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
@@ -52,9 +53,12 @@ export function TrackMenu() {
   const isFavorite = useLibrary((s) => (menu ? s.favorites.some((t) => t.id === menu.track.id) : false));
   const isMd = useMediaQuery(MD);
   const box = useRef<HTMLDivElement>(null);
+  const sheet = useRef<HTMLDivElement>(null);
   const t = useT();
   const navigate = useNavigate();
   const [pos, setPos] = useState({ left: 0, top: 0 });
+  // The phone's sheet closes when pulled down, like the Now Playing sheet.
+  const y = useSwipeDown(sheet, close, !!menu && !isMd);
 
   useLayoutEffect(() => {
     if (!menu || !isMd || !box.current) return;
@@ -190,20 +194,22 @@ export function TrackMenu() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 420, damping: 40 }}
-              className="island safe-bottom absolute inset-x-0 bottom-0 rounded-b-none"
+              className="absolute inset-x-0 bottom-0"
             >
-              <div className="island-core p-2">
-                <div className="mx-auto mt-1 mb-2 h-1 w-9 rounded-full bg-surface-4" />
-                <div className="flex items-center gap-3 px-3 pb-3">
-                  <Artwork src={menu.track.thumb} className="size-12 rounded-[10px]" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{menu.track.title}</p>
-                    <p className="truncate text-sm text-fg-2">{menu.track.artist}</p>
+              <motion.div ref={sheet} style={{ y }} className="island safe-bottom rounded-b-none">
+                <div className="island-core p-2">
+                  <div className="mx-auto mt-1 mb-2 h-1 w-9 rounded-full bg-surface-4" />
+                  <div className="flex items-center gap-3 px-3 pb-3">
+                    <Artwork src={menu.track.thumb} className="size-12 rounded-[10px]" />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{menu.track.title}</p>
+                      <p className="truncate text-sm text-fg-2">{menu.track.artist}</p>
+                    </div>
                   </div>
+                  <div className="mx-3 mb-1 h-px bg-line" />
+                  {content}
                 </div>
-                <div className="mx-3 mb-1 h-px bg-line" />
-                {content}
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </div>
