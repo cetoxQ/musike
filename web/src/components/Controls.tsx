@@ -244,7 +244,8 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
     );
 
   return (
-    <div className={cn("flex items-center", compact ? "gap-1" : "gap-2", className)}>
+    // Compact, HD/SD is a badge on the switch's corner, so it doesn't widen the row it sits in.
+    <div className={cn("flex items-center", compact ? "relative" : "gap-2", className)}>
       <div role="radiogroup" aria-label={t.player.mode} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
         <button
           type="button"
@@ -275,9 +276,16 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
           onClick={() => setQuality(quality === "sd" ? "hd" : "sd")}
           title={quality === "sd" ? t.player.toHd : t.player.toSd}
           className={cn(
-            "rounded-full font-mono text-[12px] font-semibold ring-1 transition-colors",
-            compact ? "h-8 px-2" : "h-9 px-3",
-            quality === "hd" ? "bg-accent-soft text-accent-text ring-accent/40" : "text-fg-2 ring-line hover:text-fg",
+            "rounded-full font-mono font-semibold ring-1 transition-colors",
+            compact
+              ? cn(
+                  "absolute -top-2.5 -right-2.5 h-5 px-1.5 text-[10px] leading-none",
+                  quality === "hd" ? "bg-accent text-accent-ink ring-accent" : "bg-surface-2 text-fg-2 ring-line",
+                )
+              : cn(
+                  "h-9 px-3 text-[12px]",
+                  quality === "hd" ? "bg-accent-soft text-accent-text ring-accent/40" : "text-fg-2 ring-line hover:text-fg",
+                ),
           )}
         >
           {quality === "hd" ? "HD" : "SD"}

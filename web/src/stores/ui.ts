@@ -22,6 +22,8 @@ export interface TrackMenuState {
   playlistId?: string;
   /** In a list you can pick tracks from: "Select" (or "Deselect") this one, which shows the checkboxes. */
   select?: { selected: boolean; toggle: () => void };
+  /** Opened from the phone's Now Playing sheet, which has its own Start radio button. */
+  noRadio?: boolean;
 }
 
 type Theme = "dark" | "light";

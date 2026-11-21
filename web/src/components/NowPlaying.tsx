@@ -142,7 +142,8 @@ function MoreButton({ track, slim = false, className }: { track: Track; slim?: b
       className={className}
       onClick={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
-        openMenu({ track, x: r.right, y: r.bottom });
+        // The sheet has its own Start radio button.
+        openMenu({ track, x: r.right, y: r.bottom, noRadio: slim });
       }}
     >
       <DotsThreeVerticalIcon size={slim ? 20 : 22} weight="bold" />
@@ -320,6 +321,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
   const track = usePlayer(selectShown);
   // On a phone the buttons on its side set its own volume; the other device's needs a slider.
   const elsewhere = usePlayer((s) => !!s.remote);
+  const startRadio = usePlayer((s) => s.startRadio);
   const reduce = useReducedMotion();
   const drag = useDragControls();
   const [view, setView] = useState<SheetView>("player");
@@ -389,11 +391,13 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   {elsewhere && <Volume wide className="w-full" />}
-                  {/* Everything for the track within reach of the thumb: the header keeps only Close. Symmetric
-                      around Audio/Video, which sits under Play: the slim menu at the right edge has an empty twin
-                      at the left one, and a missing button (no devices, no video) leaves its cell empty. */}
-                  <div className="grid grid-cols-[1.5rem_1fr_1fr_auto_1fr_1fr_1.5rem] items-center justify-items-center">
-                    <span aria-hidden="true" />
+                  {/* Everything for the track within reach of the thumb: the header keeps only Close. Three and
+                      three around Audio/Video, which sits under Play; a button that isn't there (no devices, no
+                      video) leaves its cell empty, so the row stays centered. */}
+                  <div className="grid grid-cols-[1fr_1fr_1fr_auto_1fr_1fr_1fr] items-center justify-items-center">
+                    <IconButton label={t.trackMenu.startRadio} onClick={() => void startRadio(track)}>
+                      <RadioIcon size={22} />
+                    </IconButton>
                     <SheetViewButton target="lyrics" view={view} setView={setView} />
                     <div>
                       <DevicesButton size="md" />
@@ -403,7 +407,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                     </div>
                     <ShareButton track={track} />
                     <SheetViewButton target="queue" view={view} setView={setView} />
-                    <MoreButton track={track} slim className="justify-self-end" />
+                    <MoreButton track={track} slim />
                   </div>
                   <ElsewhereNote className="justify-center" />
                 </div>
