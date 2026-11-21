@@ -322,7 +322,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
           />
           <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-bg/70 to-bg" />
 
-          <div className="overlay-top relative flex flex-1 flex-col px-5">
+          <div className="overlay-top relative flex min-h-0 flex-1 flex-col px-5">
             <div className="relative flex h-14 touch-none items-center justify-between" onPointerDown={(e) => drag.start(e)}>
               <IconButton label={t.common.close} onClick={onClose} className="-ml-2 text-fg">
                 <CaretDownIcon size={24} />
@@ -343,7 +343,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
             </div>
 
             {view === "queue" ? (
-              <div className="scroll-area -mx-3 flex-1 overflow-y-auto pb-6">
+              <div className="scroll-area -mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6">
                 <QueueList />
               </div>
             ) : (
