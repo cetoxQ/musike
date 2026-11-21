@@ -75,6 +75,16 @@ export interface ServerLink {
   check(): Promise<boolean>;
 }
 
+/** Settings > Android Auto (the Android app only). */
+export interface CarSettings {
+  /** Whether the app may open itself from the car, and what happened with the car lately. */
+  info(): Promise<{ background: boolean; xiaomi: boolean; log: string[] }>;
+  /** The system page where that's allowed. */
+  openBackgroundSettings(): Promise<void>;
+  /** Sends the car's log through the share sheet. */
+  shareLog(text: string): Promise<void>;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: ErrorCode) {
     super(message);
@@ -133,7 +143,8 @@ export interface Prepared {
  * Media Session can't reach them: the Android app. Absent elsewhere.
  */
 export interface SystemMedia {
-  setTrack(track: { title: string; artist: string; album: string; artwork: string }): void;
+  /** duration: the track's own (seconds), so the car and lock screen show the progress bar at once. */
+  setTrack(track: { title: string; artist: string; album: string; artwork: string; duration?: number }): void;
   setState(state: { playing: boolean; position: number; duration: number }): void;
   onAction(handler: (action: "play" | "pause" | "next" | "previous" | "seek", position?: number) => void): void;
 }

@@ -19,6 +19,10 @@ interface PlaybackPlugin {
   addListener(event: "action", fn: (e: { action: string; position?: number; value?: string }) => void): Promise<PluginListenerHandle>;
   /** Android Auto asks what a folder holds (see native/car.ts); the answer goes back through browseResult. */
   addListener(event: "browse", fn: (e: { request: string; parent: string }) => void): Promise<PluginListenerHandle>;
+  /** The car's own requests, kept until heard (the car may ask before the page starts): "open", "playItem", "search". */
+  addListener(event: "car", fn: (e: { action: string; value?: string }) => void): Promise<PluginListenerHandle>;
+  carInfo(): Promise<{ background: boolean; xiaomi: boolean; log: string[] }>;
+  openBackgroundSettings(): Promise<void>;
   browseResult(options: {
     request: string;
     items: { id: string; title: string; subtitle?: string; browsable?: boolean }[];
@@ -28,7 +32,13 @@ interface PlaybackPlugin {
 const noop = async () => {};
 export const Playback = registerPlugin<PlaybackPlugin>("MusikePlayback", {
   // In a desktop browser (development), there is nothing to drive.
-  web: () => ({ update: noop, addListener: async () => ({ remove: noop }), browseResult: noop }),
+  web: () => ({
+    update: noop,
+    addListener: async () => ({ remove: noop }),
+    browseResult: noop,
+    carInfo: async () => ({ background: false, xiaomi: false, log: [] }),
+    openBackgroundSettings: noop,
+  }),
 });
 
 /**
@@ -45,25 +55,30 @@ const iosBridge = (
 ).webkit?.messageHandlers?.musikeMedia;
 
 // The system advances the position on its own while playing; only real changes need sending.
-let last = { playing: false, position: 0, at: 0 };
+let last = { playing: false, position: 0, duration: 0, at: 0 };
 
-/** Whether this state is news to the system: a real change, not the clock moving. */
-function worthSending(playing: boolean, position: number): boolean {
+/** Whether this state is news to the system: a real change (a new length too), not the clock moving. */
+function worthSending(playing: boolean, position: number, duration: number): boolean {
   const now = Date.now();
   const expected = last.playing ? last.position + (now - last.at) / 1000 : last.position;
-  if (playing === last.playing && Math.abs(position - expected) < 2 && now - last.at < 15_000) return false;
-  last = { playing, position, at: now };
+  const sameLength = Math.abs(duration - last.duration) < 1;
+  if (playing === last.playing && sameLength && Math.abs(position - expected) < 2 && now - last.at < 15_000) return false;
+  last = { playing, position, duration, at: now };
   return true;
 }
 
+const lengthOf = (duration: number | undefined) => (duration && Number.isFinite(duration) && duration > 0 ? duration : 0);
+
 const androidMedia: SystemMedia = {
   setTrack(track) {
-    last = { playing: last.playing, position: 0, at: Date.now() };
-    void Playback.update({ ...track, position: 0 });
+    last = { playing: last.playing, position: 0, duration: lengthOf(track.duration), at: Date.now() };
+    void Playback.update({ ...track, duration: lengthOf(track.duration) || undefined, position: 0 });
   },
   setState({ playing, position, duration }) {
-    if (!worthSending(playing, position)) return;
-    void Playback.update({ playing, position, duration: Number.isFinite(duration) ? duration : 0 });
+    // The media element's length once it knows; until then the track's own, already sent with it.
+    const length = lengthOf(duration) || last.duration;
+    if (!worthSending(playing, position, length)) return;
+    void Playback.update({ playing, position, duration: length });
   },
   onAction(handler) {
     void Playback.addListener("action", (e) => handler(e.action as Parameters<typeof handler>[0], e.position));
@@ -72,12 +87,13 @@ const androidMedia: SystemMedia = {
 
 const iosMedia: SystemMedia = {
   setTrack(track) {
-    last = { playing: last.playing, position: 0, at: Date.now() };
+    last = { playing: last.playing, position: 0, duration: lengthOf(track.duration), at: Date.now() };
     iosBridge?.postMessage({ type: "track", ...track, position: 0 });
   },
   setState({ playing, position, duration }) {
-    if (!worthSending(playing, position)) return;
-    iosBridge?.postMessage({ type: "state", playing, position, duration: Number.isFinite(duration) ? duration : 0 });
+    const length = lengthOf(duration) || last.duration;
+    if (!worthSending(playing, position, length)) return;
+    iosBridge?.postMessage({ type: "state", playing, position, duration: length });
   },
   onAction(handler) {
     (globalThis as { __musikeMediaAction?: (action: string, position?: number) => void }).__musikeMediaAction = (

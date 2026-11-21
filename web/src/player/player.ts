@@ -837,7 +837,13 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 // Media Session: lock-screen, headset and notification controls.
 
 function setMetadata(track: Track) {
-  systemMedia?.setTrack({ title: track.title, artist: track.artist, album: track.album ?? "", artwork: track.art || track.thumb });
+  systemMedia?.setTrack({
+    title: track.title,
+    artist: track.artist,
+    album: track.album ?? "",
+    artwork: track.art || track.thumb,
+    duration: track.duration || undefined,
+  });
   if (!("mediaSession" in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
     title: track.title,

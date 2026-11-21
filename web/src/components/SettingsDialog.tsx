@@ -2,6 +2,7 @@ import {
   ArrowsClockwiseIcon,
   CheckCircleIcon,
   DownloadSimpleIcon,
+  CarProfileIcon,
   MoonIcon,
   ShareNetworkIcon,
   SunIcon,
@@ -13,6 +14,7 @@ import { LANGUAGES, useI18n, useT, type Lang } from "../i18n";
 import { capabilities, type Channel } from "../lib/api";
 import { cn } from "../lib/format";
 import { useShare } from "../lib/share";
+import { car } from "../lib/api";
 import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
 import { useUi } from "../stores/ui";
@@ -165,6 +167,8 @@ export function SettingsDialog() {
 
         <ShareSection />
 
+        {car && <CarSection />}
+
         <LayoutSection />
 
         <BackupSection />
@@ -282,6 +286,61 @@ function ShareSection() {
           ["ytmusic", t.share.ytmusic],
         ]}
       />
+    </section>
+  );
+}
+
+/** Android Auto: whether the app may open itself from the car, and the car's log to send along. */
+function CarSection() {
+  const t = useT();
+  const [info, setInfo] = useState<{ background: boolean; xiaomi: boolean; log: string[] } | null>(null);
+  useEffect(() => {
+    const read = () => void car?.info().then(setInfo).catch(() => {});
+    read();
+    // Back from the system's settings: read it again.
+    const back = () => document.visibilityState === "visible" && read();
+    document.addEventListener("visibilitychange", back);
+    return () => document.removeEventListener("visibilitychange", back);
+  }, []);
+  if (!info) return null;
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="flex items-center gap-1.5 text-xs font-medium text-fg-3">
+        <CarProfileIcon size={14} /> {t.car.settings}
+      </h3>
+      <div className="flex flex-col gap-2 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium">{t.car.background}</span>
+          <span className={cn("shrink-0 text-xs font-medium", info.background ? "text-accent" : "text-fg-3")}>
+            {info.background ? t.car.allowed : t.car.notAllowed}
+          </span>
+        </div>
+        <p className="text-xs text-fg-2">
+          {t.car.backgroundBody} {info.xiaomi && t.car.backgroundXiaomi}
+        </p>
+        <button
+          type="button"
+          onClick={() => void car?.openBackgroundSettings().catch(() => {})}
+          className="flex h-9 items-center self-start rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3"
+        >
+          {t.car.allow}
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-3 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <span className="flex min-w-0 flex-col">
+          <span className="text-sm font-medium">{t.car.log}</span>
+          <span className="text-xs text-fg-2">{t.car.logBody(info.log.length)}</span>
+        </span>
+        {info.log.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void car?.shareLog(info.log.join("\n"))}
+            className="flex h-9 shrink-0 items-center rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3"
+          >
+            {t.car.sendLog}
+          </button>
+        )}
+      </div>
     </section>
   );
 }

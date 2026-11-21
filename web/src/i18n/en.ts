@@ -590,6 +590,18 @@ export const en = {
     favorites: "Favorites",
     playlists: "Playlists",
     recent: "Recent",
+    recentlyPlayed: "Recently played",
+    settings: "Android Auto",
+    background: "Open Musike by itself in the car",
+    backgroundBody:
+      "Opening Musike in Android Auto with the app closed starts it in the background and resumes your last track. Android allows it only with \"Display over other apps\".",
+    backgroundXiaomi: "On Xiaomi, also turn on \"Display pop-up windows while running in the background\".",
+    allowed: "Allowed",
+    notAllowed: "Not allowed",
+    allow: "Open settings",
+    log: "Android Auto log",
+    logBody: (n: number) => (n ? `${n} recent events. If something doesn't work in the car, send it along.` : "Nothing yet: it fills in once the car connects."),
+    sendLog: "Send",
     songs: (n: number) => (n === 1 ? "1 song" : `${n} songs`),
   },
 

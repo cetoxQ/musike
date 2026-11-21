@@ -21,10 +21,10 @@ import { discover } from "../../../server/src/profile";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
-import { ApiError, type Connection, type MusikeApi, type ServerLink, type SystemInfo } from "../lib/apiTypes";
+import { ApiError, type CarSettings, type Connection, type MusikeApi, type ServerLink, type SystemInfo } from "../lib/apiTypes";
 import "./android";
 import { makeConnection, savedConnection, serverBackend } from "./connection";
-import { media } from "./media";
+import { media, Playback } from "./media";
 import { offlineCapable } from "./offline";
 import { nativeStorage } from "./storage";
 import { forgetUrl, resolveAudio } from "./streams";
@@ -232,6 +232,15 @@ export const capabilities = { video: !!server, engineSettings: false, retryOnErr
 
 /** Android Auto's lists and searches (native/car.ts), loaded only in the app. */
 export const startCar: (() => void) | null = () => void import("./car").then((m) => m.startCar());
+
+/** Settings > Android Auto: opening the app from the car, and the car's log. */
+export const car: CarSettings | null = {
+  info: () => Playback.carInfo(),
+  openBackgroundSettings: () => Playback.openBackgroundSettings(),
+  shareLog: async (text) => {
+    await Share.share({ title: "Musike Android Auto", text, dialogTitle: "Musike Android Auto" }).catch(() => {});
+  },
+};
 
 /** Devices in step: only connected to a Musike server over https (see native/connection.ts). */
 export const syncAddress: (() => Promise<string>) | null = server?.syncAddress ?? null;

@@ -581,6 +581,18 @@ export const pt: Messages = {
     favorites: "Favoritas",
     playlists: "Playlists",
     recent: "Recentes",
+    recentlyPlayed: "Tocadas recentemente",
+    settings: "Android Auto",
+    background: "Abrir o Musike sozinho no carro",
+    backgroundBody:
+      "Abrir o Musike no Android Auto com o app fechado o inicia em segundo plano e retoma a última faixa. O Android só permite com \"Sobrepor a outros apps\".",
+    backgroundXiaomi: "Na Xiaomi, ative também \"Exibir janelas pop-up durante a execução em segundo plano\".",
+    allowed: "Permitido",
+    notAllowed: "Não permitido",
+    allow: "Abrir configurações",
+    log: "Registro do Android Auto",
+    logBody: (n: number) => (n ? `${n} eventos recentes. Se algo não funcionar no carro, envie.` : "Nada ainda: preenche quando o carro conecta."),
+    sendLog: "Enviar",
     songs: (n: number) => (n === 1 ? "1 música" : `${n} músicas`),
   },
 

@@ -1,14 +1,15 @@
 import { getT } from "../i18n";
 import { api } from "../lib/api";
 import type { Track } from "../lib/types";
-import { locally, usePlayer } from "../player/player";
+import { locally, selectCurrent, usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 import { useRecent } from "../stores/recent";
 import { Playback } from "./media";
 
-// Android Auto (PlaybackService.java browses through here): the car's screen lists the queue, favorites,
-// playlists and recent items, and plays what is picked; voice and keyboard searches play the first results.
-// The car is this phone: what it starts plays here, even while the phone controls another device.
+// Android Auto (PlaybackService.java browses through here): the car's screen lists what you played lately, your
+// favorites, playlists and albums, and the queue, and plays what is picked; voice searches play the first results.
+// Opening Musike in the car resumes the last track. The car is this phone: what it starts plays here, even while
+// the phone controls another device.
 
 /** What the car lists: a folder (browsable) or a track (playable). */
 interface CarItem {
@@ -45,17 +46,34 @@ async function tracksFor(folder: string): Promise<Track[] | null> {
   }
 }
 
+/** The library, once loaded (the app may just have been opened by the car): at most a few seconds' wait. */
+async function libraryLoaded() {
+  if (useLibrary.getState().status === "ready") return;
+  await new Promise<void>((done) => {
+    const timer = setTimeout(finish, 6000);
+    const off = useLibrary.subscribe((s) => (s.status === "ready" || s.status === "error") && finish());
+    function finish() {
+      clearTimeout(timer);
+      off();
+      done();
+    }
+  });
+}
+
 async function browse(parent: string): Promise<CarItem[]> {
   const t = getT().car;
-  const lib = useLibrary.getState();
   if (parent === "root") {
+    // Android Auto shows four of these, as tabs.
     return [
-      { id: "queue", title: t.queue, browsable: true },
+      { id: "history", title: t.recentlyPlayed, browsable: true },
       { id: "favorites", title: t.favorites, browsable: true },
       { id: "playlists", title: t.playlists, browsable: true },
-      { id: "recent", title: t.recent, browsable: true },
+      { id: "queue", title: t.queue, browsable: true },
     ];
   }
+  if (parent !== "queue" && !parent.startsWith("search:")) await libraryLoaded();
+  const lib = useLibrary.getState();
+  if (parent === "history") return tracksOf("h", lib.history);
   if (parent === "queue") {
     const { queue, index } = usePlayer.getState();
     // From the current track on (the queue's start is history).
@@ -110,6 +128,16 @@ async function play(id: string) {
   if (tracks?.length) locally(() => usePlayer.getState().playList(tracks, Math.min(index, tracks.length - 1)));
 }
 
+/** Musike opened in the car: the last track goes on (or, with none, the last played), unless something plays. */
+async function resume() {
+  const p = usePlayer.getState();
+  if (p.status === "playing" || p.status === "loading") return;
+  if (selectCurrent(p)) return locally(() => usePlayer.getState().toggle());
+  await libraryLoaded();
+  const history = useLibrary.getState().history;
+  if (history.length) locally(() => usePlayer.getState().playList(history.slice(0, MAX), 0));
+}
+
 /** "Hey Google, play ... on Musike": the first results; nothing said, the music goes on. */
 async function search(query: string) {
   const q = query.trim();
@@ -134,6 +162,12 @@ export function startCar() {
   });
   void Playback.addListener("action", (e) => {
     if (e.action === "playItem" && e.value) void play(e.value).catch(() => {});
+    else if (e.action === "search") void search(e.value ?? "").catch(() => {});
+  });
+  // The car's own requests, also those made before the page started (the car opened the app).
+  void Playback.addListener("car", (e) => {
+    if (e.action === "open") void resume().catch(() => {});
+    else if (e.action === "playItem" && e.value) void play(e.value).catch(() => {});
     else if (e.action === "search") void search(e.value ?? "").catch(() => {});
   });
 }

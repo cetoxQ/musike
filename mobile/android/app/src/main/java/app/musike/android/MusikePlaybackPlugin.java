@@ -1,8 +1,13 @@
 package app.musike.android;
 
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -37,6 +42,46 @@ public class MusikePlaybackPlugin extends Plugin {
             event.put("parent", parent);
             notifyListeners("browse", event);
         };
+        // Kept until the page listens (native/car.ts): the car may ask before the page has started.
+        PlaybackService.car = (action, value) -> {
+            JSObject event = new JSObject();
+            event.put("action", action);
+            if (value != null) event.put("value", value);
+            notifyListeners("car", event, true);
+        };
+        main.post(PlaybackService::appReady);
+    }
+
+    /** Settings > Android Auto: whether the app can open itself from the car, and what happened lately. */
+    @PluginMethod
+    public void carInfo(PluginCall call) {
+        JSObject info = new JSObject();
+        info.put("background", PlaybackService.canStartInBackground(getContext()));
+        info.put("xiaomi", "xiaomi".equalsIgnoreCase(Build.MANUFACTURER));
+        JSArray log = new JSArray();
+        for (String line : PlaybackService.journal()) log.put(line);
+        info.put("log", log);
+        call.resolve(info);
+    }
+
+    /** Where Android lets the app open from the background: Xiaomi's own permissions, otherwise "display over apps". */
+    @PluginMethod
+    public void openBackgroundSettings(PluginCall call) {
+        Context context = getContext();
+        String pkg = context.getPackageName();
+        Intent overlay = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + pkg)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Intent xiaomi = new Intent("miui.intent.action.APP_PERM_EDITOR").putExtra("extra_pkgname", pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity("xiaomi".equalsIgnoreCase(Build.MANUFACTURER) ? xiaomi : overlay);
+        } catch (RuntimeException e) {
+            try {
+                context.startActivity(overlay);
+            } catch (RuntimeException again) {
+                call.reject("unavailable");
+                return;
+            }
+        }
+        call.resolve();
     }
 
     /** What a folder holds, for Android Auto (the answer to a "browse" event). */
@@ -92,6 +137,7 @@ public class MusikePlaybackPlugin extends Plugin {
     protected void handleOnDestroy() {
         PlaybackService.listener = null;
         PlaybackService.browser = null;
+        PlaybackService.car = null;
         PlaybackService.shutdown(getContext());
     }
 }

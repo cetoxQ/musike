@@ -26,9 +26,23 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.service.media.MediaBrowserService;
 import android.util.Log;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -72,7 +86,16 @@ public class PlaybackService extends MediaBrowserService {
             "com.google.android.apps.automotive.templates.host"
         )
     );
+    /** Of those, the car itself: opening Musike there resumes the music (and starts the app if it's closed). */
+    private static final Set<String> CARS = new HashSet<>(
+        Arrays.asList("com.google.android.projection.gearhead", "com.google.android.apps.automotive.templates.host")
+    );
     private static final String ROOT = "root";
+    /** The queue changes all the time: always asked afresh, never kept. */
+    private static final String QUEUE = "queue";
+    /** Lists kept for the car (the most recently shown), saved so they show even before the app opens. */
+    private static final int KEPT_LISTS = 60;
+    private static final String LISTS_FILE = "car-lists.json";
     private static final String NOT_OPEN = "not-open";
     /** How long the app gets to answer what a folder holds. */
     private static final long BROWSE_TIMEOUT_MS = 8000;
@@ -108,6 +131,23 @@ public class PlaybackService extends MediaBrowserService {
         void onBrowse(String request, String parent);
     }
 
+    /** The car's own requests: "open" (Musike opened in the car), "playItem", "search". */
+    interface Car {
+        void onCar(String action, String value);
+    }
+
+    /** A folder the car asked for: answered once the app replies (result), or already answered from the kept list. */
+    private static final class Pending {
+        final String parent;
+        final Result<List<MediaItem>> result;
+        final long at = SystemClock.elapsedRealtime();
+
+        Pending(String parent, Result<List<MediaItem>> result) {
+            this.parent = parent;
+            this.result = result;
+        }
+    }
+
     /** One entry of a folder, as the app describes it. */
     static final class Entry {
         final String id;
@@ -126,10 +166,18 @@ public class PlaybackService extends MediaBrowserService {
     static final NowPlaying state = new NowPlaying();
     static Listener listener;
     static Browser browser;
+    static Car car;
     private static PlaybackService instance;
     private static int requests;
     /** Folders asked by the car, waiting for the app's answer. */
-    private static final Map<String, Result<List<MediaItem>>> pending = new HashMap<>();
+    private static final Map<String, Pending> pending = new HashMap<>();
+    /** The lists as the app last gave them, most recently used last. */
+    private static final LinkedHashMap<String, List<Entry>> lists = new LinkedHashMap<>(16, 0.75f, true);
+    private static boolean listsLoaded;
+    /** What the car asked while the app was closed: handed over when it opens. */
+    private static final List<String[]> waiting = new ArrayList<>();
+    /** What happened with the car lately, shown in the app (Settings > Android Auto) to be sent along. */
+    private static final ArrayDeque<String> journal = new ArrayDeque<>();
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private MediaSession session;
@@ -141,6 +189,8 @@ public class PlaybackService extends MediaBrowserService {
     private boolean noisyRegistered;
     private String artworkUrl = "";
     private Bitmap artwork;
+    private long lastLaunch;
+    private final Runnable saveLists = this::writeLists;
 
     /** Shows what the app reported, starting the service when music starts. */
     static void refresh(Context context) {
@@ -165,11 +215,158 @@ public class PlaybackService extends MediaBrowserService {
 
     /** The app's answer to a folder the car asked for. */
     static void deliver(String request, List<Entry> entries) {
-        Result<List<MediaItem>> result = pending.remove(request);
-        if (result == null) return; // too late: the car already got an empty folder
+        Pending p = pending.remove(request);
+        if (p == null) {
+            log("answer " + request + " came too late");
+            return;
+        }
+        long ms = SystemClock.elapsedRealtime() - p.at;
+        boolean changed = !same(lists.get(p.parent), entries);
+        remember(p.parent, entries);
+        if (p.result != null) {
+            p.result.sendResult(items(entries));
+            log(p.parent + ": " + entries.size() + " from the app in " + ms + " ms");
+        } else if (changed && instance != null) {
+            instance.notifyChildrenChanged(p.parent);
+            log(p.parent + ": updated, " + entries.size() + " (" + ms + " ms)");
+        }
+    }
+
+    /** The app is open: what the car asked meanwhile goes to it, and the car's lists are refreshed. */
+    static void appReady() {
+        log("app ready" + (waiting.isEmpty() ? "" : ", " + waiting.size() + " waiting"));
+        if (car != null) for (String[] w : waiting) car.onCar(w[0], w[1]);
+        waiting.clear();
+        if (instance != null) instance.notifyChildrenChanged(ROOT);
+    }
+
+    private static void toCar(String action, String value) {
+        if (car != null) car.onCar(action, value);
+        else waiting.add(new String[] { action, value });
+    }
+
+    static synchronized void log(String line) {
+        Log.i(TAG, "car: " + line);
+        journal.addLast(new SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(new Date()) + " " + line);
+        while (journal.size() > 80) journal.removeFirst();
+    }
+
+    static synchronized List<String> journal() {
+        return new ArrayList<>(journal);
+    }
+
+    /** Android lets an app open itself from the background only with "display over other apps" granted. */
+    static boolean canStartInBackground(Context context) {
+        return Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(context);
+    }
+
+    private static List<MediaItem> items(List<Entry> entries) {
         List<MediaItem> items = new ArrayList<>();
         for (Entry e : entries) items.add(item(e.id, e.title, e.subtitle, e.browsable));
-        result.sendResult(items);
+        return items;
+    }
+
+    private static boolean same(List<Entry> a, List<Entry> b) {
+        if (a == null || a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            Entry x = a.get(i);
+            Entry y = b.get(i);
+            if (!x.id.equals(y.id) || !x.title.equals(y.title) || !x.subtitle.equals(y.subtitle) || x.browsable != y.browsable) return false;
+        }
+        return true;
+    }
+
+    private static void remember(String parent, List<Entry> entries) {
+        if (parent.startsWith("search:")) return;
+        lists.put(parent, entries);
+        Iterator<String> oldest = lists.keySet().iterator();
+        while (lists.size() > KEPT_LISTS && oldest.hasNext()) {
+            oldest.next();
+            oldest.remove();
+        }
+        if (instance != null && !QUEUE.equals(parent)) {
+            instance.main.removeCallbacks(instance.saveLists);
+            instance.main.postDelayed(instance.saveLists, 2000);
+        }
+    }
+
+    private void readLists() {
+        if (listsLoaded) return;
+        listsLoaded = true;
+        File file = new File(getFilesDir(), LISTS_FILE);
+        if (!file.exists()) return;
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (InputStream in = new FileInputStream(file)) {
+                byte[] buffer = new byte[16384];
+                for (int n; (n = in.read(buffer)) > 0; ) bytes.write(buffer, 0, n);
+            }
+            JSONObject all = new JSONObject(bytes.toString("UTF-8"));
+            for (Iterator<String> it = all.keys(); it.hasNext(); ) {
+                String parent = it.next();
+                JSONArray array = all.getJSONArray(parent);
+                List<Entry> entries = new ArrayList<>();
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject o = array.getJSONObject(i);
+                    entries.add(new Entry(o.optString("id"), o.optString("title"), o.optString("subtitle"), o.optBoolean("browsable")));
+                }
+                if (!lists.containsKey(parent)) lists.put(parent, entries);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not read the car's lists", e);
+        }
+    }
+
+    private void writeLists() {
+        String json;
+        try {
+            JSONObject all = new JSONObject();
+            for (Map.Entry<String, List<Entry>> list : lists.entrySet()) {
+                if (QUEUE.equals(list.getKey())) continue;
+                JSONArray array = new JSONArray();
+                for (Entry e : list.getValue()) {
+                    array.put(new JSONObject().put("id", e.id).put("title", e.title).put("subtitle", e.subtitle).put("browsable", e.browsable));
+                }
+                all.put(list.getKey(), array);
+            }
+            json = all.toString();
+        } catch (Exception e) {
+            return;
+        }
+        File file = new File(getFilesDir(), LISTS_FILE);
+        new Thread(
+            () -> {
+                File tmp = new File(file.getPath() + ".tmp");
+                try (FileOutputStream out = new FileOutputStream(tmp)) {
+                    out.write(json.getBytes(StandardCharsets.UTF_8));
+                } catch (Exception e) {
+                    return;
+                }
+                if (!tmp.renameTo(file)) tmp.delete();
+            },
+            "musike-car-lists"
+        ).start();
+    }
+
+    /**
+     * Musike opened in the car while the app is closed: it's started in the background (its page holds the library
+     * and plays the music), if Android lets it.
+     */
+    private void launchApp() {
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastLaunch < 20_000) return;
+        lastLaunch = now;
+        Intent intent = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(MainActivity.EXTRA_BACKGROUND, true);
+        try {
+            startActivity(intent);
+            log("opening the app in the background (" + (canStartInBackground(this) ? "allowed" : "not allowed in Settings, Android may block it") + ")");
+        } catch (RuntimeException e) {
+            log("could not open the app: " + e.getMessage());
+        }
+    }
+
+    private boolean appOpen() {
+        return listener != null && browser != null;
     }
 
     private static MediaItem item(String id, String title, String subtitle, boolean browsable) {
@@ -181,6 +378,7 @@ public class PlaybackService extends MediaBrowserService {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        readLists();
         notifications = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         wakeLock = ((PowerManager) getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Musike:playback");
         wakeLock.setReferenceCounted(false);
@@ -200,6 +398,12 @@ public class PlaybackService extends MediaBrowserService {
             new MediaSession.Callback() {
                 @Override
                 public void onPlay() {
+                    // From the car or the headphones with the app closed: it opens and resumes the last track.
+                    if (!appOpen()) {
+                        toCar("open", null);
+                        launchApp();
+                        return;
+                    }
                     emit("play", -1);
                 }
 
@@ -234,12 +438,21 @@ public class PlaybackService extends MediaBrowserService {
 
                 @Override
                 public void onPlayFromMediaId(String mediaId, Bundle extras) {
-                    emit("playItem", -1, mediaId);
+                    if (appOpen()) emit("playItem", -1, mediaId);
+                    else {
+                        toCar("playItem", mediaId);
+                        launchApp();
+                    }
                 }
 
                 @Override
                 public void onPlayFromSearch(String query, Bundle extras) {
-                    emit("search", -1, query == null ? "" : query);
+                    String q = query == null ? "" : query;
+                    if (appOpen()) emit("search", -1, q);
+                    else {
+                        toCar("search", q);
+                        launchApp();
+                    }
                 }
             },
             main
@@ -255,6 +468,12 @@ public class PlaybackService extends MediaBrowserService {
         if (clientUid != Process.myUid() && !BROWSERS.contains(clientPackageName)) return null;
         // "Recent" playback for the system's resume controls: only while the app runs, so not offered.
         if (rootHints != null && rootHints.getBoolean(BrowserRoot.EXTRA_RECENT)) return null;
+        if (CARS.contains(clientPackageName)) {
+            // Musike opened in the car: the last track plays (the app opens first if it's closed).
+            log("opened in the car" + (appOpen() ? "" : ", app closed"));
+            toCar("open", null);
+            if (!appOpen()) launchApp();
+        }
         Bundle extras = new Bundle();
         extras.putInt("android.media.browse.CONTENT_STYLE_BROWSABLE_HINT", 1); // lists, not grids
         extras.putInt("android.media.browse.CONTENT_STYLE_PLAYABLE_HINT", 1);
@@ -266,22 +485,40 @@ public class PlaybackService extends MediaBrowserService {
         ask(parentId, result);
     }
 
-    /** The app holds the library and plays the music: without it open there is nothing to list. */
+    /**
+     * The app holds the library and plays the music. A list it gave before shows at once (and its new answer
+     * refreshes it); a new one waits for the app. With the app closed, the kept lists show while it opens.
+     */
     private void ask(String parent, Result<List<MediaItem>> result) {
-        if (listener == null || browser == null) {
+        List<Entry> kept = QUEUE.equals(parent) ? null : lists.get(parent);
+        if (!appOpen()) {
+            launchApp();
+            if (kept != null) {
+                result.sendResult(items(kept));
+                log(parent + ": " + kept.size() + " kept (app closed)");
+                return;
+            }
             List<MediaItem> items = new ArrayList<>();
             if (ROOT.equals(parent)) items.add(item(NOT_OPEN, getString(R.string.car_open_app), getString(R.string.car_open_app_hint), true));
             result.sendResult(items);
+            log(parent + ": app closed, nothing kept");
             return;
         }
-        result.detach();
         String request = String.valueOf(++requests);
-        pending.put(request, result);
+        if (kept != null) {
+            result.sendResult(items(kept));
+            pending.put(request, new Pending(parent, null));
+        } else {
+            result.detach();
+            pending.put(request, new Pending(parent, result));
+        }
         browser.onBrowse(request, parent);
         main.postDelayed(
             () -> {
-                Result<List<MediaItem>> late = pending.remove(request);
-                if (late != null) late.sendResult(new ArrayList<>());
+                Pending late = pending.remove(request);
+                if (late == null) return;
+                log(parent + ": no answer from the app in " + BROWSE_TIMEOUT_MS + " ms");
+                if (late.result != null) late.result.sendResult(new ArrayList<>());
             },
             BROWSE_TIMEOUT_MS
         );
@@ -326,8 +563,9 @@ public class PlaybackService extends MediaBrowserService {
     @Override
     public void onDestroy() {
         instance = null;
-        for (Result<List<MediaItem>> result : pending.values()) result.sendResult(new ArrayList<>());
+        for (Pending p : pending.values()) if (p.result != null) p.result.sendResult(new ArrayList<>());
         pending.clear();
+        main.removeCallbacks(saveLists);
         releaseWakeLock();
         setNoisyReceiver(false);
         session.setActive(false);

@@ -1,5 +1,5 @@
 import { getT } from "../i18n";
-import { ApiError, type Connection, type MusikeApi, type ServerLink, type SystemMedia } from "./apiTypes";
+import { ApiError, type CarSettings, type Connection, type MusikeApi, type ServerLink, type SystemMedia } from "./apiTypes";
 import { desktop } from "./desktop";
 import { httpBackend } from "./httpApi";
 
@@ -107,6 +107,9 @@ export const link: ServerLink | null = null;
 
 /** Android Auto: only the Android app (native/api.ts). */
 export const startCar: (() => void) | null = null;
+
+/** Settings > Android Auto: only the Android app (native/api.ts). */
+export const car: CarSettings | null = null;
 
 /**
  * Devices in step (see stores/devices.ts): the WebSocket address, with a fresh single-use ticket. Only over https:
