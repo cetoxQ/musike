@@ -13,10 +13,10 @@ import {
   SpeakerXIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useT } from "../i18n";
-import { capabilities } from "../lib/api";
+import { capabilities, link } from "../lib/api";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
 import { selectHasShown, selectShownDuration, selectShownPosition, selectShownStatus, usePlayer } from "../player/player";
@@ -224,6 +224,17 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
 }
 
 /** Audio / Video segmented switch. For songs, Video plays the song's music video when YouTube has one. */
+const noLink = () => () => {};
+
+/**
+ * Whether video can play: on this device (a phone's server out of reach means audio only, so it follows the server
+ * coming and going), or on the device it controls.
+ */
+export function useVideoAvailable(): boolean {
+  useSyncExternalStore(link?.subscribe ?? noLink, () => link?.online ?? true);
+  return usePlayer((s) => s.remote?.video ?? capabilities.video);
+}
+
 /** `compact`: icons only, for the row at the bottom of the phone's sheet. */
 export function ModeSwitch({ className, compact = false }: { className?: string; compact?: boolean }) {
   const t = useT();
@@ -233,7 +244,7 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
   const quality = usePlayer((s) => s.remote?.quality ?? s.quality);
   const setQuality = usePlayer((s) => s.setQuality);
   const showingVideo = usePlayer((s) => s.remote?.showingVideo ?? s.mediaKind === "video");
-  const canVideo = usePlayer((s) => s.remote?.video ?? capabilities.video);
+  const canVideo = useVideoAvailable();
   if (!canVideo) return null;
 
   const seg = (on: boolean) =>

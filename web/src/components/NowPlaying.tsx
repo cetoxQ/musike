@@ -17,12 +17,13 @@ import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import type { Track } from "../lib/types";
 import { selectShown, selectShownIndex, selectShownQueue, selectShownStatus, usePlayer, useStatusText } from "../player/player";
+import { useDevices } from "../stores/devices";
 import { useUi, type PanelTab } from "../stores/ui";
 import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { DevicesButton, ElsewhereNote } from "./Devices";
 import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume } from "./Controls";
+import { FavoriteButton, ModeSwitch, Scrubber, Transport, useVideoAvailable, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
 import { LyricsView, useLyricsNavigation } from "./Lyrics";
 import { QueueList } from "./Queue";
@@ -316,12 +317,45 @@ function SheetViewButton({ target, view, setView }: { target: "queue" | "lyrics"
   );
 }
 
+/**
+ * Everything for the track within reach of the thumb, under the controls: the sheet's header keeps only Close.
+ * Symmetric with whatever buttons there are: around Audio/Video, under Play, its two sides take the same width
+ * (three and three, or two wider ones without devices); without video, the buttons share the row evenly.
+ */
+function SheetRow({ track, view, setView }: { track: Track; view: SheetView; setView: (v: SheetView) => void }) {
+  const t = useT();
+  const startRadio = usePlayer((s) => s.startRadio);
+  const hasDevices = useDevices((s) => s.status !== "off");
+  const hasVideo = useVideoAvailable();
+  const left = [
+    <IconButton key="radio" label={t.trackMenu.startRadio} onClick={() => void startRadio(track)}>
+      <RadioIcon size={22} />
+    </IconButton>,
+    <SheetViewButton key="lyrics" target="lyrics" view={view} setView={setView} />,
+    ...(hasDevices ? [<DevicesButton key="devices" size="md" />] : []),
+  ];
+  const right = [
+    <ShareButton key="share" track={track} />,
+    <SheetViewButton key="queue" target="queue" view={view} setView={setView} />,
+    <MoreButton key="more" track={track} slim />,
+  ];
+  const columns = hasVideo
+    ? `repeat(${left.length}, ${right.length / left.length}fr) auto repeat(${right.length}, 1fr)`
+    : `repeat(${left.length + right.length}, 1fr)`;
+  return (
+    <div className="grid items-center justify-items-center" style={{ gridTemplateColumns: columns }}>
+      {left}
+      {hasVideo && <ModeSwitch key="mode" compact />}
+      {right}
+    </div>
+  );
+}
+
 /** Full-screen Now Playing for phones. Drag down (or Back) to close. */
 export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const track = usePlayer(selectShown);
   // On a phone the buttons on its side set its own volume; the other device's needs a slider.
   const elsewhere = usePlayer((s) => !!s.remote);
-  const startRadio = usePlayer((s) => s.startRadio);
   const reduce = useReducedMotion();
   const drag = useDragControls();
   const [view, setView] = useState<SheetView>("player");
@@ -391,24 +425,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   {elsewhere && <Volume wide className="w-full" />}
-                  {/* Everything for the track within reach of the thumb: the header keeps only Close. Three and
-                      three around Audio/Video, which sits under Play; a button that isn't there (no devices, no
-                      video) leaves its cell empty, so the row stays centered. */}
-                  <div className="grid grid-cols-[1fr_1fr_1fr_auto_1fr_1fr_1fr] items-center justify-items-center">
-                    <IconButton label={t.trackMenu.startRadio} onClick={() => void startRadio(track)}>
-                      <RadioIcon size={22} />
-                    </IconButton>
-                    <SheetViewButton target="lyrics" view={view} setView={setView} />
-                    <div>
-                      <DevicesButton size="md" />
-                    </div>
-                    <div>
-                      <ModeSwitch compact />
-                    </div>
-                    <ShareButton track={track} />
-                    <SheetViewButton target="queue" view={view} setView={setView} />
-                    <MoreButton track={track} slim />
-                  </div>
+                  <SheetRow track={track} view={view} setView={setView} />
                   <ElsewhereNote className="justify-center" />
                 </div>
               </div>

@@ -303,9 +303,17 @@ export const systemMedia = media;
 
 /**
  * On the phone alone there's no video (videos play as audio). Connected to a server, the server streams the video
- * too, as in the browser.
+ * too, as in the browser, while it answers: out of reach, the phone plays on its own, audio only, so the video
+ * options go away instead of showing a blank video.
  */
-export const capabilities = { video: !!server, engineSettings: false, retryOnError: true, playLog: !!server };
+export const capabilities = {
+  get video() {
+    return !!offline && offline.online();
+  },
+  engineSettings: false,
+  retryOnError: true,
+  playLog: !!server,
+};
 
 /** Android Auto's lists and searches (native/car.ts), loaded only in the app. */
 export const startCar: (() => void) | null = () => void import("./car").then((m) => m.startCar());

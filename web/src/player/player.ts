@@ -214,8 +214,9 @@ function lookupClip(track: Track): Promise<string | null> {
   return lookup;
 }
 
+// Video mode only counts where video can play (a phone whose server is out of reach plays audio).
 const needsClipLookup = (track: Track, preferVideo: boolean) =>
-  preferVideo && track.kind === "song" && !clipFor.has(track.id);
+  preferVideo && capabilities.video && track.kind === "song" && !clipFor.has(track.id);
 
 /** No progress for this long while it should play: treated like a stream error. */
 const STALL_MS = 20_000;
@@ -232,7 +233,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
   const mediaIdFor = (track: Track, kind: Kind) =>
     kind === "video" && track.kind !== "video" ? clipFor.get(track.id)! : track.id;
   const noteFor = (track: Track) =>
-    get().preferVideo && track.kind === "song" && clipFor.get(track.id) === null ? ("noClip" as const) : null;
+    get().preferVideo && capabilities.video && track.kind === "song" && clipFor.get(track.id) === null
+      ? ("noClip" as const)
+      : null;
   const activeMedia = (): HTMLMediaElement | null => (loaded ? mediaFor(loaded.kind) : null);
 
   function play(media: HTMLMediaElement) {
