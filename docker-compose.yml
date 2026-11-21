@@ -11,10 +11,22 @@ services:
       - musike-data:/data # library: playlists, favorites, history
       - musike-cache:/cache # HD videos already downloaded
     environment:
-      # Optional, see the README: cookies for YouTube's bot checks, region for search results.
-      # YTDLP_EXTRA_ARGS: "--cookies /data/cookies.txt"
+      # yt-dlp gets YouTube's proof-of-origin tokens from the "pot" service below. Cookies, if you add them, go
+      # in the same line: "--extractor-args ... --cookies /data/cookies.txt".
+      YTDLP_EXTRA_ARGS: "--extractor-args youtubepot-bgutilhttp:base_url=http://pot:4416"
+      # Optional, see the README: region for search results.
       # MUSIKE_LOCATION: "US"
       MUSIKE_CACHE_MAX_MB: "2048"
+    depends_on: [pot]
+    restart: unless-stopped
+
+  # Proof-of-origin tokens for yt-dlp, so YouTube asks less often to "confirm you're not a bot" (VPNs, shared
+  # networks). Optional: without it Musike works the same, only bot-checked more often. Keep the version in step with
+  # BGUTIL_VERSION in the Dockerfile.
+  pot:
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.2
+    container_name: musike-pot
+    init: true
     restart: unless-stopped
 
 volumes:

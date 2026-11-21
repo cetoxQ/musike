@@ -360,6 +360,12 @@ services:
       MUSIKE_AUTH: "on"
       MUSIKE_DIRECT_AUDIO: "first"
     restart: unless-stopped
+  pot: # proof-of-origin tokens for yt-dlp, in the same network: Musike finds it at 127.0.0.1:4416
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.2
+    init: true
+    network_mode: "service:gluetun"
+    depends_on: [gluetun]
+    restart: unless-stopped
 volumes:
   musike-data:
   musike-cache:
@@ -367,7 +373,8 @@ volumes:
 
 - When the tunnel is down Musike has no internet at all, so nothing leaks outside it; the library still opens.
 - If gluetun is recreated, recreate Musike too (`docker compose up -d`): it keeps the network of the old container.
-- **The catch:** a VPN exit is shared by many people, so YouTube asks it to prove it's not a bot more often than a home connection. Direct audio often still works; if tracks keep failing, pick another city or server.
+- **The catch:** a VPN exit is shared by many people, so YouTube asks it to prove it's not a bot more often than a home connection. The `pot` service gives yt-dlp the proof-of-origin tokens YouTube looks for, which makes that much rarer; direct audio often works anyway. If tracks still fail, pick another city or server.
+- When YouTube asks anyway, Musike stops on the track and tries it again after a minute instead of skipping through the queue (each try makes the check stick), and video falls back to the song's audio for a while.
 - Don't publish the port to the internet without accounts and HTTPS in front (a reverse proxy, or Tailscale).
 
 ### Option 7: Node server + browser
@@ -603,6 +610,8 @@ YouTube changes often and yt-dlp keeps up. Open **Settings** and click **Update*
 YouTube asks this of some connections, mostly VPNs and shared networks (offices, universities, some providers). Musike first tries to get the audio another way, so you only see this message when that fails too.
 
 - If you use a VPN, turn it off and try again.
+- In Docker, run the `pot` service of this fork's [docker-compose.yml](docker-compose.yml): it gives yt-dlp the proof-of-origin tokens YouTube looks for, which makes the check much rarer.
+- On the phone on its own (mobile data in particular: carrier addresses are shared by many people), turning airplane mode on and off usually gets a new address. Musike stops on the track and tries again after a minute instead of skipping through the queue, since each try makes the check stick.
 - Running the server yourself, you can pass cookies from a signed-in browser (Firefox works best on Windows). YouTube may flag an account used this way, so prefer one you don't mind losing:
 
 ```bash

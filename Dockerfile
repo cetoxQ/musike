@@ -26,6 +26,8 @@ RUN pnpm --filter @musike/web build && pnpm --filter @musike/server bundle
 # ---- Runtime: Node, FFmpeg, yt-dlp and Deno ----
 FROM node:${NODE_VERSION}-bookworm-slim
 ARG TARGETARCH
+# The yt-dlp plugin for proof-of-origin tokens; keep it at the version of the "pot" image in docker-compose.yml.
+ARG BGUTIL_VERSION=2.0.2
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl unzip \
@@ -33,6 +35,9 @@ RUN apt-get update \
 
 # Official standalone builds of yt-dlp and Deno (Deno solves YouTube's player challenges for yt-dlp).
 # They live in a folder the app user owns, so "Update" in Musike's Settings can replace yt-dlp.
+# Next to yt-dlp, in its own plugin folder (an update leaves it alone): the plugin that asks a token provider (the
+# "pot" service in docker-compose.yml) for YouTube's proof-of-origin tokens, against its bot check. With no provider
+# running, yt-dlp just goes on without tokens.
 RUN set -eux; \
   case "$TARGETARCH" in \
     arm64) ytdlp="yt-dlp_linux_aarch64"; deno="deno-aarch64-unknown-linux-gnu.zip" ;; \
@@ -44,6 +49,9 @@ RUN set -eux; \
   curl -fsSL -o /tmp/deno.zip "https://github.com/denoland/deno/releases/latest/download/$deno"; \
   unzip -q /tmp/deno.zip -d /opt/musike/bin; \
   rm /tmp/deno.zip; \
+  mkdir -p /opt/musike/bin/yt-dlp-plugins; \
+  curl -fsSL -o /opt/musike/bin/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip \
+    "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_VERSION}/bgutil-ytdlp-pot-provider.zip"; \
   mkdir -p /data /cache; \
   chown -R node:node /opt/musike /data /cache
 
