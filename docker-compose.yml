@@ -11,12 +11,20 @@ services:
       - musike-data:/data # library: playlists, favorites, history
       - musike-cache:/cache # HD videos already downloaded
     environment:
+      # Accounts, each with its own library: open Musike right away and create the admin.
+      MUSIKE_AUTH: "on"
+      # Audio straight from YouTube, about half a second to start; yt-dlp when that's refused.
+      MUSIKE_DIRECT_AUDIO: "first"
+      # Your country, for search results (the default is BR).
+      MUSIKE_LOCATION: "IT"
       # yt-dlp gets YouTube's proof-of-origin tokens from the "pot" service below. Cookies, if you add them, go
       # in the same line: "--extractor-args ... --cookies /data/cookies.txt".
       YTDLP_EXTRA_ARGS: "--extractor-args youtubepot-bgutilhttp:base_url=http://pot:4416"
-      # Optional, see the README: region for search results.
-      # MUSIKE_LOCATION: "US"
+      # HD video cache, in MB.
       MUSIKE_CACHE_MAX_MB: "2048"
+      # More in the README's Configuration table, for example:
+      # YTDLP_CHANNEL: "nightly"   # keeps yt-dlp up to date on that channel
+      # MUSIKE_TRUST_PROXY: "true" # behind a reverse proxy
     depends_on: [pot]
     restart: unless-stopped
 

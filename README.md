@@ -7,18 +7,18 @@
 **Your music, uninterrupted.**
 
 A personal music player for YouTube's catalog: any song or music video, as **audio** or **video**, with no ads, no account and no subscription.
-Runs as a **Windows**, **macOS** and **Linux** app, as an **Android**, **Android TV** and **iPhone** app that needs no computer, in any **browser** (installable PWA) and in **Docker**.
+This fork runs as a **Windows** app, as an **Android** and **Android TV** app that needs no computer and plays in **Android Auto**, in any **browser** (installable PWA) and in **Docker**. For macOS, Linux and iPhone there are the [original Musike's builds](#option-2-macos-app).
 
 ![MIT license](https://img.shields.io/badge/license-MIT-c3ec52?style=flat-square&labelColor=121318)
-![Windows, macOS and Linux](https://img.shields.io/badge/desktop-Windows%20%7C%20macOS%20%7C%20Linux-c3ec52?style=flat-square&labelColor=121318)
-![Android and iOS](https://img.shields.io/badge/mobile-Android%20%7C%20iOS-c3ec52?style=flat-square&labelColor=121318)
+![Windows](https://img.shields.io/badge/desktop-Windows-c3ec52?style=flat-square&labelColor=121318)
+![Android, Android TV and Android Auto](https://img.shields.io/badge/mobile-Android%20%7C%20Android%20TV%20%7C%20Android%20Auto-c3ec52?style=flat-square&labelColor=121318)
 ![Web and PWA](https://img.shields.io/badge/web-PWA-c3ec52?style=flat-square&labelColor=121318)
 ![Docker](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-c3ec52?style=flat-square&labelColor=121318)
 ![TypeScript](https://img.shields.io/badge/TypeScript-100%25-c3ec52?style=flat-square&labelColor=121318)
 
 <img src="docs/screenshots/home.jpg" alt="Musike playing Radiohead, with playlists, recently played and the Now Playing panel" width="900" />
 
-**[Download for Windows, macOS, Linux, Android and iPhone](https://github.com/Ernani1234/musike/releases/latest)** · [Run with Docker](#option-6-docker) · [Run from source](#option-7-node-server--browser)
+**[Download for Android and Windows](https://github.com/yourboiava/musike/releases/latest)** · [Run with Docker](#option-6-docker) · [Run from source](#option-7-node-server--browser)
 
 </div>
 
@@ -123,19 +123,19 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - Show or hide panels: the Now Playing panel, playlists in the sidebar, a compact icons-only sidebar, the album column, the background texture, and each section of the Home page
 - Responsive from 320 px phones to ultrawide monitors; lock screen, headphone and media key controls (Media Session); picks up the queue where you left off
 
-**Desktop app (Windows, macOS and Linux)**
+**Desktop app** (Windows in this fork; macOS and Linux from the original Musike)
 - Native window with its own title bar, no browser
 - Windows installer with desktop and Start menu shortcuts; macOS app for Apple Silicon and Intel; Linux `.deb` and AppImage for x64 and arm64
 - Updating keeps your library (it's backed up automatically before each update)
 - Downloads and maintains the tools it needs (yt-dlp, Deno, FFmpeg)
 
-**Android and iPhone apps**
+**Android app** (and the original Musike's iPhone app)
 - **Standalone:** no computer, no server. The phone searches YouTube Music and plays the audio straight from YouTube
 - Same app as on the computer: search, genres, artists, albums, Search a list, playlists, favorites, themes and colors
 - Keeps playing with the screen off, with controls in the notification, on the lock screen and on headphones; pauses for calls and when headphones are unplugged
 - **iPhone:** the same app for iOS, installed with AltStore, SideStore or Sideloadly
 - **Android TV:** the same app appears in the TV launcher and switches to a bigger interface you navigate with the remote
-- Audio only for now (no video mode)
+- On its own, audio only. The Android app of this fork, connected to a Musike server, plays video too
 
 **Self-hosting**
 - **Docker image** for amd64 and arm64 (Raspberry Pi), with everything inside
@@ -200,10 +200,11 @@ flowchart LR
 
 ### Builds of this fork
 
-The releases linked above are the original Musike. This fork's own builds come from GitHub Actions on every push to `local` (and to `community`):
+This fork builds and uses the **Android** and **Windows** apps and the **Docker** image. Each version is on [this fork's releases](https://github.com/yourboiava/musike/releases/latest):
 
-- **Android:** Actions > **Android APK** > the latest run > `musike-android-…` artifact. Signed with this fork's key and installed as `app.musike.android.fork`, next to the original app, not over it. Updates install over the previous build of the fork.
-- **Windows:** Actions > **Windows app** > `musike-windows-…` artifact. Same app ID as the original: it replaces it and keeps its library.
+- **Android:** `Musike-Setup-<version>-Android.apk`, always at `https://github.com/yourboiava/musike/releases/latest/download/Musike-Setup-1.5.1-Android.apk` while the version stays 1.5.1. Signed with this fork's key and installed as `app.musike.android.fork`, next to the original app, not over it. Updates install over the previous build of the fork. See [Option 4](#option-4-android-app), and [Android Auto](#android-auto) for the car.
+- **Windows:** `Musike-Setup-<version>-Windows.exe`. Same app ID as the original: it replaces it and keeps its library. See [Option 1](#option-1-windows-app).
+- **macOS, Linux and iPhone:** not built here. The original Musike's builds work, without this fork's changes.
 - **Server:** the image `ghcr.io/yourboiava/musike:latest` (amd64 and arm64), with the compose file of [Option 6](#option-6-docker). Or built from source:
 
   ```bash
@@ -215,11 +216,11 @@ The releases linked above are the original Musike. This fork's own builds come f
 
   Built from source, `git pull && docker compose up -d --build` updates it.
 
-Artifacts are kept for 14 days. To build by hand, **Run workflow** on the same pages. The releases of this fork are on [its own page](https://github.com/yourboiava/musike/releases); the latest APK is always at `https://github.com/yourboiava/musike/releases/latest/download/Musike-Setup-1.5.1-Android.apk` while the version stays 1.5.1.
+Between releases, every push to `local` (and to `community`) builds the apps in GitHub Actions: Actions > **Android APK** or **Windows app** > the latest run > the `musike-…` artifact, kept for 14 days. To build by hand, **Run workflow** on the same pages.
 
 ### Option 1: Windows app
 
-Download `Musike-Setup-<version>-Windows.exe` from the [latest release](https://github.com/Ernani1234/musike/releases/latest) and run it. The installer:
+Download `Musike-Setup-<version>-Windows.exe` from [this fork's latest release](https://github.com/yourboiava/musike/releases/latest) and run it. It replaces the original Musike if you have it, and keeps its library. The installer:
 
 - installs for the current user only (no administrator needed) and lets you pick the folder;
 - creates **Musike** shortcuts on the desktop and in the Start menu, and opens the app when it's done;
@@ -242,39 +243,15 @@ To build the installer yourself: `pnpm install && pnpm installer` (creates `rele
 
 ### Option 2: macOS app
 
-Download the `.dmg` for your Mac from the [latest release](https://github.com/Ernani1234/musike/releases/latest): `Musike-Setup-<version>-macOS-arm64.dmg` for Apple Silicon (M1 and newer) or `Musike-Setup-<version>-macOS-x64.dmg` for Intel. Open it and drag **Musike** to **Applications**. Requires macOS 12 or newer.
-
-The app isn't notarized by Apple yet, so macOS blocks the first launch:
-
-1. Open Musike once; macOS says it can't verify it. Click **Done**.
-2. Open **System Settings > Privacy & Security**, scroll down and click **Open Anyway** next to Musike, then confirm.
-
-If macOS says the app "is damaged and can't be opened", remove the download flag in Terminal and open it again:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/Musike.app
-```
-
-Like on Windows, the first launch downloads yt-dlp, Deno and FFmpeg. Everything lives in `~/Library/Application Support/Musike` (same folders as the table above), and updating (dragging the new version over the old one) keeps your library.
-
-To build it yourself on a Mac: `pnpm install && pnpm --filter musike-desktop dist:mac` (creates the `.dmg` files in `release`).
+Not built by this fork. The [original Musike](https://github.com/Ernani1234/musike#option-2-macos-app) has a macOS app, without this fork's changes. To build this fork on a Mac yourself (untested here): `pnpm install && pnpm --filter musike-desktop dist:mac`.
 
 ### Option 3: Linux app
 
-From the [latest release](https://github.com/Ernani1234/musike/releases/latest), pick the package for your system: `x64` for most PCs, `arm64` for ARM computers such as a Raspberry Pi 4 or 5 running a 64-bit desktop.
-
-- **Debian, Ubuntu, Linux Mint, Pop!_OS:** `Musike-Setup-<version>-Linux-x64.deb`. Open it with the software installer, or run `sudo apt install ./Musike-Setup-<version>-Linux-x64.deb`. Musike appears in the applications menu.
-- **Any other distribution:** `Musike-Setup-<version>-Linux-x64.AppImage`. Make it executable and run it: `chmod +x Musike-*.AppImage && ./Musike-*.AppImage`.
-
-> Ubuntu 24.04 and newer block the sandbox an AppImage needs, so there the AppImage closes right away: use the `.deb` (it sets up what's needed), or start the AppImage with `--no-sandbox`.
-
-Like on Windows and macOS, the first launch downloads yt-dlp, Deno and FFmpeg. Everything lives in `~/.config/Musike` (same folders as the table above). To update, install the new `.deb` over the old one or replace the AppImage: your library stays.
-
-To build it yourself on Linux: `pnpm install && pnpm --filter musike-desktop dist:linux` (creates the `.deb` and `.AppImage` files in `release`).
+Not built by this fork. The [original Musike](https://github.com/Ernani1234/musike#option-3-linux-app) has `.deb` and AppImage packages, without this fork's changes. To build this fork on Linux yourself (untested here): `pnpm install && pnpm --filter musike-desktop dist:linux`.
 
 ### Option 4: Android app
 
-On the phone, download `Musike-Setup-<version>-Android.apk` from the [latest release](https://github.com/Ernani1234/musike/releases/latest) and open it. Android asks to allow installing apps from your browser (or Files): allow it, then tap **Install**. If Play Protect warns about an unknown app, tap **More details > Install anyway**. Requires Android 7.0 or newer.
+On the phone, download `Musike-Setup-<version>-Android.apk` from [this fork's latest release](https://github.com/yourboiava/musike/releases/latest) and open it. It installs as its own app (`app.musike.android.fork`), next to the original Musike if you have it. Android asks to allow installing apps from your browser (or Files): allow it, then tap **Install**. If Play Protect warns about an unknown app, tap **More details > Install anyway**. Requires Android 7.0 or newer.
 
 - It works on its own: no computer and no Musike server needed, only an internet connection.
 - Your playlists and favorites live on the phone. To move them to or from a computer, use [backup to a file](#moving-your-library-backup) (on Android, Export opens the share sheet: save to Files or Drive, or send it to yourself).
@@ -283,20 +260,22 @@ On the phone, download `Musike-Setup-<version>-Android.apk` from the [latest rel
 - On its own the app plays audio only: videos play as audio, with their picture. Connected to a Musike server (below), it also plays video, streamed by the server as in the browser.
 - **Android TV:** install the same APK on the TV (for example with a file manager app, or `adb install`). Musike shows up in the TV launcher and switches to a remote-friendly interface by itself.
 
+#### Android Auto
+
+In the car, Musike shows up among the media apps with your favorites, playlists, recently played and the queue. Android Auto hides apps that don't come from the Play Store until you allow them, once:
+
+1. On the phone, open Android Auto's settings: **Settings > Apps > Android Auto > Additional settings in the app**, or search Settings for "Android Auto" (the path changes from phone to phone).
+2. Tap the version at the bottom about 10 times, until Android Auto says developer mode is on.
+3. In the three-dot menu at the top, open **Developer settings** and turn on **Unknown sources**.
+4. Disconnect from the car and connect again.
+
+To have Musike start by itself when you open it in the car with the app closed, allow **Display over other apps** for Musike (**Settings > Apps > Musike**). If something doesn't show in the car, **Settings > Android Auto** in Musike keeps a log of the car's requests.
+
 To build the APK yourself you need JDK 21 and the Android SDK (Android Studio installs both): `pnpm install && pnpm --filter @musike/mobile apk` (creates `release/Musike-Setup-<version>-Android.apk`; unsigned unless `mobile/android/keystore.properties` points to your signing key). With `MUSIKE_APP_ID=<another id>` the APK installs next to the official app instead of replacing it (an APK signed with another key can't update it).
 
 ### Option 5: iPhone app
 
-Download `Musike-Setup-<version>-iOS.ipa` from the [latest release](https://github.com/Ernani1234/musike/releases/latest). Apple only lets App Store apps install directly, so the file comes unsigned and is signed with your own Apple ID as you install it, using one of these free tools:
-
-- **AltStore** or **SideStore:** install the store on the iPhone, then open the `.ipa` with it.
-- **Sideloadly:** on a Windows or Mac computer, connect the iPhone and drag the `.ipa` into it. Then trust your Apple ID in **Settings > General > VPN & Device Management**.
-
-On iOS 16 and newer, also turn on **Settings > Privacy & Security > Developer Mode** the first time. With a free Apple ID the app has to be signed again every 7 days; AltStore and SideStore do it on their own in the background. Requires iOS 15 or newer.
-
-Like on Android, it works on its own (no computer or server), keeps playing with the screen locked, and has controls on the lock screen, in Control Center and on headphones. Audio only for now.
-
-To build it yourself on a Mac with Xcode: `pnpm install && pnpm --filter @musike/mobile ipa` (creates `release/Musike-Setup-<version>-iOS.ipa`).
+Not built by this fork. The [original Musike](https://github.com/Ernani1234/musike#option-5-iphone-app) has an iPhone app to sideload, without this fork's changes. To build this fork yourself on a Mac with Xcode (untested here): `pnpm install && pnpm --filter @musike/mobile ipa`.
 
 ### Option 6: Docker
 
@@ -313,6 +292,9 @@ services:
       - musike-data:/data   # library (musike.db): playlists, favorites, history
       - musike-cache:/cache # HD videos already downloaded
     environment:
+      MUSIKE_AUTH: "on"            # accounts: open Musike right away and create the admin
+      MUSIKE_DIRECT_AUDIO: "first" # audio straight from YouTube, about half a second to start
+      MUSIKE_LOCATION: "IT"        # country for search results (the default is BR)
       YTDLP_EXTRA_ARGS: "--extractor-args youtubepot-bgutilhttp:base_url=http://pot:4416"
     depends_on: [pot]
     restart: unless-stopped
@@ -326,8 +308,10 @@ volumes:
 ```
 
 ```bash
-docker compose up -d   # then open http://<that machine>:4180
+docker compose up -d   # then open http://<that machine>:4180 and create the admin account
 ```
+
+Every variable in [Configuration](#configuration) goes under `environment:` the same way, for example `YTDLP_CHANNEL: "nightly"` to keep yt-dlp up to date, `MUSIKE_CACHE_MAX_MB: "4096"` for a bigger video cache, or `MUSIKE_TRUST_PROXY` behind a reverse proxy. Without `MUSIKE_AUTH` there are no accounts: one library, open to anyone who reaches the port.
 
 The same file, with comments, is this fork's [docker-compose.yml](docker-compose.yml): `curl -O https://raw.githubusercontent.com/yourboiava/musike/local/docker-compose.yml` downloads it. Behind a VPN, see [below](#docker-behind-a-vpn).
 
@@ -336,7 +320,6 @@ Or with plain Docker, without the tokens: `docker run -d -p 4180:4180 -v musike-
 - `docker compose pull && docker compose up -d` gets the latest image. The library stays in the `/data` volume.
 - To back up the database itself, copy `/data` while the container is stopped (with it running, `musike.db-wal` may hold the latest changes). [Export](#moving-your-library-backup) works any time.
 - yt-dlp can also be updated from **Settings** without a new image (until the container is recreated). To always have a channel, set `YTDLP_CHANNEL=nightly` (or `stable`): Musike updates yt-dlp to it at start and once a day, so a recreated container doesn't fall back to the image's version.
-- All the [environment variables](#configuration) work, e.g. `YTDLP_EXTRA_ARGS="--cookies /data/cookies.txt"` for YouTube's bot checks.
 
 > **Run it at home, not on a VPS:** YouTube blocks datacenter IPs ("Sign in to confirm you're not a bot"). A home server uses your residential IP.
 
@@ -513,7 +496,8 @@ Server environment variables (all optional):
 | `MUSIKE_CACHE_MAX_MB` | `2048` | Video cache limit (least recently played go first) |
 | `MUSIKE_BIN_DIR` | | Private tools folder (the desktop app uses `%APPDATA%\Musike\bin`) |
 | `MUSIKE_LANG` | `en` | YouTube Music language when a request doesn't say (the app always sends the chosen language) |
-| `MUSIKE_LOCATION` | `BR` | Region for YouTube Music results |
+| `MUSIKE_LOCATION` | `BR` | Country for YouTube Music results, as a two-letter code (`IT`, `US`) |
+| `LOG_LEVEL` | `warn` | Server log detail: `info` or `debug` for more, `error` for less |
 
 ## API
 
