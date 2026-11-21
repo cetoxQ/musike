@@ -335,7 +335,7 @@ To build the APK yourself you need JDK 21 and the Android SDK (Android Studio in
 
 ### Option 5: iPhone app
 
-Not built by this fork. The [original Musike](https://github.com/Ernani1234/musike#option-5-iphone-app) has an iPhone app to sideload, without this fork's changes. To build this fork yourself on a Mac with Xcode (untested here): `pnpm install && pnpm --filter @musike/mobile ipa`.
+Not built by this fork. The [original Musike](https://github.com/Ernani1234/musike#option-5-iphone-app) has an iPhone app to sideload, without this fork's changes. To build this fork yourself on a Mac with Xcode (untested here): `pnpm install && pnpm --filter @musike/mobile ipa`. Or install it from Safari as an app, from your Musike server: see [Option 8](#option-8-from-the-browser-as-an-app).
 
 ### Option 6: Docker
 
@@ -448,6 +448,16 @@ pnpm start   # http://localhost:4180
 The server prints its network addresses on start. Open the `Network:` address on a phone on the same Wi-Fi (allow Node through the firewall on private networks). On Windows the server finds yt-dlp even in terminals opened before it was installed, by reading the PATH from the registry.
 
 **Away from home:** reach the computer through a VPN to your home network (WireGuard, Tailscale, ZeroTier and the like), or put a reverse proxy with HTTPS in front. To install Musike as an app (PWA) on the phone the browser requires HTTPS: a reverse proxy with a certificate gives it, and so does a VPN that serves HTTPS (with Tailscale, `tailscale serve --bg 4180` and the `https://...ts.net` address).
+
+### Option 8: from the browser, as an app
+
+Any phone or computer can install Musike from your server's page, with nothing to download: it opens in its own window, with its own icon. The server must be on `https://` (see [HTTP or HTTPS](#http-or-https)).
+
+- **Android (Chrome, Edge):** the browser's menu > **Install app** (on some versions **Add to Home screen**).
+- **iPhone and iPad (Safari):** the Share button > **Add to Home Screen**. This fork builds no iPhone app, so this is the way to use it there.
+- **Computer (Chrome, Edge):** the install icon at the right of the address bar, or the browser's menu > **Install Musike**.
+
+It's the server's page in a window of its own: without the server it can't play or show your library, and it keeps no copy of the library like the Android app does.
 
 ### Development
 
