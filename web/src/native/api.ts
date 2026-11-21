@@ -17,6 +17,7 @@ import {
 } from "../../../server/src/browse";
 import { msg, tr, type MsgKey } from "../../../server/src/i18n";
 import * as library from "../../../server/src/library";
+import { lyricsFor } from "../../../server/src/lyrics";
 import { discover } from "../../../server/src/profile";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
@@ -110,6 +111,8 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       return ytPlaylistPage(id, getLang());
     }, signal),
   videoFor: (t) => call(() => findVideoFor(t.id, t.title, t.artist, t.duration)),
+  lyrics: (t, signal) =>
+    call(() => lyricsFor({ id: t.id, title: t.title, artist: t.artist, album: t.album, duration: t.duration }), signal),
   prepare: (id, signal) =>
     call(async () => {
       if (!VIDEO_ID.test(id)) throw fail(400, "invalidVideoId");

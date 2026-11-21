@@ -260,6 +260,7 @@ const SHORTCUTS: [string | null, keyof Messages["dialogs"]["shortcuts"]][] = [
   ["V", "video"],
   ["F", "theater"],
   ["Q", "queue"],
+  ["Y", "lyrics"],
   ["/", "search"],
   ["?", "help"],
 ];

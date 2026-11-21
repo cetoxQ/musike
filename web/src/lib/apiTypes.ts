@@ -152,6 +152,22 @@ export interface Prepared {
   hasSdVideo: boolean;
 }
 
+/** One line of lyrics, with the second of the track it starts on (0 for every line when unsynced). */
+export interface LyricLine {
+  time: number;
+  text: string;
+}
+
+export interface Lyrics {
+  /** Each line carries its own time, so the app can highlight the line being sung. */
+  synced: boolean;
+  /** No singing by design: the app says so instead of "not found". */
+  instrumental: boolean;
+  lines: LyricLine[];
+  sourceDuration: number | null;
+  source: string;
+}
+
 /**
  * The operating system's media controls (notification, lock screen, headphone buttons) when the browser's
  * Media Session can't reach them: the Android app. Absent elsewhere.
@@ -194,6 +210,8 @@ export interface MusikeApi {
   ytPlaylist(id: string, signal?: AbortSignal): Promise<YtPlaylistPage>;
   /** The music video matching a song, or null when YouTube has none. */
   videoFor(t: Track): Promise<Track | null>;
+  /** The track's lyrics (timed when the source has them timed), or null when there are none. */
+  lyrics(t: Track, signal?: AbortSignal): Promise<Lyrics | null>;
   prepare(id: string, signal?: AbortSignal): Promise<Prepared>;
 
   library(): Promise<Library>;

@@ -4,6 +4,7 @@ import { DevicesDialog } from "./components/Devices";
 import { AddToPlaylistDialog, ForgetDialog, ShareDialog, ShortcutsDialog } from "./components/Dialogs";
 import { MiniPlayer, TabBar } from "./components/MobileChrome";
 import { NowPlayingSheet, PanelDrawer, SidePanel } from "./components/NowPlaying";
+import { LyricsPage } from "./components/Lyrics";
 import { PlayerBar } from "./components/PlayerBar";
 import { Rail } from "./components/Rail";
 import { TitleBar } from "./components/TitleBar";
@@ -198,6 +199,7 @@ export default function App() {
               <Route path="/search/artist/:id" element={<Artist />} />
               <Route path="/search/album/:id" element={<Album />} />
               <Route path="/search/playlist/:id" element={<YtPlaylist />} />
+              <Route path={paths.lyrics} element={<LyricsPage />} />
               <Route path={paths.library} element={<Library />} />
               <Route path={paths.profile} element={<Profile />} />
               <Route path={paths.stats} element={<Stats />} />

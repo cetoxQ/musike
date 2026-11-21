@@ -7,6 +7,7 @@ export const paths = {
   artist: (id: string) => `/search/artist/${id}`,
   album: (id: string) => `/search/album/${id}`,
   ytPlaylist: (id: string) => `/search/playlist/${id}`,
+  lyrics: "/lyrics",
   library: "/library",
   favorites: "/favorites",
   history: "/history",

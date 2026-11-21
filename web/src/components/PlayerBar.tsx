@@ -9,6 +9,7 @@ import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
+import { LyricsButton, useLyricsNavigation } from "./Lyrics";
 
 /** Desktop and tablet player: a floating island under the content. */
 export function PlayerBar() {
@@ -18,7 +19,9 @@ export function PlayerBar() {
   const t = useT();
   const status = usePlayer(selectShownStatus);
   const panelOpen = useUi((s) => s.panelOpen || s.drawerOpen);
-  const panelTab = useUi((s) => s.panelTab);
+  const storeTab = useUi((s) => s.panelTab);
+  // On the lyrics page the panel hides its Lyrics tab and shows Playing instead.
+  const panelTab = useLyricsNavigation().atLyrics && storeTab === "lyrics" ? "playing" : storeTab;
   const togglePanel = useUi((s) => s.togglePanel);
   const setShortcutsOpen = useUi((s) => s.setShortcutsOpen);
 
@@ -62,6 +65,7 @@ export function PlayerBar() {
 
         <div className="flex items-center justify-end gap-1">
           <ModeSwitch className="max-2xl:hidden" />
+          <LyricsButton />
           <DevicesButton />
           <IconButton
             label={t.player.queue}
