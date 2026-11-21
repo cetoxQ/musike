@@ -16,7 +16,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 ![Docker](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-c3ec52?style=flat-square&labelColor=121318)
 ![TypeScript](https://img.shields.io/badge/TypeScript-100%25-c3ec52?style=flat-square&labelColor=121318)
 
-<img src="docs/screenshots/home.jpg" alt="Musike playing Radiohead, with playlists, recently played and the Now Playing panel" width="900" />
+<img src="docs/screenshots/fork-profile.jpg" alt="Profile page with the most played tracks of the last month, the playlists in the sidebar and the Now Playing panel" width="900" />
 
 **[Download for Android and Windows](https://github.com/yourboiava/musike/releases/latest)** · [Run with Docker](#option-6-docker) · [Run from source](#option-7-node-server--browser)
 
@@ -162,6 +162,32 @@ The Android and Windows apps work on their own, with no other computer. Connecte
 - Playback errors offer the "Update" button right in the notice
 
 ## Screenshots
+
+**This fork**
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/fork-stats.jpg" width="440" alt="Your listening: plays, hours, tracks, artists, albums and days, with charts over time, by hour and by weekday" /><br /><sub>Your listening, for any period</sub></td>
+    <td align="center"><img src="docs/screenshots/fork-stats-more.jpg" width="440" alt="Day by hour map, busiest day, favourite hour, streaks and top artists" /><br /><sub>When you listen, streaks and top artists</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/fork-profile-more.jpg" width="440" alt="Profile with live recordings, playlists and artists you might also like" /><br /><sub>Your profile: playlists and You might also like</sub></td>
+    <td align="center"><img src="docs/screenshots/fork-devices.jpg" width="300" alt="Devices: a phone, a browser and the Windows app, one playing and the others paused" /><br /><sub>Devices: one plays, the others are remotes</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/fork-phone-sheet.jpg" width="200" alt="Phone Now Playing sheet with one row of buttons under the controls, playing on the Windows app" /><br /><sub>Everything in one row, playing on the PC</sub></td>
+    <td align="center"><img src="docs/screenshots/fork-phone-devices.jpg" width="200" alt="Devices from the phone" /><br /><sub>Devices from the phone</sub></td>
+    <td align="center"><img src="docs/screenshots/fork-phone-lyrics.jpg" width="200" alt="Timed lyrics in the phone sheet, the sung line highlighted" /><br /><sub>Timed lyrics</sub></td>
+    <td align="center"><img src="docs/screenshots/fork-phone-offline.jpg" width="200" alt="Notice on the phone: the server can't be reached, Musike goes on from this phone" /><br /><sub>Server out of reach: it goes on</sub></td>
+  </tr>
+</table>
+
+<p align="center"><img src="docs/screenshots/fork-report.jpg" width="320" alt="Report image made by Share: totals, busiest day, favourite hour, streaks, top artists, tracks and albums, charts" /><br /><sub>The report <b>Share</b> makes, in your accent color</sub></p>
+
+**The original Musike**
 
 <table>
   <tr>
