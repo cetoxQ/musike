@@ -22,7 +22,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 
 </div>
 
-> **This is a fork** of [Ernani1234/musike](https://github.com/Ernani1234/musike), built around one library shared by every device through your own Musike server: accounts, the phone and the PC in step, a profile with your listening statistics, other devices as remotes, Android Auto. [What this fork adds](#what-this-fork-adds) · [Builds of this fork](#builds-of-this-fork). The `community` branch collects upstream pull requests and fixes for upstream issues, to try before they reach `local`.
+> **This is a fork** of [Ernani1234/musike](https://github.com/Ernani1234/musike), built around one library shared by every device through your own Musike server: accounts, the phone and the PC in step, a profile with your listening statistics, other devices as remotes, Android Auto. [What this fork adds](#what-this-fork-adds) · [Builds of this fork](#builds-of-this-fork). Everything is on `local`; `community` is where upstream pull requests and fixes for upstream issues are tried first.
 
 ---
 
@@ -30,6 +30,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 
 - [What it is](#what-it-is)
 - [What this fork adds](#what-this-fork-adds)
+- [On its own or with a server](#on-its-own-or-with-a-server)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -52,7 +53,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **No ads, no account:** the server gets the original stream with [yt-dlp](https://github.com/yt-dlp/yt-dlp) and passes the bytes to the player.
 - **Song or music video:** switch between Audio and Video at any time, from the same point in the track. For songs, Musike finds the artist's official music video.
 - **Any screen:** designed for phones of every size, tablets, laptops and big monitors.
-- **Yours:** it runs on your own computer. Playlists and favorites live in a local file you can export and take to any other Musike.
+- **Yours:** it runs on your own devices, or on your own server. Playlists and favorites stay there, and you can export them to a file for any other Musike.
 
 ## What this fork adds
 
@@ -91,6 +92,21 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - A track YouTube holds back for a few seconds (it answers 403 until then) starts as soon as YouTube serves it, instead of failing
 - `MUSIKE_DIRECT_AUDIO=first`: audio straight from YouTube's API, about half a second to start. Without it, audio still comes from there when YouTube refuses yt-dlp's URL
 - Can run behind a VPN, see [Docker behind a VPN](#docker-behind-a-vpn)
+
+## On its own or with a server
+
+The Android and Windows apps work on their own, with no other computer. Connected to your Musike server (**Settings > Server**), they show the server's library instead and play through it. The browser always opens a server: [Docker](#option-6-docker) or the [Node server](#option-7-node-server--browser).
+
+| | On its own | Connected to your Musike server |
+|---|---|---|
+| **Library** | On the device, one per device | On the server: the same on every device, with an account for each person |
+| **Who asks YouTube for the music** | The device, from its own connection | The server: the device only talks to it |
+| **Video** | Windows: yes, it has its own yt-dlp and FFmpeg. Android: no, audio with the artwork | Yes, from the server |
+| **Devices, remote control, changes showing up live** | No | Yes |
+| **Listening statistics** | Totals per track: no charts over time, by hour or by weekday, no streaks | Every play with its time: all the charts |
+| **When the server can't be reached** | Nothing changes | Android keeps playing and searching from its own copy of the library, audio only, and sends the changes when the server is back. Windows offers to try again, or to use this computer's own library, which is a separate one |
+| **YouTube's bot check** | Depends on the device's connection: mobile data, shared by many people, gets it more often | Depends on the server's connection: rarely from home, more often through a VPN (the [pot service](#docker-behind-a-vpn) helps) |
+| **Android Auto** | Yes | Yes |
 
 ## Features
 
@@ -133,13 +149,13 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **Standalone:** no computer, no server. The phone searches YouTube Music and plays the audio straight from YouTube
 - Same app as on the computer: search, genres, artists, albums, Search a list, playlists, favorites, themes and colors
 - Keeps playing with the screen off, with controls in the notification, on the lock screen and on headphones; pauses for calls and when headphones are unplugged
-- **iPhone:** the same app for iOS, installed with AltStore, SideStore or Sideloadly
+- **iPhone:** the same app for iOS, sideloaded with your own Apple ID (original Musike only)
 - **Android TV:** the same app appears in the TV launcher and switches to a bigger interface you navigate with the remote
 - On its own, audio only. The Android app of this fork, connected to a Musike server, plays video too
 
 **Self-hosting**
-- **Docker image** for amd64 and arm64 (Raspberry Pi), with everything inside
-- Open it from any device on your network, or from anywhere with Tailscale
+- **Docker image** for amd64 and arm64 machines (a PC, a NAS, an ARM board), with everything inside
+- Open it from any device on your network; from outside, through a VPN to your home or a reverse proxy with HTTPS
 
 **Maintenance**
 - **Settings** shows the yt-dlp version, tells you when there's an update and updates it in one click (Stable or Nightly channel)
@@ -191,10 +207,12 @@ flowchart LR
 1. **Catalog:** the server queries YouTube Music with [youtubei.js](https://github.com/LuanRT/YouTube.js): search, suggestions, genres, artists, albums, radio and picking the official music video.
 2. **Playback:** yt-dlp resolves the stream URLs (AAC audio, MP4 video), running YouTube's player code with Deno. Those URLs are tied to the IP that resolved them, so the server **proxies** the bytes, forwarding the `Range` header so seeking is instant. Nothing is written to disk for audio.
 3. **HD video and videos without an SD version:** yt-dlp downloads and merges video + audio with FFmpeg, keeps it in a cache (least-recently-played first, 2 GB by default) and the server serves the file with Range support.
-4. **Library:** playlists, favorites, history, saved artists, albums and playlists, and the play log live in `musike.db`, a SQLite database (Node's built-in `node:sqlite`, so nothing to install). Each change is one transaction. The desktop and Android apps keep a single `library.json` instead, written atomically. A server upgraded from an earlier version moves its `library.json` into the database on the first start and keeps the file as `library.json.imported`.
-
-**On Android** there is no server. The app runs Musike's server code itself (catalog and library, from `server/src`) and asks YouTube for the audio stream from the phone, so the stream URL belongs to the phone's own connection and the player reads it directly, without a proxy. Which YouTube client the app uses to get streams is read from [`mobile/streaming.json`](mobile/streaming.json), so it can be adjusted without releasing a new app.
+4. **Library:** playlists, favorites, history, saved artists, albums and playlists, and the play log live in `musike.db`, a SQLite database (Node's built-in `node:sqlite`, so nothing to install). Each change is one transaction. The Windows and Android apps on their own keep a single `library.json` instead, written atomically, with totals per track rather than every play. A server upgraded from an earlier version moves its `library.json` into the database on the first start and keeps the file as `library.json.imported`.
 5. **Web:** a single `<video>` element moves around the page (panel, full screen, mini player, cinema mode) without interrupting playback.
+
+**The apps on their own:** the Windows app runs this same server inside itself, with its own yt-dlp, Deno and FFmpeg, and shows it in its window. The Android app has no server process: it runs Musike's server code itself (catalog and library, from `server/src`) and asks YouTube for the audio stream from the phone, so the stream URL belongs to the phone's own connection and the player reads it directly, without a proxy. Which YouTube client it uses is read from [`mobile/streaming.json`](mobile/streaming.json), so it can be adjusted without releasing a new app. On its own the phone plays audio only.
+
+**Connected to a Musike server,** both apps work like the browser: the server does all of the above, and the app plays what the server sends. See [On its own or with a server](#on-its-own-or-with-a-server).
 
 ## Installation
 
@@ -254,7 +272,7 @@ Not built by this fork. The [original Musike](https://github.com/Ernani1234/musi
 On the phone, download `Musike-Setup-<version>-Android.apk` from [this fork's latest release](https://github.com/yourboiava/musike/releases/latest) and open it. It installs as its own app (`app.musike.android.fork`), next to the original Musike if you have it. Android asks to allow installing apps from your browser (or Files): allow it, then tap **Install**. If Play Protect warns about an unknown app, tap **More details > Install anyway**. Requires Android 7.0 or newer.
 
 - It works on its own: no computer and no Musike server needed, only an internet connection.
-- Your playlists and favorites live on the phone. To move them to or from a computer, use [backup to a file](#moving-your-library-backup) (on Android, Export opens the share sheet: save to Files or Drive, or send it to yourself).
+- Your playlists and favorites live on the phone. To move them to or from a computer, use [backup to a file](#moving-your-library-backup) (on Android, Export opens the share sheet: save it to the phone's files or a cloud folder, or send it to yourself).
 - **Or connect it to your Musike server:** **Settings > Server > Musike server**, the server's address (`http://192.168.1.10:4180`, or `https://` through a reverse proxy), then sign in if the server has [accounts](#accounts). Searches, your library, play counts and the music itself then all go through the server: the phone only talks to it, and the library is the same as in the browser. **Copy this phone's library to the server** merges the phone's own library into your account. **Back to this phone** returns to the phone's library, untouched. On `http://` the app warns that the password and what you play travel unencrypted.
 - **To update,** install the new APK over the old one. Your library stays.
 - On its own the app plays audio only: videos play as audio, with their picture. Connected to a Musike server (below), it also plays video, streamed by the server as in the browser.
@@ -265,8 +283,8 @@ On the phone, download `Musike-Setup-<version>-Android.apk` from [this fork's la
 In the car, Musike shows up among the media apps with your favorites, playlists, recently played and the queue. Android Auto hides apps that don't come from the Play Store until you allow them, once:
 
 1. On the phone, open Android Auto's settings: **Settings > Apps > Android Auto > Additional settings in the app**, or search Settings for "Android Auto" (the path changes from phone to phone).
-2. Tap the version at the bottom about 10 times, until Android Auto says developer mode is on.
-3. In the three-dot menu at the top, open **Developer settings** and turn on **Unknown sources**.
+2. **Turn on Android Auto's developer mode.** It's Android Auto's own, separate from the phone's Developer options. Scroll to the bottom of Android Auto's settings and tap **Version** (on some phones **Version and permission info**) about 10 times in a row, then confirm: Android Auto says developer mode is on.
+3. In the three-dot menu at the top right, open **Developer settings**, scroll down and turn on **Unknown sources**.
 4. Disconnect from the car and connect again.
 
 To have Musike start by itself when you open it in the car with the app closed, allow **Display over other apps** for Musike (**Settings > Apps > Musike**). If something doesn't show in the car, **Settings > Android Auto** in Musike keeps a log of the car's requests.
@@ -279,7 +297,7 @@ Not built by this fork. The [original Musike](https://github.com/Ernani1234/musi
 
 ### Option 6: Docker
 
-For a home server, NAS or Raspberry Pi. The image (amd64 and arm64) includes yt-dlp, Deno and FFmpeg.
+For a home server or a NAS, amd64 or arm64. The image includes yt-dlp, Deno and FFmpeg.
 
 ```yaml
 # docker-compose.yml
@@ -325,7 +343,7 @@ Or with plain Docker, without the tokens: `docker run -d -p 4180:4180 -v musike-
 
 #### Docker behind a VPN
 
-To send Musike's traffic to YouTube through a VPN, put it in the network of a [gluetun](https://github.com/qdm12/gluetun) container. Example with NordVPN over WireGuard (the private key goes in an `.env` file next to the compose file, never in the compose file itself):
+To send Musike's traffic to YouTube through a VPN, put it in the network of a VPN client container. This example uses [gluetun](https://github.com/qdm12/gluetun), which works with most providers, over WireGuard (the private key goes in an `.env` file next to the compose file, never in the compose file itself):
 
 ```yaml
 services:
@@ -334,10 +352,10 @@ services:
     cap_add: [NET_ADMIN]
     devices: [/dev/net/tun:/dev/net/tun]
     environment:
-      VPN_SERVICE_PROVIDER: nordvpn
+      VPN_SERVICE_PROVIDER: <your provider> # its name in gluetun's wiki
       VPN_TYPE: wireguard
       WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
-      SERVER_COUNTRIES: Netherlands # or SERVER_CITIES, see gluetun's wiki
+      SERVER_COUNTRIES: <a country near you> # or SERVER_CITIES, see gluetun's wiki
     ports:
       - "4180:4180" # Musike, published by gluetun: Musike has no network of its own
     restart: unless-stopped
@@ -364,10 +382,10 @@ volumes:
 ```
 
 - When the tunnel is down Musike has no internet at all, so nothing leaks outside it; the library still opens.
-- If gluetun is recreated, recreate Musike too (`docker compose up -d`): it keeps the network of the old container.
+- If the VPN container is recreated, recreate Musike too (`docker compose up -d`): it keeps the network of the old container.
 - **The catch:** a VPN exit is shared by many people, so YouTube asks it to prove it's not a bot more often than a home connection. The `pot` service gives yt-dlp the proof-of-origin tokens YouTube looks for, which makes that much rarer; direct audio often works anyway. If tracks still fail, pick another city or server.
 - When YouTube asks anyway, Musike stops on the track and tries it again after a minute instead of skipping through the queue (each try makes the check stick), and video falls back to the song's audio for a while.
-- Don't publish the port to the internet without accounts and HTTPS in front (a reverse proxy, or Tailscale).
+- Don't publish the port to the internet without accounts and HTTPS in front (a reverse proxy), or reach it through a VPN to your home.
 
 ### Option 7: Node server + browser
 
@@ -387,7 +405,7 @@ pnpm start   # http://localhost:4180
 
 The server prints its network addresses on start. Open the `Network:` address on a phone on the same Wi-Fi (allow Node through the firewall on private networks). On Windows the server finds yt-dlp even in terminals opened before it was installed, by reading the PATH from the registry.
 
-**Away from home:** install [Tailscale](https://tailscale.com) on the computer and the phone. To install Musike as an app (PWA) on the phone the browser requires HTTPS: run `tailscale serve --bg 4180` and use the `https://...ts.net` address.
+**Away from home:** reach the computer through a VPN to your home network (WireGuard, Tailscale, ZeroTier and the like), or put a reverse proxy with HTTPS in front. To install Musike as an app (PWA) on the phone the browser requires HTTPS: a reverse proxy with a certificate gives it, and so does a VPN that serves HTTPS (with Tailscale, `tailscale serve --bg 4180` and the `https://...ts.net` address).
 
 ### Development
 
