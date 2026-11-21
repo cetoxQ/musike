@@ -81,6 +81,7 @@ const CATALOG = [
   "topPlays",
   "discover",
   "profileImage",
+  "playLog",
 ] as const;
 
 /** Changes that name a playlist by its id (first argument): one created offline gets the server's id. */

@@ -12,6 +12,7 @@ export const paths = {
   history: "/history",
   playlist: (id: string) => `/playlist/${id}`,
   profile: "/profile",
+  stats: "/profile/stats",
 };
 
 /** Hash that opens the full-screen Now Playing sheet on phones (so Back closes it). */

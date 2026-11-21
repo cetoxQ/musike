@@ -30,6 +30,12 @@ export const RECENT_KINDS: readonly RecentKind[] = ["query", "track", "artist", 
  * Everything the app does with a library. Two implementations: jsonLibrary below (one JSON document, used by
  * the Android and desktop apps) and the SQLite one in librarySqlite.ts (the server). They behave the same.
  */
+/** One row of the play log: track id, when (ms), how many plays, 1 when restored from a backup. */
+export type PlayRow = [string, number, number, 0 | 1];
+
+/** At most this many rows of the play log at once (years of listening). */
+export const PLAY_LOG_LIMIT = 200_000;
+
 export interface LibraryStore {
   getLibrary(): Promise<Library>;
   /** The library without the play log, which can be large and is fetched on its own (playsFor, allPlays). */
@@ -45,6 +51,12 @@ export interface LibraryStore {
   topPlays(since: number, limit: number): Promise<PlayEntry[]>;
   /** When the first play still on record was made (ms), or null with none. */
   firstPlay(): Promise<number | null>;
+  /**
+   * Every play between two times, oldest first, for the statistics: [track id, when, how many, restored from a
+   * backup (1: its date is only the last play's)]. The JSON library keeps only totals: one row per track,
+   * dated: false.
+   */
+  playLog(since: number, until: number): Promise<{ rows: PlayRow[]; tracks: Track[]; dated: boolean }>;
   /** Off the Recently played list only. */
   removeFromHistory(id: string): Promise<Track[]>;
   /** Damnatio memoriae: every trace of the track's plays goes (history, play log, recent), as if never played. */
@@ -414,6 +426,15 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
 
     async allPlays() {
       return (await load()).plays;
+    },
+
+    async playLog(since, until) {
+      const plays = (await load()).plays.filter((p) => p.lastPlayed >= since && p.lastPlayed <= until);
+      return {
+        rows: plays.map((p): PlayRow => [p.track.id, p.lastPlayed, p.count, 1]),
+        tracks: plays.map((p) => p.track),
+        dated: false,
+      };
     },
 
     async firstPlay() {

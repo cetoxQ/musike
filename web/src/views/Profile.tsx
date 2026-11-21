@@ -1,4 +1,4 @@
-import { CameraIcon, PlayIcon, ShuffleIcon, UserIcon, XIcon } from "@phosphor-icons/react";
+import { CameraIcon, CaretRightIcon, ChartBarIcon, PlayIcon, ShuffleIcon, UserIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { AlbumRow } from "../components/AlbumTiles";
@@ -181,6 +181,20 @@ export default function Profile() {
           </IconButton>
         )}
       </div>
+
+      <Link
+        to={paths.stats}
+        className="mx-4 mt-5 flex items-center gap-3 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line transition-colors hover:bg-surface-2 md:mx-6"
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
+          <ChartBarIcon size={22} weight="fill" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-semibold">{t.stats.title}</span>
+          <span className="truncate text-sm text-fg-2">{t.stats.teaser}</span>
+        </span>
+        <CaretRightIcon size={18} className="text-fg-3" />
+      </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-6 pb-1 md:px-6">
         <h2 className="text-xl font-semibold tracking-tight">{t.profile.top}</h2>

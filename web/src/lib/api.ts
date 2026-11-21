@@ -54,6 +54,26 @@ export async function shareLink(title: string, url: string): Promise<"shared" | 
   return "copied";
 }
 
+/** Shares a picture (the listening report): the share sheet where there is one with files, otherwise downloaded. */
+export async function shareImage(blob: Blob, name: string, title: string): Promise<"shared" | "saved" | "cancelled"> {
+  const file = new File([blob], name, { type: blob.type });
+  if (!desktop && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title });
+      return "shared";
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return "cancelled";
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return "saved";
+}
+
 /** Only the Android app needs its own bridge to the system's media controls. */
 export const systemMedia: SystemMedia | null = null;
 

@@ -5,7 +5,9 @@ import {
   HISTORY_LIMIT,
   importLists,
   type LibraryStore,
+  PLAY_LOG_LIMIT,
   playedAt,
+  type PlayRow,
   playlistName,
   randomUUID,
   rankPlays,
@@ -225,6 +227,12 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
   );
   const playsEver = rows(`${PLAY_SUMS} WHERE p.user_id = ? GROUP BY p.track_id ORDER BY plays DESC, last DESC LIMIT ?`);
   const firstPlayed = db.prepare("SELECT MIN(played_at) AS first FROM plays WHERE user_id = ?");
+  const logRows = db.prepare(
+    `SELECT track_id AS tid, played_at AS at, count AS n, source FROM plays WHERE user_id = ? AND played_at BETWEEN ? AND ? ORDER BY played_at, rowid LIMIT ${PLAY_LOG_LIMIT}`,
+  );
+  const logTracks = rows(
+    `SELECT ${TRACK_COLS} FROM tracks t WHERE t.id IN (SELECT DISTINCT track_id FROM plays WHERE user_id = ? AND played_at BETWEEN ? AND ?)`,
+  );
   const playsForget = db.prepare("DELETE FROM plays WHERE user_id = ? AND track_id = ?");
   const recentForget = db.prepare("DELETE FROM recent WHERE user_id = ? AND kind = 'track' AND id = ?");
   // Tracks that name this artist page, and the ones that name no page at all (matched by name in rankPlays).
@@ -280,6 +288,15 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
         playsFor: (artistId, name, limit = 20) => tx(() => rankPlays(playsMaybeBy(uid, artistId).map(toPlay), artistId, name, limit)),
 
         allPlays: () => tx(() => playsAll(uid).map(toPlay)),
+
+        playLog: (since, until) =>
+          tx(() => ({
+            rows: (logRows.all(uid, since, until) as { tid: string; at: number; n: number; source: string }[]).map(
+              (r): PlayRow => [r.tid, Number(r.at), Number(r.n), r.source === "import" ? 1 : 0],
+            ),
+            tracks: logTracks(uid, since, until).map(toTrack),
+            dated: true,
+          })),
 
         firstPlay: () => tx(() => ((firstPlayed.get(uid) as { first: number | null } | undefined)?.first ?? null)),
 

@@ -75,6 +75,17 @@ export interface ServerLink {
   check(): Promise<boolean>;
 }
 
+/**
+ * Every play in a period: rows are [index into tracks, when (ms), how many, 1 if restored from a backup (dated only
+ * by its last play)]. dated: false on the phone on its own, which keeps only totals (one row per track).
+ */
+export interface PlayLog {
+  tracks: Track[];
+  rows: [number, number, number, number][];
+  first: number | null;
+  dated: boolean;
+}
+
 /** The profile's period: the last 3 months, all time, or since a time (ms). */
 export type TopRange = "3m" | "all" | { since: number };
 
@@ -195,6 +206,8 @@ export interface MusikeApi {
   plays(artistId?: string, name?: string, signal?: AbortSignal): Promise<PlayEntry[]>;
   /** The profile: the most played in the last 3 months, ever, or since a time; first: the oldest play on record. */
   topPlays(range: TopRange, limit?: number, signal?: AbortSignal): Promise<{ plays: PlayEntry[]; first: number | null }>;
+  /** Your listening between two times (ms), for the statistics. */
+  playLog(since: number, until: number, signal?: AbortSignal): Promise<PlayLog>;
   /** The profile picture (a data: URL), or null for the default. */
   profileImage(signal?: AbortSignal): Promise<string | null>;
   setProfileImage(image: string | null): Promise<string | null>;

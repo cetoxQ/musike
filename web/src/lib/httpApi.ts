@@ -9,6 +9,7 @@ import {
   type ErrorCode,
   type ImportResult,
   type MusikeApi,
+  type PlayLog,
   type Prepared,
   type SystemInfo,
   type SystemJob,
@@ -148,6 +149,8 @@ export function httpBackend(opts: HttpBackendOptions) {
           : `/api/profile/top?range=${range}&limit=${limit}`,
         { signal },
       ),
+    playLog: (since: number, until: number, signal?: AbortSignal) =>
+      request<PlayLog>(`/api/profile/log?since=${Math.round(since)}&until=${Math.round(until)}`, { signal }),
     profileImage: (signal?: AbortSignal) => request<{ image: string | null }>("/api/profile/image", { signal }).then((r) => r.image),
     setProfileImage: (image: string | null) =>
       request<{ image: string | null }>("/api/profile/image", { method: "PUT", json: { image } }).then((r) => r.image),

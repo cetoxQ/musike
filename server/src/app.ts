@@ -377,6 +377,23 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return { plays: await lib.topPlays(since, n), first: await lib.firstPlay() };
   });
 
+  // Your listening, for the statistics: every play in a period, the tracks they name, and the first play on record.
+  app.get("/api/profile/log", async (req) => {
+    const q = req.query as { since?: string; until?: string };
+    const until = Math.min(Math.trunc(Number(q.until)) || Date.now(), Date.now());
+    const since = Math.max(Math.trunc(Number(q.since)) || 0, 0);
+    const lib = libOf(req);
+    const log = await lib.playLog(since, until);
+    // Rows name tracks by their place in the list: much smaller than repeating every track.
+    const at = new Map(log.tracks.map((t, i) => [t.id, i]));
+    return {
+      tracks: log.tracks,
+      rows: log.rows.flatMap(([id, when, n, restored]) => (at.has(id) ? [[at.get(id)!, when, n, restored]] : [])),
+      first: await lib.firstPlay(),
+      dated: log.dated,
+    };
+  });
+
   // The profile picture: one per account, kept as a small image (data: URL) in the data folder.
   const pictureOf = (req: FastifyRequest) => path.join(config.dataDir, "avatars", `${req.user?.id ?? DEFAULT_USER}.txt`);
   app.get("/api/profile/image", async (req) => ({

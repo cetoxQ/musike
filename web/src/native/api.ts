@@ -132,6 +132,19 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       const since = typeof range === "object" ? range.since : range === "all" ? 0 : Date.now() - 91 * 24 * 3600_000;
       return { plays: await lib.topPlays(since, Math.min(Math.max(limit, 1), 100)), first: await lib.firstPlay() };
     }, signal),
+  playLog: (since, until, signal) =>
+    call(async () => {
+      const log = await lib.playLog(since, until);
+      const at = new Map(log.tracks.map((t, i) => [t.id, i]));
+      return {
+        tracks: log.tracks,
+        rows: log.rows.flatMap(([id, when, n, restored]): [number, number, number, number][] =>
+          at.has(id) ? [[at.get(id)!, when, n, restored]] : [],
+        ),
+        first: await lib.firstPlay(),
+        dated: log.dated,
+      };
+    }, signal),
   // On the phone: kept in the app's storage.
   profileImage: async () => {
     try {
@@ -229,6 +242,23 @@ export async function explainStreamError(url: string, error?: MediaError | null)
 
 /** Where the library and the music come from: this phone, or a Musike server (Settings > Server). */
 export const connection: Connection = makeConnection(saved, api, () => lib.getLibrary());
+
+/** A picture (the listening report) through Android's share sheet: written to the app's cache, then shared. */
+export async function shareImage(blob: Blob, name: string, title: string): Promise<"shared" | "saved" | "cancelled"> {
+  const data = await new Promise<string>((done, fail) => {
+    const reader = new FileReader();
+    reader.onload = () => done(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => fail(reader.error);
+    reader.readAsDataURL(blob);
+  });
+  const { uri } = await Filesystem.writeFile({ path: name, data, directory: Directory.Cache });
+  try {
+    await Share.share({ title, files: [uri], dialogTitle: title });
+    return "shared";
+  } catch {
+    return "cancelled";
+  }
+}
 
 /** Links go out through Android's share sheet (WhatsApp, Telegram, copy...). */
 export async function shareLink(title: string, url: string): Promise<"shared" | "copied" | "cancelled"> {
