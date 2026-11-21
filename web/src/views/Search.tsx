@@ -25,20 +25,10 @@ import { api } from "../lib/api";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
+import { trackFromLink, videoIdFromUrl } from "../lib/youtubeLink";
 import type { AlbumCard, ArtistCard, PlaylistCard, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { parseList } from "./BatchSearch";
-
-function videoIdFromUrl(text: string): string | null {
-  try {
-    const url = new URL(text.trim());
-    if (!/(^|\.)youtube\.com$|^youtu\.be$/.test(url.hostname)) return null;
-    const id = url.hostname === "youtu.be" ? url.pathname.slice(1) : url.searchParams.get("v") ?? url.pathname.split("/shorts/")[1];
-    return id && /^[A-Za-z0-9_-]{11}$/.test(id.slice(0, 11)) ? id.slice(0, 11) : null;
-  } catch {
-    return null;
-  }
-}
 
 type Kind = "song" | "video" | "album" | "artist" | "playlist";
 const KIND_PARAM: Record<Kind, string | null> = {
@@ -159,19 +149,8 @@ export default function Search() {
     if (!linkId) return setLinkTrack(null);
     const ctrl = new AbortController();
     setLinkTrack("loading");
-    api
-      .prepare(linkId, ctrl.signal)
-      .then((r) =>
-        setLinkTrack({
-          id: r.id,
-          title: r.title,
-          artist: t.search.youtubeLink,
-          duration: r.duration,
-          thumb: `https://i.ytimg.com/vi/${r.id}/mqdefault.jpg`,
-          art: `https://i.ytimg.com/vi/${r.id}/hq720.jpg`,
-          kind: "video",
-        }),
-      )
+    trackFromLink(linkId, ctrl.signal)
+      .then(setLinkTrack)
       .catch((e: Error) => e.name !== "AbortError" && setLinkTrack("error"));
     return () => ctrl.abort();
   }, [linkId]);

@@ -128,6 +128,9 @@ export const link: ServerLink | null = null;
 /** Android Auto: only the Android app (native/api.ts). */
 export const startCar: (() => void) | null = null;
 
+/** YouTube links opened with the app or shared to it: only the Android app (native/api.ts). */
+export const openedLinks: ((open: (url: string) => void) => () => void) | null = null;
+
 /** Settings > Android Auto: only the Android app (native/api.ts). */
 export const car: CarSettings | null = null;
 

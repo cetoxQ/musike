@@ -353,6 +353,7 @@ export const pt: Messages = {
     list: "Buscar lista",
     youtubeLink: "Link do YouTube",
     linkError: "Não foi possível abrir esse link. Confira se o vídeo é público.",
+    notVideoLink: "O Musike abre links de um vídeo ou música do YouTube, e este não é.",
     failed: "A busca falhou",
     nothingFound: "Nada encontrado",
     nothingFoundBody: (query, otherTab) => `Nenhum resultado para "${query}". Tente outro termo ou a aba ${otherTab}.`,

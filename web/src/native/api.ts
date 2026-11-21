@@ -1,3 +1,4 @@
+import { App } from "@capacitor/app";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import {
@@ -327,6 +328,15 @@ export const capabilities = {
 export const startCar: (() => void) | null = () => void import("./car").then((m) => m.startCar());
 
 /** Settings > Android Auto: opening the app from the car, and the car's log. */
+/**
+ * YouTube links opened with Musike, or shared to it (MainActivity turns a share into the same link). The App plugin
+ * keeps the one the app was started with until this listener asks for it.
+ */
+export const openedLinks: ((open: (url: string) => void) => () => void) | null = (open) => {
+  const sub = App.addListener("appUrlOpen", ({ url }) => open(url));
+  return () => void sub.then((s) => s.remove());
+};
+
 export const car: CarSettings | null = {
   info: () => Playback.carInfo(),
   openBackgroundSettings: () => Playback.openBackgroundSettings(),

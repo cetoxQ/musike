@@ -359,6 +359,7 @@ export const en = {
     list: "Search a list",
     youtubeLink: "YouTube link",
     linkError: "Couldn't open this link. Check that the video is public.",
+    notVideoLink: "Musike opens links to a YouTube video or song, and this one isn't.",
     failed: "Search failed",
     nothingFound: "Nothing found",
     nothingFoundBody: (query: string, otherTab: string) => `No results for "${query}". Try another term or the ${otherTab} tab.`,

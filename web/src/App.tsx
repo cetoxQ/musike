@@ -17,7 +17,8 @@ import { MD, useMediaQuery } from "./hooks/useMediaQuery";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { getT } from "./i18n";
 import { loadAccountSettings } from "./lib/accountSettings";
-import { capabilities, link, startCar, syncAddress } from "./lib/api";
+import { capabilities, link, openedLinks, startCar, syncAddress } from "./lib/api";
+import { playLink } from "./lib/youtubeLink";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
 import { selectHasShown, usePlayer } from "./player/player";
@@ -89,6 +90,9 @@ export default function App() {
 
   // Android Auto's lists (the Android app only).
   useEffect(() => startCar?.(), []);
+
+  // A YouTube link opened with the Android app, or shared to it, plays right away.
+  useEffect(() => openedLinks?.((url) => void playLink(url)), []);
 
   // Settings that follow the account (the accent colour...): for whoever is signed in.
   const userId = useAuth((s) => s.user?.id);

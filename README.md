@@ -85,6 +85,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - Connected to a server it can't reach, the phone plays audio with the artwork instead of offering video
 
 **Android**
+- **YouTube links:** **Share > Musike** from YouTube or YouTube Music plays the video in Musike, and Musike can open the YouTube links you tap ([how](#youtube-links))
 - **Android Auto:** your favorites, playlists, recently played and the queue in the car. With "Display over other apps" allowed, opening Musike in the car with the app closed starts it in the background and resumes the last track. A log of the car's requests (**Settings > Android Auto**) helps when something doesn't show
 - Connected to the server, the phone also plays video, streamed by the server
 
@@ -127,7 +128,7 @@ Setting up `https://`:
 ## Features
 
 **Listen**
-- Search YouTube Music with **Songs**, **Videos** and **Albums** tabs, with suggestions as you type
+- Paste a **YouTube link** (a video, a song or a Short) in the search box: it shows up on top, ready to play
 - Paste a **YouTube link** to play it right away
 - **Browse by genre:** the **Genres** button opens YouTube Music's genres (Rock, Pop, Hip-hop, Indie, Metal, Jazz…). See each genre's bands and artists (with "Load more") or all its songs in one list
 - **Artists:** greatest hits, plus every album and single
@@ -319,6 +320,13 @@ On the phone, download `Musike-Setup-<version>-Android.apk` from [this fork's la
 - **To update,** install the new APK over the old one. Your library stays.
 - On its own the app plays audio only: videos play as audio, with their picture. Connected to a Musike server (below), it also plays video, streamed by the server as in the browser.
 - **Android TV:** install the same APK on the TV (for example with a file manager app, or `adb install`). Musike shows up in the TV launcher and switches to a remote-friendly interface by itself.
+
+#### YouTube links
+
+- **Share > Musike** from YouTube, YouTube Music or a chat plays that video or song in Musike right away.
+- To have the YouTube links you tap open in Musike: **Settings > Apps > Musike > Open by default > Add links**, and tick the YouTube addresses. If the YouTube app is installed, it holds those links: first turn off **Open supported links** in its own **Open by default**. The names change from phone to phone.
+
+Links to a single video or song work, also from Shorts; a playlist or a channel gets a message instead.
 
 #### Android Auto
 
