@@ -118,6 +118,14 @@ let lang: Lang = readSettings().lang ?? "en";
 const SERVER_DOWN: Record<Lang, (url: string) => string> = {
   en: (url) => `no Musike server answers at ${url}.`,
   "pt-BR": (url) => `nenhum servidor Musike responde em ${url}.`,
+  it: (url) => `nessun server Musike risponde a ${url}.`,
+};
+
+// Asked before a server's own page connects the app to a server.
+const CONNECT: Record<Lang, { buttons: string[]; message: (url: string) => string }> = {
+  en: { buttons: ["Connect", "Cancel"], message: (url) => `Connect Musike to ${url}?` },
+  "pt-BR": { buttons: ["Conectar", "Cancelar"], message: (url) => `Conectar o Musike a ${url}?` },
+  it: { buttons: ["Connetti", "Annulla"], message: (url) => `Connettere Musike a ${url}?` },
 };
 
 function readWindowState(): WindowState {
@@ -309,10 +317,10 @@ ipcMain.handle("musike:connect", async (event, input: unknown): Promise<ConnectR
   if (!fromThisApp(event) && win) {
     const { response } = await dialog.showMessageBox(win, {
       type: "question",
-      buttons: lang === "pt-BR" ? ["Conectar", "Cancelar"] : ["Connect", "Cancel"],
+      buttons: CONNECT[lang].buttons,
       defaultId: 1,
       cancelId: 1,
-      message: lang === "pt-BR" ? `Conectar o Musike a ${url}?` : `Connect Musike to ${url}?`,
+      message: CONNECT[lang].message(url),
     });
     if (response !== 0) return { error: "cancelled" };
   }

@@ -5,4 +5,6 @@
     <string name="playback_pause">Pausa</string>
     <string name="playback_next">Successivo</string>
     <string name="playback_previous">Precedente</string>
+    <string name="car_open_app">Apri Musike sul telefono</string>
+    <string name="car_open_app_hint">Si apre da solo se lo consenti in Impostazioni, Android Auto</string>
 </resources>
