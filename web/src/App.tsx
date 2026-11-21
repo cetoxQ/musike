@@ -15,6 +15,7 @@ import { FloatingVideo, Theater } from "./components/Video";
 import { MD, useMediaQuery } from "./hooks/useMediaQuery";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { getT } from "./i18n";
+import { loadAccountSettings } from "./lib/accountSettings";
 import { capabilities, link, startCar, syncAddress } from "./lib/api";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
@@ -88,6 +89,12 @@ export default function App() {
   // Android Auto's lists (the Android app only).
   useEffect(() => startCar?.(), []);
 
+  // Settings that follow the account (the accent colour...): for whoever is signed in.
+  const userId = useAuth((s) => s.user?.id);
+  useEffect(() => {
+    void loadAccountSettings();
+  }, [userId]);
+
   // The server answers again (the Android app, connected to one): show what it has now.
   useEffect(() => {
     if (!link) return;
@@ -97,6 +104,7 @@ export default function App() {
         void loadLibrary();
         void useRecent.getState().load();
         void useAuth.getState().load();
+        void loadAccountSettings();
       }
       was = link!.online;
     });

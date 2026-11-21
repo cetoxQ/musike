@@ -226,6 +226,8 @@ export const pt: Messages = {
     savedPlaylists: "Playlists salvas",
     alsoLike: "Você também pode gostar",
     custom: "Personalizado",
+    period: "Período",
+    defaultPeriod: "Seu perfil abre em",
     amount: "Quantos",
     unit: "Unidade",
     units: { hours: "horas", days: "dias", weeks: "semanas", months: "meses", years: "anos" },
@@ -240,7 +242,7 @@ export const pt: Messages = {
     title: "Suas reproduções",
     teaser: "Números, gráficos e um relatório para compartilhar",
     period: "Período",
-    periods: { days7: "7 dias", weeks4: "4 semanas", months3: "3 meses", months12: "12 meses", all: "Sempre" },
+    periods: { days7: "7 dias", month1: "1 mês", months3: "3 meses", months12: "12 meses", all: "Sempre" },
     lastN: (n: number, unit: string) => `Últimos ${n} ${unit}`,
     plays: "Reproduções",
     hours: "Horas ouvidas",
@@ -630,7 +632,9 @@ export const pt: Messages = {
     status: (since: string) => `O servidor não responde desde ${since}. O Musike toca e busca pelo celular, com a sua biblioteca como estava.`,
     pending: (n: number) => (n === 1 ? "1 mudança esperando o servidor." : `${n} mudanças esperando o servidor.`),
     retry: "Tentar agora",
-    trying: "Tentando",
+    trying: "Tentando…",
+    tryingLong: "Procurando o servidor, alguns segundos no máximo.",
+    stillGone: (at: string) => `Ainda sem resposta (${at}). Ele continua tentando sozinho.`,
   },
 
   car: {

@@ -104,6 +104,21 @@ export interface RunningServer {
 
 /** Builds the Musike HTTP server (API + web app) and starts listening. */
 
+interface AccountSettings {
+  accent: string | null;
+  profilePeriod: string | null;
+}
+
+const PROFILE_PERIODS = new Set(["7d", "1m", "3m", "12m", "all"]);
+
+/** Only what's known, well formed: a #rrggbb colour, one of the profile's periods. */
+function cleanSettings(v: Record<string, unknown>): AccountSettings {
+  return {
+    accent: typeof v.accent === "string" && /^#[0-9a-f]{6}$/i.test(v.accent) ? v.accent.toLowerCase() : null,
+    profilePeriod: typeof v.profilePeriod === "string" && PROFILE_PERIODS.has(v.profilePeriod) ? v.profilePeriod : null,
+  };
+}
+
 /** The profile's "most played lately". */
 const PROFILE_RANGE_MS = 91 * 24 * 3600_000;
 /** How long the profile's suggestions are kept before they're worked out again. */
@@ -120,6 +135,7 @@ function libraryParts(route: string): LibraryPart[] {
   if (route === "/api/library/import") return ["library", "recent"];
   if (route.startsWith("/api/recent")) return ["recent"];
   if (route === "/api/history/:id") return ["library"];
+  if (route === "/api/profile/settings") return ["settings"];
   if (route === "/api/plays/:id") return ["library", "recent"];
   if (/^\/api\/(favorites|playlists|library\/)/.test(route)) return ["library"];
   return [];
@@ -392,6 +408,25 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
       first: await lib.firstPlay(),
       dated: log.dated,
     };
+  });
+
+  // Settings that follow the account to every device (the accent colour, the profile's default period).
+  const settingsOf = (req: FastifyRequest) => path.join(config.dataDir, "settings", `${req.user?.id ?? DEFAULT_USER}.json`);
+  const readSettings = async (req: FastifyRequest): Promise<AccountSettings> => {
+    try {
+      return cleanSettings(JSON.parse(await fs.promises.readFile(settingsOf(req), "utf8")));
+    } catch {
+      return { accent: null, profilePeriod: null };
+    }
+  };
+  app.get("/api/profile/settings", async (req) => readSettings(req));
+  app.put("/api/profile/settings", async (req) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const next = cleanSettings({ ...(await readSettings(req)), ...body });
+    const file = settingsOf(req);
+    await fs.promises.mkdir(path.dirname(file), { recursive: true });
+    await fs.promises.writeFile(file, JSON.stringify(next));
+    return next;
   });
 
   // The profile picture: one per account, kept as a small image (data: URL) in the data folder.

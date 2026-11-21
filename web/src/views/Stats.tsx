@@ -9,6 +9,7 @@ import { useI18n, useT } from "../i18n";
 import { api, shareImage } from "../lib/api";
 import type { PlayLog } from "../lib/apiTypes";
 import { cn } from "../lib/format";
+import { maxAmount, PERIODS, periodName, sinceOf, UNIT_MS, type PeriodId, type Unit } from "../lib/periods";
 import { reportImage } from "../lib/report";
 import { paths } from "../lib/routes";
 import { computeStats, type Bucket, type Stats as Numbers } from "../lib/stats";
@@ -17,12 +18,6 @@ import { useLibrary } from "../stores/library";
 import { toast } from "../stores/ui";
 import { RankedTracks } from "./Artist";
 
-type Period = "7d" | "4w" | "3m" | "12m" | "all" | "custom";
-type Unit = "hours" | "days" | "weeks" | "months" | "years";
-
-const DAY = 86_400_000;
-const PRESETS: Record<Exclude<Period, "all" | "custom">, number> = { "7d": 7 * DAY, "4w": 28 * DAY, "3m": 91 * DAY, "12m": 365 * DAY };
-const UNIT_MS: Record<Unit, number> = { hours: 3600_000, days: DAY, weeks: 7 * DAY, months: 30.44 * DAY, years: 365.25 * DAY };
 
 /** Your listening in numbers and charts, for a period of your choosing; and a picture of it to share. */
 export default function Stats() {
@@ -30,20 +25,19 @@ export default function Stats() {
   const lang = useI18n((s) => s.lang);
   const user = useAuth((s) => s.user);
   const playsVersion = useLibrary((s) => s.playsVersion);
-  const [period, setPeriod] = useState<Period>("4w");
+  const [period, setPeriod] = useState<PeriodId>("1m");
   const [amount, setAmount] = useState(14);
   const [unit, setUnit] = useState<Unit>("days");
   const [first, setFirst] = useState<number | null>(null);
 
-  const maxAmount = Math.max(1, Math.ceil((first ? Date.now() - first : 0) / UNIT_MS[unit]));
-  const shownAmount = Math.min(Math.max(1, amount), maxAmount);
+  const most = maxAmount(unit, first);
+  const shownAmount = Math.min(Math.max(1, amount), most);
   const key = period === "custom" ? `custom:${shownAmount}:${unit}` : period;
 
   // The period and the same length just before it (to compare), in one request.
   const page = useRemote<{ log: PlayLog; since: number; until: number; compare: boolean }>(`stats:${key}:${playsVersion}`, async (signal) => {
     const until = Date.now();
-    const span = period === "custom" ? shownAmount * UNIT_MS[unit] : period === "all" ? 0 : PRESETS[period];
-    const since = period === "all" ? 0 : Math.max(first ?? 0, until - span);
+    const since = sinceOf(period, { amount: shownAmount, unit }, first, until);
     const compare = period !== "all";
     const log = await api.playLog(compare ? since - (until - since) : 0, until, signal);
     if (log.first != null) setFirst(log.first);
@@ -54,16 +48,8 @@ export default function Stats() {
     [page],
   );
 
-  const periods: [Period, string][] = [
-    ["7d", t.stats.periods.days7],
-    ["4w", t.stats.periods.weeks4],
-    ["3m", t.stats.periods.months3],
-    ["12m", t.stats.periods.months12],
-    ["all", t.stats.periods.all],
-    ["custom", t.profile.custom],
-  ];
-  const periodLabel =
-    period === "custom" ? t.stats.lastN(shownAmount, t.profile.units[unit]) : (periods.find(([p]) => p === period)?.[1] ?? "");
+  const periods: [PeriodId, string][] = PERIODS.map((p) => [p, periodName(t, p)]);
+  const periodLabel = period === "custom" ? t.stats.lastN(shownAmount, t.profile.units[unit]) : periodName(t, period);
 
   const share = async () => {
     if (!stats) return;
@@ -129,7 +115,7 @@ export default function Stats() {
             type="number"
             inputMode="numeric"
             min={1}
-            max={maxAmount}
+            max={most}
             value={shownAmount}
             aria-label={t.profile.amount}
             onChange={(e) => setAmount(Math.trunc(Number(e.target.value)) || 1)}

@@ -232,6 +232,8 @@ export const en = {
     savedPlaylists: "Saved playlists",
     alsoLike: "You might also like",
     custom: "Custom",
+    period: "Period",
+    defaultPeriod: "Your profile opens on",
     amount: "How many",
     unit: "Unit",
     units: { hours: "hours", days: "days", weeks: "weeks", months: "months", years: "years" },
@@ -246,7 +248,7 @@ export const en = {
     title: "Your listening",
     teaser: "Numbers, charts and a report to share",
     period: "Period",
-    periods: { days7: "7 days", weeks4: "4 weeks", months3: "3 months", months12: "12 months", all: "All time" },
+    periods: { days7: "7 days", month1: "1 month", months3: "3 months", months12: "12 months", all: "All time" },
     lastN: (n: number, unit: string) => `Last ${n} ${unit}`,
     plays: "Plays",
     hours: "Hours listened",
@@ -638,7 +640,9 @@ export const en = {
     status: (since: string) => `The server hasn't answered since ${since}. Musike plays and searches from this phone, with your library as it was then.`,
     pending: (n: number) => (n === 1 ? "1 change waiting for the server." : `${n} changes waiting for the server.`),
     retry: "Try now",
-    trying: "Trying",
+    trying: "Trying…",
+    tryingLong: "Reaching the server, a few seconds at most.",
+    stillGone: (at: string) => `Still no answer (${at}). It keeps trying on its own.`,
   },
 
   // Android Auto's lists.

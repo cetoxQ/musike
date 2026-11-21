@@ -60,6 +60,7 @@ const WRITES = [
   "clearRecent",
   "removeFromHistory",
   "forget",
+  "setProfileSettings",
 ] as const;
 type Writes = (typeof WRITES)[number];
 
@@ -82,6 +83,7 @@ const CATALOG = [
   "discover",
   "profileImage",
   "playLog",
+  "profileSettings",
 ] as const;
 
 /** Changes that name a playlist by its id (first argument): one created offline gets the server's id. */
@@ -283,8 +285,12 @@ export function offlineCapable({ url, server, phone }: Options) {
 
   let trying: Promise<boolean> | null = null;
   /** Tries the server; back: the queue goes, the copy is refreshed, the app reloads what it shows. */
-  function retry(): Promise<boolean> {
+  /** Asked by a button: the result is said, back or not. */
+  let manualTry = false;
+
+  function retry(manual = false): Promise<boolean> {
     if (online) return Promise.resolve(true);
+    if (manual) manualTry = true;
     trying ??= (async () => {
       const ok = await healthy();
       if (!ok) {
@@ -312,7 +318,8 @@ export function offlineCapable({ url, server, phone }: Options) {
       if (queued().length) void flush().then((r) => r.done || wentAway());
       // Back within the quick tries, with nothing sent: nothing to say (nothing was said either).
       if (waiting) toast(t().backSent(sent));
-      else if (told) toast(t().back);
+      else if (told || manualTry) toast(t().back);
+      manualTry = false;
       lastSnapshot = 0;
       void snapshot();
       changed();

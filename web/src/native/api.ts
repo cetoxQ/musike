@@ -72,6 +72,7 @@ const SYSTEM: SystemInfo = {
 };
 
 const PROFILE_IMAGE = "musike:profile-image";
+const ACCOUNT_SETTINGS = "musike:account-settings";
 
 /** The phone's own engine (YouTube, from the phone) over a library: the phone's own, or the copy of a server account's. */
 function phoneApi(lib: library.LibraryStore): MusikeApi {
@@ -145,6 +146,25 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
         dated: log.dated,
       };
     }, signal),
+  // On the phone on its own: kept in the app's storage, like the rest of its settings.
+  profileSettings: async () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(ACCOUNT_SETTINGS) ?? "{}") as { accent?: string; profilePeriod?: string };
+      return { accent: v.accent ?? null, profilePeriod: v.profilePeriod ?? null };
+    } catch {
+      return { accent: null, profilePeriod: null };
+    }
+  },
+  setProfileSettings: async (patch) => {
+    let v: { accent: string | null; profilePeriod: string | null } = { accent: null, profilePeriod: null };
+    try {
+      v = { ...v, ...(JSON.parse(localStorage.getItem(ACCOUNT_SETTINGS) ?? "{}") as object), ...patch };
+      localStorage.setItem(ACCOUNT_SETTINGS, JSON.stringify(v));
+    } catch {
+      /* this session only */
+    }
+    return v;
+  },
   // On the phone: kept in the app's storage.
   profileImage: async () => {
     try {

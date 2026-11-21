@@ -23,6 +23,8 @@ function libraryChanged(parts: unknown, history: unknown) {
   if (parts.includes("history") && Array.isArray(history)) useLibrary.setState({ history: history as Track[] });
   if (parts.includes("library")) stale.add("library");
   if (parts.includes("recent")) stale.add("recent");
+  // Small: fetched at once, so the colour changes on every open device.
+  if (parts.includes("settings")) void import("../lib/accountSettings").then((m) => m.loadAccountSettings());
   refreshStale();
 }
 

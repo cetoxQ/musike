@@ -69,8 +69,8 @@ export interface ServerLink {
   /** Changes waiting for the server. */
   pending: number;
   subscribe(fn: () => void): () => void;
-  /** Try the server now; true once it answers. */
-  retry(): Promise<boolean>;
+  /** Try the server now; true once it answers. manual: asked by a button, so the result is always said. */
+  retry(manual?: boolean): Promise<boolean>;
   /** Connected: is the server still there? If not, the app goes on from the phone (false). */
   check(): Promise<boolean>;
 }
@@ -208,6 +208,9 @@ export interface MusikeApi {
   topPlays(range: TopRange, limit?: number, signal?: AbortSignal): Promise<{ plays: PlayEntry[]; first: number | null }>;
   /** Your listening between two times (ms), for the statistics. */
   playLog(since: number, until: number, signal?: AbortSignal): Promise<PlayLog>;
+  /** Settings that follow the account: the accent colour, the profile's default period. */
+  profileSettings(signal?: AbortSignal): Promise<{ accent: string | null; profilePeriod: string | null }>;
+  setProfileSettings(patch: { accent?: string | null; profilePeriod?: string | null }): Promise<{ accent: string | null; profilePeriod: string | null }>;
   /** The profile picture (a data: URL), or null for the default. */
   profileImage(signal?: AbortSignal): Promise<string | null>;
   setProfileImage(image: string | null): Promise<string | null>;

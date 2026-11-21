@@ -125,6 +125,8 @@
   .scroll-area {
     scrollbar-width: thin;
     scrollbar-color: var(--surface-4) transparent;
+    /* A list scrolled past its end stops there: the page behind a dialog or a sheet doesn't move. */
+    overscroll-behavior: contain;
   }
 
   .safe-bottom {

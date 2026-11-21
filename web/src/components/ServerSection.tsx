@@ -1,4 +1,4 @@
-import { ArrowClockwiseIcon, CloudArrowUpIcon, CloudSlashIcon, DesktopIcon, DeviceMobileIcon, HardDrivesIcon, WarningIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, CircleNotchIcon, CloudArrowUpIcon, CloudSlashIcon, DesktopIcon, DeviceMobileIcon, HardDrivesIcon, WarningIcon } from "@phosphor-icons/react";
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { useT } from "../i18n";
 import { connection, link } from "../lib/api";
@@ -145,6 +145,8 @@ function OfflineNote() {
   // Re-renders when the server comes and goes (or a change is queued).
   const state = useSyncExternalStore(link?.subscribe ?? noLink, () => (link ? `${link.online}:${link.pending}:${link.since}` : ""));
   const [trying, setTrying] = useState(false);
+  // The last try's answer, shown under the button for a while: a button that does nothing visible looks broken.
+  const [failed, setFailed] = useState(0);
   if (!link || link.online || !state) return null;
   const since = new Date(link.since ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return (
@@ -156,17 +158,28 @@ function OfflineNote() {
           {link.pending > 0 && <> {t.offline.pending(link.pending)}</>}
         </span>
       </p>
-      <button
-        type="button"
-        disabled={trying}
-        onClick={() => {
-          setTrying(true);
-          void link?.retry().finally(() => setTrying(false));
-        }}
-        className="flex h-10 items-center justify-center gap-2 self-start rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3 disabled:opacity-50"
-      >
-        <ArrowClockwiseIcon size={16} /> {trying ? t.offline.trying : t.offline.retry}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={trying}
+          aria-busy={trying}
+          onClick={() => {
+            setTrying(true);
+            setFailed(0);
+            void link
+              ?.retry(true)
+              .then((ok) => !ok && setFailed(Date.now()))
+              .finally(() => setTrying(false));
+          }}
+          className="flex h-10 items-center justify-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3 disabled:cursor-wait"
+        >
+          {trying ? <CircleNotchIcon size={16} className="animate-spin" /> : <ArrowClockwiseIcon size={16} />}
+          {trying ? t.offline.trying : t.offline.retry}
+        </button>
+        <span aria-live="polite" className="text-xs text-fg-2">
+          {trying ? t.offline.tryingLong : failed ? t.offline.stillGone(new Date(failed).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })) : ""}
+        </span>
+      </div>
     </div>
   );
 }

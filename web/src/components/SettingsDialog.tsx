@@ -6,6 +6,7 @@ import {
   MoonIcon,
   ShareNetworkIcon,
   SunIcon,
+  UserCircleIcon,
   TranslateIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
@@ -14,6 +15,8 @@ import { LANGUAGES, useI18n, useT, type Lang } from "../i18n";
 import { capabilities, type Channel } from "../lib/api";
 import { cn } from "../lib/format";
 import { useShare } from "../lib/share";
+import { saveAccountSettings, useAccountSettings } from "../lib/accountSettings";
+import { DEFAULT_PERIODS, periodName, type PeriodId } from "../lib/periods";
 import { car } from "../lib/api";
 import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
@@ -166,6 +169,8 @@ export function SettingsDialog() {
         </section>
 
         <ShareSection />
+
+        <ProfileSection />
 
         {car && <CarSection />}
 
@@ -341,6 +346,31 @@ function CarSection() {
           </button>
         )}
       </div>
+    </section>
+  );
+}
+
+/** The period the profile's "most played" opens on (follows the account with a server). */
+function ProfileSection() {
+  const t = useT();
+  const period = useAccountSettings((s) => s.profilePeriod) ?? "1m";
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-1.5 text-xs font-medium text-fg-3">
+        <UserCircleIcon size={14} /> {t.profile.defaultPeriod}
+      </h3>
+      <select
+        value={period}
+        aria-label={t.profile.defaultPeriod}
+        onChange={(e) => saveAccountSettings({ profilePeriod: e.target.value as PeriodId })}
+        className="h-10 rounded-full bg-surface-1 px-4 text-sm ring-1 ring-line focus:ring-accent focus:outline-none"
+      >
+        {DEFAULT_PERIODS.map((p) => (
+          <option key={p} value={p}>
+            {periodName(t, p)}
+          </option>
+        ))}
+      </select>
     </section>
   );
 }

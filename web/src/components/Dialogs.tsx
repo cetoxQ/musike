@@ -25,17 +25,6 @@ export function ForgetDialog() {
         <div className="flex flex-col gap-2">
           <button
             type="button"
-            onClick={() => {
-              if (track) void useLibrary.getState().forget(track.id);
-              close();
-            }}
-            className="flex flex-col items-center justify-center rounded-[16px] bg-danger px-4 py-3 text-white transition-transform active:scale-[0.98]"
-          >
-            <span className="text-[15px] font-bold tracking-wide">Damnatio Memoriae</span>
-            <span className="text-xs text-white/85">{t.forget.damnatioHint}</span>
-          </button>
-          <button
-            type="button"
             disabled={!inHistory}
             onClick={() => {
               if (track) void useLibrary.getState().removeFromHistory(track.id);
@@ -46,6 +35,17 @@ export function ForgetDialog() {
             {t.forget.remove}
           </button>
           {!inHistory && <p className="text-center text-xs text-fg-3">{t.forget.notInHistory}</p>}
+          <button
+            type="button"
+            onClick={() => {
+              if (track) void useLibrary.getState().forget(track.id);
+              close();
+            }}
+            className="flex flex-col items-center justify-center rounded-[16px] bg-danger px-4 py-3 text-white transition-transform active:scale-[0.98]"
+          >
+            <span className="text-[15px] font-bold tracking-wide">Damnatio Memoriae</span>
+            <span className="text-xs text-white/85">{t.forget.damnatioHint}</span>
+          </button>
         </div>
       </div>
     </Modal>

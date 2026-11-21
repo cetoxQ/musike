@@ -99,7 +99,7 @@ export interface DeviceInfo {
 }
 
 /** What changed in an account's library: the lists (favorites, saved, playlists), the Recent list, the history. */
-export type LibraryPart = "library" | "recent" | "history";
+export type LibraryPart = "library" | "recent" | "history" | "settings";
 
 export type ServerMessage =
   | { type: "devices"; you: string; active: string | null; devices: DeviceInfo[] }

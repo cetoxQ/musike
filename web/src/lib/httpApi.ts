@@ -151,6 +151,10 @@ export function httpBackend(opts: HttpBackendOptions) {
       ),
     playLog: (since: number, until: number, signal?: AbortSignal) =>
       request<PlayLog>(`/api/profile/log?since=${Math.round(since)}&until=${Math.round(until)}`, { signal }),
+    profileSettings: (signal?: AbortSignal) =>
+      request<{ accent: string | null; profilePeriod: string | null }>("/api/profile/settings", { signal }),
+    setProfileSettings: (patch: { accent?: string | null; profilePeriod?: string | null }) =>
+      request<{ accent: string | null; profilePeriod: string | null }>("/api/profile/settings", { method: "PUT", json: patch }),
     profileImage: (signal?: AbortSignal) => request<{ image: string | null }>("/api/profile/image", { signal }).then((r) => r.image),
     setProfileImage: (image: string | null) =>
       request<{ image: string | null }>("/api/profile/image", { method: "PUT", json: { image } }).then((r) => r.image),

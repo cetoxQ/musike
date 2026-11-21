@@ -12,8 +12,10 @@ import { useRemote } from "../hooks/useRemote";
 import { useI18n, useT } from "../i18n";
 import { learnTypes, useAlbumTypes } from "../lib/albumTypes";
 import { api, capabilities } from "../lib/api";
-import { cn, shuffled } from "../lib/format";
+import { shuffled } from "../lib/format";
 import { saysLive } from "../lib/live";
+import { useAccountSettings } from "../lib/accountSettings";
+import { maxAmount, PERIODS, periodName, sinceOf, UNIT_MS, type PeriodId, type Unit } from "../lib/periods";
 import { paths } from "../lib/routes";
 import type { AlbumCard, Discover, PlayEntry } from "../lib/types";
 import type { TopRange } from "../lib/apiTypes";
@@ -23,16 +25,6 @@ import { useLibrary } from "../stores/library";
 import { toast } from "../stores/ui";
 import { RankedTracks } from "./Artist";
 
-type Range = "3m" | "all" | "custom";
-type Unit = "hours" | "days" | "weeks" | "months" | "years";
-
-const UNIT_MS: Record<Unit, number> = {
-  hours: 3600_000,
-  days: 86_400_000,
-  weeks: 7 * 86_400_000,
-  months: 30.44 * 86_400_000,
-  years: 365.25 * 86_400_000,
-};
 
 /** A picture from the gallery, cropped square and made small (a few tens of KB). */
 async function squarePicture(file: File): Promise<string> {
@@ -56,24 +48,27 @@ export default function Profile() {
   const { favorites, artists, albums, playlists, ytPlaylists, history, playsVersion } = useLibrary();
   const playList = usePlayer((s) => s.playList);
 
-  // Most played: the last 3 months, unless there's too little there (then ever), all time, or a period of your own
-  // (never further back than the first play on record).
-  const [range, setRange] = useState<Range>("3m");
-  const [picked, setPicked] = useState(false);
+  // Most played: the period from Settings (1 month unless changed), all time if it has too little, or one you
+  // pick (a custom one never further back than the first play on record).
+  const fallback = useAccountSettings((s) => s.profilePeriod) ?? "1m";
+  const [chosen, setChosen] = useState<PeriodId | null>(null);
+  const [auto, setAuto] = useState<PeriodId | null>(null);
+  const range = chosen ?? auto ?? fallback;
+  const picked = chosen != null;
+  const setRange = (p: PeriodId) => setChosen(p);
   const [amount, setAmount] = useState(7);
   const [unit, setUnit] = useState<Unit>("days");
   const [first, setFirst] = useState<number | null>(null);
-  const span = first ? Date.now() - first : 0;
-  const maxAmount = Math.max(1, Math.ceil(span / UNIT_MS[unit]));
-  const shownAmount = Math.min(Math.max(1, amount), maxAmount);
-  const asked: TopRange = range === "custom" ? { since: Math.max(first ?? 0, Date.now() - shownAmount * UNIT_MS[unit]) } : range;
+  const most = maxAmount(unit, first);
+  const shownAmount = Math.min(Math.max(1, amount), most);
+  const asked: TopRange = range === "all" ? "all" : { since: sinceOf(range, { amount: shownAmount, unit }, first) };
   const key = range === "custom" ? `custom:${shownAmount}:${unit}` : range;
   const top = useRemote<{ plays: PlayEntry[]; first: number | null }>(`profile-top:${key}:${playsVersion}`, (signal) =>
     api.topPlays(asked, 20, signal),
   );
   useEffect(() => {
     if (top.status === "ok") setFirst(top.data.first);
-    if (!picked && range === "3m" && top.status === "ok" && top.data.plays.length < 5) setRange("all");
+    if (!picked && range !== "all" && top.status === "ok" && top.data.plays.length < 5) setAuto("all");
   }, [top.status, picked, range]);
   const topTracks = top.status === "ok" ? top.data.plays.map((p) => ({ ...p.track, plays: t.artist.yourPlays(p.count) })) : [];
 
@@ -198,32 +193,18 @@ export default function Profile() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-6 pb-1 md:px-6">
         <h2 className="text-xl font-semibold tracking-tight">{t.profile.top}</h2>
-        <div role="radiogroup" aria-label={t.profile.top} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
-          {(
-            [
-              ["3m", t.profile.lately],
-              ["all", t.profile.ever],
-              ["custom", t.profile.custom],
-            ] as [Range, string][]
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={range === value}
-              onClick={() => {
-                setPicked(true);
-                setRange(value);
-              }}
-              className={cn(
-                "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors",
-                range === value ? "bg-surface-3 text-fg" : "text-fg-2 hover:text-fg",
-              )}
-            >
-              {label}
-            </button>
+        <select
+          value={range}
+          aria-label={t.profile.period}
+          onChange={(e) => setRange(e.target.value as PeriodId)}
+          className="h-9 rounded-full bg-surface-1 px-3 text-sm font-medium ring-1 ring-line focus:ring-accent focus:outline-none"
+        >
+          {PERIODS.map((p) => (
+            <option key={p} value={p}>
+              {periodName(t, p)}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
       {range === "custom" && (
         <div className="flex flex-wrap items-center gap-2 px-4 pt-2 md:px-6">
@@ -231,7 +212,7 @@ export default function Profile() {
             type="number"
             inputMode="numeric"
             min={1}
-            max={maxAmount}
+            max={most}
             value={shownAmount}
             aria-label={t.profile.amount}
             onChange={(e) => setAmount(Math.trunc(Number(e.target.value)) || 1)}
