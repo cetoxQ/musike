@@ -8,4 +8,6 @@
     <string name="playback_pause">Tạm dừng</string>
     <string name="playback_next">Bài sau</string>
     <string name="playback_previous">Bài trước</string>
+    <string name="car_open_app">Mở Musike trên điện thoại</string>
+    <string name="car_open_app_hint">Ứng dụng tự mở nếu được cho phép trong Cài đặt, Android Auto</string>
 </resources>

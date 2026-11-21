@@ -33,14 +33,21 @@ function Segmented<T extends string>({
   value,
   options,
   onChange,
+  grid = false,
 }: {
   label: string;
   value: T;
   options: [T, ReactNode][];
   onChange: (v: T) => void;
+  /** Two per row: for longer lists (the languages), which don't fit one row on a phone. */
+  grid?: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn("bg-surface-1 p-1 ring-1 ring-line", grid ? "grid grid-cols-2 gap-1 rounded-[22px]" : "flex rounded-full")}
+    >
       {options.map(([v, content]) => (
         <button
           key={v}
@@ -175,6 +182,7 @@ export function SettingsDialog() {
             label={t.settings.language}
             value={lang}
             onChange={setLang}
+            grid={LANGUAGES.length > 3}
             options={LANGUAGES.map(({ id, name }): [Lang, ReactNode] => [id, <span lang={id}>{name}</span>])}
           />
         </section>
