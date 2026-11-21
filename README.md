@@ -59,9 +59,9 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 
 **One library, every device**
 - A Musike server with [accounts](#accounts) is the library: the browser, the Android app and the Windows app connect to it (**Settings > Server**) and show the same favorites, playlists, history and play counts
-- **Live:** a change on one device (a favorite, a playlist, a track played) shows up on the others within seconds, without reloading
+- **Live** (over [HTTPS](#http-or-https)): a change on one device (a favorite, a playlist, a track played) shows up on the others within seconds, without reloading
 - **Offline on the phone:** when the server can't be reached, the Android app keeps playing and searching from its own copy of your library, queues your changes and sends them when the server is back. It tries 5 times in the first seconds, then every 20 seconds; **Try now** in Settings says what happened
-- **Devices:** every device open with your account appears in the Devices button. One plays at a time and the others are its remote: play, pause, seek, skip, volume, the queue, or move playback to this device
+- **Devices** (over [HTTPS](#http-or-https)): every device open with your account appears in the Devices button. One plays at a time and the others are its remote: play, pause, seek, skip, volume, the queue, or move playback to this device
 
 **You**
 - **Profile,** laid out like an artist's page: your most played tracks for a period you choose (7 days to all time, or a custom range), your albums, singles and live recordings, the artists you follow, your playlists and saved playlists, and **You might also like**, from what you listen to. A profile picture from the gallery, and an accent color that follows your account on every device
@@ -107,6 +107,22 @@ The Android and Windows apps work on their own, with no other computer. Connecte
 | **When the server can't be reached** | Nothing changes | Android keeps playing and searching from its own copy of the library, audio only, and sends the changes when the server is back. Windows offers to try again, or to use this computer's own library, which is a separate one |
 | **YouTube's bot check** | Depends on the device's connection: mobile data, shared by many people, gets it more often | Depends on the server's connection: rarely from home, more often through a VPN (the [pot service](#docker-behind-a-vpn) helps) |
 | **Android Auto** | Yes | Yes |
+
+### HTTP or HTTPS
+
+At home, Musike works over plain `http://`. With `https://` in front (a reverse proxy with a certificate, or a VPN that serves HTTPS), you also get:
+
+- **Devices and live changes.** Other devices as remotes, and a change on one device showing up on the others within seconds. Browsers and the apps open that connection only over `https://`. Over `http://`, what changed elsewhere shows up when you come back to Musike after a minute away.
+- **The browser as an app.** Installing Musike from the browser (PWA) needs `https://`, and so does the system's share sheet: over `http://`, links are copied and the report is downloaded instead.
+- **Privacy on the network.** Over `http://` your password, your session and what you play travel unencrypted, readable by anyone on the same network. At home, with devices you trust, that's acceptable; from outside, use `https://` or a VPN to your home.
+
+A VPN to your home encrypts the traffic even over `http://`, but the browser still sees `http://` and keeps the devices' connection off. Playback, the library, accounts, statistics, lyrics and Android Auto work the same either way.
+
+Setting up `https://`:
+
+- The certificate must be one the devices trust: browsers and the Android app refuse a self-signed one. A free certificate for a domain of yours works even at home, without opening ports (with a DNS challenge), and so does a VPN that serves HTTPS.
+- A reverse proxy must let WebSocket connections through, for `/api/sync` (with nginx: `proxy_http_version 1.1` and the `Upgrade` and `Connection` headers). Without them Musike works, but Devices shows no other device and changes made elsewhere don't arrive live.
+- Behind a reverse proxy, also set `MUSIKE_TRUST_PROXY` (see [Accounts](#accounts)).
 
 ## Features
 
@@ -355,7 +371,7 @@ volumes:
 docker compose up -d   # then open http://<that machine>:4180 and create the admin account
 ```
 
-Every variable in [Configuration](#configuration) goes under `environment:` the same way, for example `YTDLP_CHANNEL: "nightly"` to keep yt-dlp up to date, `MUSIKE_CACHE_MAX_MB: "4096"` for a bigger video cache, or `MUSIKE_TRUST_PROXY` behind a reverse proxy. Without `MUSIKE_AUTH` there are no accounts: one library, open to anyone who reaches the port.
+Over plain `http://` there are no Devices and no live changes between devices: see [HTTP or HTTPS](#http-or-https). Every variable in [Configuration](#configuration) goes under `environment:` the same way, for example `YTDLP_CHANNEL: "nightly"` to keep yt-dlp up to date, `MUSIKE_CACHE_MAX_MB: "4096"` for a bigger video cache, or `MUSIKE_TRUST_PROXY` behind a reverse proxy. Without `MUSIKE_AUTH` there are no accounts: one library, open to anyone who reaches the port.
 
 The same file, with comments, is this fork's [docker-compose.yml](docker-compose.yml): `curl -O https://raw.githubusercontent.com/yourboiava/musike/local/docker-compose.yml` downloads it. Behind a VPN, see [below](#docker-behind-a-vpn).
 
