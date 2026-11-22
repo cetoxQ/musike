@@ -217,8 +217,11 @@ export interface MusikeApi {
   loudness(id: string): Promise<number | null>;
   /** The video qualities a track comes in on the server (quality lines, e.g. 720), and the server's limit. */
   videoQualities(id: string): Promise<{ qualities: number[]; max: number }>;
-  /** Downloads a video ahead on the server in a quality: resolves when it's ready to play. */
-  prepareVideo(id: string, height: number): Promise<void>;
+  /**
+   * Downloads a video ahead on the server in a quality: resolves when it's ready to play, with the quality it really
+   * has (the nearest under the one asked for, when the video doesn't have that). `signal`: no longer wanted.
+   */
+  prepareVideo(id: string, height: number, signal?: AbortSignal): Promise<number>;
   /** Fetches a track's audio ahead (into the server's cache; on the phone alone, its stream resolved): returns at once. */
   prefetchAudio(id: string): Promise<void>;
 

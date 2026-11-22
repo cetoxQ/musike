@@ -1,5 +1,5 @@
 import { ArrowsInIcon, ArrowsOutIcon, ArrowsOutSimpleIcon, CornersInIcon, CornersOutIcon, XIcon } from "@phosphor-icons/react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { create } from "zustand";
@@ -7,14 +7,15 @@ import { MD, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { appFullscreen } from "../lib/api";
 import { cn } from "../lib/format";
-import { selectCurrent, usePlayer, useStatusText, videoEl } from "../player/player";
+import { selectCurrent, usePlayer, useStatusText, videoBox, videoEl } from "../player/player";
 import { useUi } from "../stores/ui";
 import { FavoriteButton, QualityButton, Scrubber, Transport, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
 
 /**
- * One <video> element serves every place video can appear. It is re-parented into the highest-priority
- * mounted slot; moving a media element within the document does not interrupt playback.
+ * One video box (the player's two <video> elements, see player.ts) serves every place video can appear. It is
+ * re-parented into the highest-priority mounted slot; moving a media element within the document does not interrupt
+ * playback.
  */
 export const SLOT = { theater: 50, sheet: 30, panel: 20, floating: 5 } as const;
 
@@ -26,14 +27,14 @@ const holder = document.createElement("div");
 holder.setAttribute("aria-hidden", "true");
 holder.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0;pointer-events:none;overflow:hidden";
 document.body.appendChild(holder);
-holder.appendChild(videoEl);
+holder.appendChild(videoBox);
 
 const useSlots = create<{ top: number }>(() => ({ top: 0 }));
 
 function place() {
   const best = [...slots.values()].sort((a, b) => b.priority - a.priority)[0];
   const target = best?.el ?? holder;
-  if (videoEl.parentElement !== target) target.appendChild(videoEl);
+  if (videoBox.parentElement !== target) target.appendChild(videoBox);
   useSlots.setState({ top: best?.priority ?? 0 });
 }
 
@@ -53,11 +54,21 @@ export function VideoSlot({
 }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
+  // A slot counts only while it's really on screen: the desktop's side panel stays mounted, hidden, on smaller
+  // screens, and took the video there (into nothing), so the floating player never showed on a phone.
   useLayoutEffect(() => {
+    const el = ref.current!;
     const id = ++seq;
-    slots.set(id, { el: ref.current!, priority });
-    place();
+    const update = () => {
+      if (el.getClientRects().length > 0) slots.set(id, { el, priority });
+      else slots.delete(id);
+      place();
+    };
+    update();
+    const watch = new ResizeObserver(update);
+    watch.observe(el);
     return () => {
+      watch.disconnect();
       slots.delete(id);
       place();
     };
@@ -85,43 +96,83 @@ export function VideoSlot({
   );
 }
 
-/** Small floating player shown when video is playing but no larger video surface is on screen. */
+/** Where the floating video was dragged to (for as long as the page is open), and the track it was closed on. */
+const useFloating = create<{ x: number; y: number; closedOn: string | null }>(() => ({ x: 0, y: 0, closedOn: null }));
+
+/**
+ * Small floating player shown when video is playing here but no larger video surface is on screen. It can be dragged
+ * anywhere on the screen and closed (the track plays on; the next one brings it back). Tapped, the cinema view.
+ */
 export function FloatingVideo() {
-  const isVideo = usePlayer((s) => s.mediaKind === "video" && s.queue.length > 0);
+  // A video playing on this device: while it controls another one, its own video is only a still frame.
+  const track = usePlayer((s) => (s.mediaKind === "video" && !s.remote ? (s.queue[s.index]?.id ?? null) : null));
   const top = useSlots((s) => s.top);
+  const closedOn = useFloating((s) => s.closedOn);
   const t = useT();
   const isMd = useMediaQuery(MD);
-  const show = isVideo && top < SLOT.panel;
+  const show = !!track && top < SLOT.panel && closedOn !== track;
+  const x = useMotionValue(useFloating.getState().x);
+  const y = useMotionValue(useFloating.getState().y);
+  const bounds = useRef<HTMLDivElement>(null);
+  /** A drag ends in a click on the surface: that one doesn't open the cinema view. */
+  const dragged = useRef(false);
 
   return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          initial={{ opacity: 0, y: 16, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.96 }}
-          transition={{ type: "spring", stiffness: 420, damping: 36 }}
-          className={cn(
-            "group fixed z-30 overflow-hidden rounded-2xl border border-line-strong bg-black shadow-[0_16px_40px_rgb(0_0_0/0.5)]",
-            isMd
-              ? "right-4 bottom-[112px] w-72"
-              : "right-3 bottom-[calc(140px+env(safe-area-inset-bottom))] w-44",
-          )}
-        >
-          <VideoSlot priority={SLOT.floating} className="aspect-video w-full" />
-          <button
-            type="button"
-            onClick={openTheater}
-            aria-label={t.video.maximize}
-            className="absolute inset-0 grid place-items-end p-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+    <>
+      {/* The area it can be dragged in: the screen, clear of its edges, the header, and the player and tabs below. */}
+      <div
+        ref={bounds}
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-2 top-[calc(env(safe-area-inset-top)+60px)] bottom-[calc(132px+env(safe-area-inset-bottom))] md:top-2 md:bottom-[104px]"
+      />
+      <AnimatePresence>
+        {show && (
+          <motion.div
+            drag
+            dragConstraints={bounds}
+            dragMomentum={false}
+            dragElastic={0.04}
+            onDragStart={() => (dragged.current = true)}
+            onDragEnd={() => {
+              useFloating.setState({ x: x.get(), y: y.get() });
+              setTimeout(() => (dragged.current = false), 0);
+            }}
+            style={{ x, y }}
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 420, damping: 36 }}
+            className={cn(
+              "group fixed z-30 cursor-grab touch-none overflow-hidden rounded-2xl border border-line-strong bg-black shadow-[0_16px_40px_rgb(0_0_0/0.5)] active:cursor-grabbing",
+              isMd
+                ? "right-4 bottom-[112px] w-72"
+                : "right-3 bottom-[calc(140px+env(safe-area-inset-bottom))] w-44",
+            )}
           >
-            <span className="grid size-8 place-items-center rounded-full bg-black/60 text-white backdrop-blur-sm">
-              <ArrowsOutSimpleIcon size={16} />
-            </span>
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <VideoSlot priority={SLOT.floating} className="pointer-events-none aspect-video w-full" />
+            <button
+              type="button"
+              onClick={() => !dragged.current && openTheater()}
+              aria-label={t.video.maximize}
+              className="absolute inset-0 grid place-items-end p-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+            >
+              <span className="grid size-8 place-items-center rounded-full bg-black/60 text-white backdrop-blur-sm">
+                <ArrowsOutSimpleIcon size={16} />
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => !dragged.current && useFloating.setState({ closedOn: track })}
+              aria-label={t.video.close}
+              title={t.video.close}
+              className="absolute top-1.5 left-1.5 grid size-8 place-items-center rounded-full bg-black/60 text-white opacity-100 backdrop-blur-sm transition-opacity md:opacity-0 md:group-hover:opacity-100"
+            >
+              <XIcon size={15} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

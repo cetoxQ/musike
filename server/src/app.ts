@@ -45,7 +45,7 @@ import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./s
 import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
 import { cacheAudio, cachedAudio } from "./audioCache.js";
-import { downloadVideo, loudnessOf, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
+import { downloadVideo, heightOfFile, loudnessOf, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -98,6 +98,15 @@ function heightOf(q: unknown): number {
   const height = Math.trunc(Number(h));
   if (Number.isFinite(height) && height >= 144 && height <= 4320) return height;
   return legacy === "hd" ? 720 : 0;
+}
+
+/** Aborted when the client goes away before its answer is sent. */
+function gone(reply: FastifyReply): AbortSignal {
+  const controller = new AbortController();
+  reply.raw.on("close", () => {
+    if (!reply.raw.writableFinished) controller.abort(new Error("the client went away"));
+  });
+  return controller.signal;
 }
 
 function query(q: unknown): string {
@@ -590,13 +599,15 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
    * A video downloaded ahead in a quality (?h=, e.g. 1080), so the player can switch to it without waiting: the
    * Auto quality does this when the video is shown big. /hd is the older name for 720.
    */
-  const prepareVideo = async (id: string, height: number) => {
-    if (height <= 360 && (await resolveStreams(id)).video) return { ready: true };
-    await downloadVideo(id, height);
-    return { ready: true };
+  const prepareVideo = async (id: string, height: number, reply: FastifyReply) => {
+    if (height <= 360 && (await resolveStreams(id)).video) return { ready: true, height: 360 };
+    // The player gone (it skipped the track): it no longer waits for this download (see downloadVideo).
+    const file = await downloadVideo(id, height, gone(reply));
+    // The quality it really has: the nearest under the one asked for, when the video doesn't have that.
+    return { ready: true, height: heightOfFile(file) };
   };
-  app.post("/api/prepare/:id/video", async (req) => prepareVideo(videoId(req.params), heightOf(req.query)));
-  app.post("/api/prepare/:id/hd", async (req) => prepareVideo(videoId(req.params), 720));
+  app.post("/api/prepare/:id/video", async (req, reply) => prepareVideo(videoId(req.params), heightOf(req.query), reply));
+  app.post("/api/prepare/:id/hd", async (req, reply) => prepareVideo(videoId(req.params), 720, reply));
 
   /**
    * The audio of a track coming up, fetched into the cache in the background (the answer doesn't wait for it): when
@@ -623,7 +634,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
       const resolved = await resolveStreams(id);
       if (resolved.video) return proxyStream(req, reply, id, "video");
     }
-    return serveFile(req, reply, await downloadVideo(id, height || 360), "video/mp4");
+    return serveFile(req, reply, await downloadVideo(id, height || 360, gone(reply)), "video/mp4");
   });
 
   // Library

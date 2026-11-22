@@ -173,11 +173,35 @@ interface PlayerState {
 // On iOS this is the native player behind the same API (see lib/audio.ts).
 const audio = createAudio();
 
-export const videoEl = document.createElement("video");
-videoEl.playsInline = true;
-videoEl.preload = "auto";
-videoEl.setAttribute("playsinline", "");
-videoEl.className = "block h-full w-full object-contain bg-black";
+function makeVideo(): HTMLVideoElement {
+  const v = document.createElement("video");
+  v.playsInline = true;
+  v.preload = "auto";
+  v.setAttribute("playsinline", "");
+  v.className = "absolute inset-0 block h-full w-full object-contain bg-black";
+  return v;
+}
+
+/**
+ * Two <video> elements, one over the other: the one playing (`videoEl`), and one where another quality of the same
+ * video gets ready, hidden, to take over without a gap (see swapQuality).
+ */
+const videos = [makeVideo(), makeVideo()] as const;
+export let videoEl: HTMLVideoElement = videos[0];
+const standbyVideo = () => (videoEl === videos[0] ? videos[1] : videos[0]);
+/** What the video slots show (components/Video.tsx moves it around the page): the two <video> elements. */
+export const videoBox = document.createElement("div");
+// Its own stacking context: the two <video>s' order stays inside, under whatever a slot puts over the video.
+videoBox.className = "relative isolate h-full w-full bg-black";
+videoBox.append(...videos);
+/** The one playing in front; the other one invisible behind it (still decoding, so it's ready when it takes over). */
+function showPlaying() {
+  for (const v of videos) {
+    v.style.opacity = v === videoEl ? "1" : "0";
+    v.style.zIndex = v === videoEl ? "1" : "0";
+  }
+}
+showPlaying();
 
 const mediaFor = (k: Kind): HTMLMediaElement => (k === "video" ? videoEl : audio);
 
@@ -203,6 +227,12 @@ const sdFor = new Map<string, boolean>();
 let hdPending: Promise<unknown> | null = null;
 /** How long a quality may take to be ready before SD plays meanwhile: a file already in the cache answers sooner. */
 const HD_GRACE_MS = 1200;
+/** Skips closer together than this, in Video mode, are a skipping-through: only where it stops is loaded. */
+const SKIP_BURST_MS = 1200;
+/** How long the skipping has to pause for the track it stopped on to load. */
+const SKIP_SETTLE_MS = 450;
+/** How far ahead of the picture the next quality gets ready, to take over when the picture gets there. */
+const SWAP_LEAD_S = 1.5;
 /** How many tracks of the queue are got ready ahead. */
 const AHEAD = 2;
 /** Told by the video's size on screen. */
@@ -346,11 +376,21 @@ export const usePlayer = create<PlayerState>((set, get) => {
     });
   }
 
-  /** `ready`: the quality is known to be downloaded already (it takes over from SD, see upgrade). */
-  function load(index: number, opts: { autoplay?: boolean; startAt?: number; ready?: boolean } = {}) {
+  /** The server work for the track loading (its quality's download): given up when another track loads. */
+  let loadWork = new AbortController();
+  /** Skipping through in Video mode: the track it stopped on loads after this (see skipTo). */
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  let lastSkip = 0;
+
+  function load(index: number, opts: { autoplay?: boolean; startAt?: number } = {}) {
+    clearTimeout(settle);
     const s = get();
     const track = s.queue[index];
     if (!track) return;
+    loadWork.abort();
+    loadWork = new AbortController();
+    const signal = loadWork.signal;
+    cancelSwap();
 
     // Video mode on a song: find its music video first, then load whichever fits.
     if (needsClipLookup(track, s.preferVideo)) {
@@ -382,9 +422,11 @@ export const usePlayer = create<PlayerState>((set, get) => {
     token++;
     const height = heightOf(track, kind);
     const id = mediaIdFor(track, kind);
-    loaded = { id: track.id, kind, height, media: id };
+    const mine = (loaded = { id: track.id, kind, height, media: id });
+    /** Still this load: not replaced by another, nor dropped by a pause before it started. */
+    const live = () => loaded === mine;
     // The server downloads the quality first (and SD too, for a video without YouTube's ready-made SD stream).
-    const download = kind === "video" && !opts.ready && (height !== SD || sdFor.get(id) === false);
+    const download = kind === "video" && (height !== SD || sdFor.get(id) === false);
     pendingSeek = opts.startAt ?? 0;
     // The same track again from where it was (a retry, Audio/Video switched): the same play. Anything else is a new one.
     const key = `${index}:${track.id}`;
@@ -410,49 +452,48 @@ export const usePlayer = create<PlayerState>((set, get) => {
       lastProgress = Date.now();
       if (autoplay) play(media);
     };
-    const mine = token;
     const begin = (h: number) => {
       // The server's proxy URL is known right away; on Android the stream is first resolved on the phone.
       const source = streamSource(mediaIdFor(track, kind), kind, h);
       if (typeof source === "string") start(source);
       else
         source.then(
-          (src) => mine === token && start(src),
-          (err: ApiError) => mine === token && report(err.message, err.code),
+          (src) => live() && start(src),
+          (err: ApiError) => live() && report(err.message, err.code),
         );
     };
-    const toSd = () => {
-      if (loaded) loaded.height = SD;
-      set({ videoQuality: SD, statusText: "loadingVideo" });
-      begin(SD);
+    const playsIn = (h: number) => {
+      mine.height = h;
+      set({ videoQuality: h });
     };
     if (download) {
       // Asked ahead rather than streamed, so the player doesn't sit on a request with no data and take it for a
       // stall. Already in the cache (fetched ahead while the last track played), the quality answers in a moment and
-      // plays straight away; otherwise SD, which starts at once, plays meanwhile and the quality takes over from where
-      // it is (see upgrade). If the quality can't be had, SD plays on instead of skipping the track.
+      // plays straight away; otherwise SD, which starts at once, plays meanwhile and the quality takes over without a
+      // gap when it's there (swapQuality). If it can't be had, SD plays on instead of skipping the track.
       const sdMeanwhile = height !== SD && sdFor.get(id) !== false;
       let onSd = false;
-      const timer = sdMeanwhile
-        ? setTimeout(() => {
-            if (mine !== token) return;
-            onSd = true;
-            toSd();
-          }, HD_GRACE_MS)
-        : undefined;
-      const job = api.prepareVideo(id, height);
+      const toSd = () => {
+        onSd = true;
+        playsIn(SD);
+        set({ statusText: "loadingVideo" });
+        begin(SD);
+      };
+      const timer = sdMeanwhile ? setTimeout(() => live() && toSd(), HD_GRACE_MS) : undefined;
+      const job = api.prepareVideo(id, height, signal);
       hdPending = job;
       job
         .then(
-          () => {
+          (real) => {
             clearTimeout(timer);
-            if (mine !== token) return;
-            if (onSd) upgrade(track, height);
-            else begin(height);
+            if (!live()) return;
+            if (onSd) return swapQuality(real);
+            playsIn(real);
+            begin(real);
           },
           (err: ApiError) => {
             clearTimeout(timer);
-            if (mine !== token) return;
+            if (!live() || signal.aborted) return;
             if (!onSd && (err.code === "bot_check" || height === SD)) return report(err.message, err.code);
             toast(getT().player.qualityFailed);
             if (!onSd) toSd();
@@ -466,12 +507,142 @@ export const usePlayer = create<PlayerState>((set, get) => {
     if (kind === "video") fitToScreen();
   }
 
-  /** The quality downloaded while SD played: it takes over from where SD is, if that track is still on. */
-  function upgrade(track: Track, height: number) {
-    const now = get();
-    if (now.queue[now.index]?.id !== track.id || loaded?.id !== track.id || loaded.kind !== "video" || loaded.height >= height) return;
-    if (now.quality === "auto") fetchedFor.set(loaded.media, height);
-    load(now.index, { startAt: now.position, autoplay: now.status === "playing" || now.status === "loading", ready: true });
+  /** A quality getting ready in the hidden <video> (swapQuality). */
+  let swap: { cancel: () => void } | null = null;
+  function cancelSwap() {
+    swap?.cancel();
+    swap = null;
+  }
+
+  /**
+   * Another quality of the video playing takes over without a gap: it loads in the hidden <video>, a little ahead of
+   * where the picture is, and when the playing one gets there the two trade places, the sound along with them.
+   * Paused, it takes over at once on the same frame. If it doesn't get ready, the current quality just plays on.
+   */
+  function swapQuality(height: number) {
+    cancelSwap();
+    const mine = loaded;
+    if (!mine || mine.kind !== "video") return;
+    if (mine.height === height && videoEl.getAttribute("src")) return;
+    const from = videoEl;
+    const to = standbyVideo();
+    let finished = false;
+    let tick: ReturnType<typeof setTimeout> | undefined;
+    let target = 0;
+    const finish = (took: boolean) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(giveUp);
+      clearTimeout(tick);
+      to.removeEventListener("seeked", onSeeked);
+      to.removeEventListener("canplay", onSeeked);
+      to.removeEventListener("error", onError);
+      if (!took) {
+        to.pause();
+        to.removeAttribute("src");
+        to.load();
+      }
+      if (swap === handle) swap = null;
+    };
+    const handle = { cancel: () => finish(false) };
+    swap = handle;
+    const giveUp = setTimeout(() => finish(false), 30_000);
+    const onError = () => finish(false);
+    // With the page hidden (screen off, another tab) timers run once a second: a shorter lead, a wider window, and only
+    // the sound to keep in step.
+    const lead = () => (document.hidden ? 0.4 : SWAP_LEAD_S);
+    /** Gets ready where the picture will be in a moment (where it is, paused). */
+    const aim = () => {
+      target = from.paused ? from.currentTime : from.currentTime + lead();
+      to.currentTime = target;
+    };
+    const commit = () => {
+      if (loaded !== mine) return finish(false);
+      const playing = !from.paused;
+      videoEl = to;
+      showPlaying();
+      to.muted = get().muted;
+      applyVolume();
+      if (playing) play(to);
+      from.pause();
+      from.removeAttribute("src");
+      from.load();
+      mine.height = height;
+      set({ videoQuality: height, ...(to.videoWidth && to.videoHeight ? { videoAspect: to.videoWidth / to.videoHeight } : {}) });
+      finish(true);
+    };
+    /** Ready where it aimed: takes over when the picture reaches that point; aims again if the picture jumped. */
+    const watch = () => {
+      if (finished) return;
+      if (loaded !== mine) return finish(false);
+      if (to.seeking || to.readyState < 3) return; // on its way (seeked or canplay comes)
+      const gap = target - from.currentTime;
+      const late = document.hidden ? -1.2 : -0.25;
+      if (from.paused) return Math.abs(gap) < 0.05 ? commit() : aim();
+      if (gap <= 0.03 && gap > late) return commit();
+      if (gap <= late || gap > lead() + 1) return aim(); // seeked meanwhile, or this one was too slow
+      tick = setTimeout(watch, 15);
+    };
+    const onSeeked = () => watch();
+    to.addEventListener("seeked", onSeeked);
+    to.addEventListener("canplay", onSeeked);
+    to.addEventListener("error", onError);
+    to.addEventListener("loadedmetadata", () => !finished && aim(), { once: true });
+    to.muted = true;
+    const source = streamSource(mine.media, "video", height);
+    if (typeof source === "string") to.src = source;
+    else source.then((src) => !finished && (to.src = src), () => finish(false));
+  }
+
+  /**
+   * Another quality chosen while the video plays: the picture goes on in the current one while the new one downloads,
+   * then the new one takes over without a gap.
+   */
+  function changeQuality() {
+    const mine = loaded;
+    const q = get().quality;
+    if (!mine || mine.kind !== "video") return;
+    if (q === "auto") return fitToScreen();
+    if (q === mine.height) return;
+    const ready = q <= SD && sdFor.get(mine.media) !== false ? Promise.resolve(SD) : api.prepareVideo(mine.media, q, loadWork.signal);
+    ready.then(
+      (real) => loaded === mine && real !== mine.height && swapQuality(real),
+      () => loaded === mine && !loadWork.signal.aborted && toast(getT().player.qualityFailed),
+    );
+  }
+
+  /** Stops what's loading or playing here, without starting anything: skipping through, a track is only shown. */
+  function stopLoading() {
+    token++;
+    loadWork.abort();
+    cancelSwap();
+    loaded = null;
+    for (const media of [audio, ...videos]) {
+      media.pause();
+      if (media.getAttribute("src")) {
+        media.removeAttribute("src");
+        media.load();
+      }
+    }
+  }
+
+  /**
+   * Next or previous. In Video mode every track loaded starts a clip lookup and a download on the server, so skips
+   * close together are a skipping-through: each track shows at once, and only the one it stops on loads.
+   */
+  function skipTo(index: number) {
+    const s = get();
+    const track = s.queue[index];
+    if (!track) return;
+    const now = Date.now();
+    const burst = now - lastSkip < SKIP_BURST_MS;
+    lastSkip = now;
+    if (!burst || !(s.preferVideo && capabilities.video)) return load(index);
+    stopLoading();
+    set({ index, status: "loading", statusText: null, videoNote: null, position: 0, duration: track.duration, buffered: 0 });
+    setMetadata(track);
+    clearTimeout(settle);
+    settle = setTimeout(() => load(get().index), SKIP_SETTLE_MS);
   }
 
   /**
@@ -492,16 +663,15 @@ export const usePlayer = create<PlayerState>((set, get) => {
       .then(async ({ qualities }) => {
         const fits = qualities.find((h) => h >= wanted) ?? qualities[qualities.length - 1];
         if (!fits || !loaded || fits <= loaded.height) return;
-        const job = api.prepareVideo(id, fits);
+        const mine = loaded;
+        const job = api.prepareVideo(id, fits, loadWork.signal);
         hdPending = job;
-        await job.finally(() => {
+        const real = await job.finally(() => {
           if (hdPending === job) hdPending = null;
         });
-        fetchedFor.set(id, fits);
-        const now = get();
-        if (now.quality !== "auto" || now.queue[now.index]?.id !== track.id || loaded?.id !== track.id || loaded.kind !== "video") return;
-        if (loaded.height >= fits) return;
-        load(now.index, { startAt: now.position, autoplay: now.status === "playing" || now.status === "loading", ready: true });
+        fetchedFor.set(id, real);
+        if (get().quality !== "auto" || loaded !== mine || mine.height >= real) return;
+        swapQuality(real);
       })
       .catch(() => {}) // the better quality didn't come: the current one goes on
       .finally(() => {
@@ -560,7 +730,12 @@ export const usePlayer = create<PlayerState>((set, get) => {
    * server's cache; in Video mode their music videos looked up, and the very next one resolved (is it there, can it
    * play, has it a ready-made SD stream) and downloaded in the quality it will play in.
    */
+  /** What's fetched ahead for the next tracks: given up when the queue moves on. */
+  let warmWork = new AbortController();
+
   function warmUpcoming() {
+    warmWork.abort();
+    warmWork = new AbortController();
     const s = get();
     const next = s.queue.slice(s.index + 1, s.index + 1 + AHEAD);
     const video = s.preferVideo && capabilities.video && Date.now() > videoBlockedUntil;
@@ -580,6 +755,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
   }
 
   function warmVideo(track: Track, clip: string) {
+    const signal = warmWork.signal;
     api
       .prepare(clip)
       .then(
@@ -592,8 +768,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
           if (!need) return;
           // After this track's own download: one at a time, each is done sooner.
           await hdPending?.catch(() => {});
-          await api.prepareVideo(clip, need);
-          if (get().quality === "auto") fetchedFor.set(clip, need);
+          if (signal.aborted) return;
+          const real = await api.prepareVideo(clip, need, signal);
+          if (get().quality === "auto") fetchedFor.set(clip, real);
         },
         (err: ApiError) => {
           // A clip that can't play (removed, private, age-restricted): its song plays as audio, instead of failing on it.
@@ -762,7 +939,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     media.addEventListener("error", () => isActive() && media.getAttribute("src") && onError(media));
   }
   wire(audio);
-  wire(videoEl);
+  for (const v of videos) wire(v);
 
   // A stream that stops arriving (the network gone, a server that stopped answering) doesn't always end in an
   // error: the player would wait forever, looking alive. No progress for a while is treated as one, so it's tried
@@ -795,7 +972,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
     const wasPlaying = s.status === "playing" || s.status === "loading";
     if (needsClipLookup(track, s.preferVideo)) return load(s.index, { startAt: s.position, autoplay: wasPlaying });
     const kind = kindFor(track);
-    if (loaded.kind === kind && (kind === "audio" || loaded.height === heightOf(track, kind))) return;
+    if (loaded.kind === kind && kind === "audio") return;
+    // Only the quality changed: the video plays on until the new one takes over (no going back to SD meanwhile).
+    if (loaded.kind === kind && kind === "video" && videoEl.getAttribute("src")) return changeQuality();
     load(s.index, { startAt: s.position, autoplay: wasPlaying });
   };
 
@@ -970,12 +1149,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
       // The spinner is a stop button: a track stuck loading (YouTube holding it back) can be let go.
       if (s.status === "loading") return get().pause();
       const kind = kindFor(track);
-      const stale =
-        !loaded ||
-        loaded.id !== track.id ||
-        loaded.kind !== kind ||
-        (kind === "video" && loaded.height !== heightOf(track, kind)) ||
-        needsClipLookup(track, s.preferVideo);
+      // Not the quality: SD plays while the chosen one downloads, and a video may only go up to a lower one. A quality
+      // change takes over by itself (changeQuality); Play and Pause just play and pause.
+      const stale = !loaded || loaded.id !== track.id || loaded.kind !== kind || needsClipLookup(track, s.preferVideo);
       if (stale || s.status === "error") return load(s.index, { startAt: s.position });
       const media = mediaFor(kind);
       if (media.paused) play(media);
@@ -995,7 +1171,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
         else {
           loaded = null;
           // Drop the request too, so the server stops waiting on YouTube for it.
-          for (const media of [audio, videoEl]) {
+          cancelSwap();
+          for (const media of [audio, ...videos]) {
             media.removeAttribute("src");
             media.load();
           }
@@ -1011,8 +1188,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const r = elsewhere();
       if (r) return r.next();
       const s = get();
-      if (s.index < s.queue.length - 1) return load(s.index + 1);
-      if (s.repeat === "all" && s.queue.length) return load(0);
+      if (s.index < s.queue.length - 1) return skipTo(s.index + 1);
+      if (s.repeat === "all" && s.queue.length) return skipTo(0);
       if (s.autoRadio) void continueWithRadio();
     },
 
@@ -1021,7 +1198,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (r) return r.prev();
       const s = get();
       if (s.position > 3 || s.index === 0) return get().seek(0);
-      load(s.index - 1);
+      skipTo(s.index - 1);
     },
 
     seek: (seconds) => {
@@ -1146,18 +1323,19 @@ if (typeof ResizeObserver !== "undefined") {
   new ResizeObserver(() => {
     clearTimeout(settle);
     settle = setTimeout(() => {
-      const w = videoEl.clientWidth;
-      const h = videoEl.clientHeight;
+      const w = videoBox.clientWidth;
+      const h = videoBox.clientHeight;
       const ratio = videoEl.videoWidth && videoEl.videoHeight ? videoEl.videoWidth / videoEl.videoHeight : 16 / 9;
       // The picture's shorter side: what YouTube's quality lines measure (a vertical 1080p clip is 1080 wide).
       const picture = w / h > ratio ? [h * ratio, h] : [w, w / ratio];
       onShown(Math.round(Math.min(picture[0], picture[1])));
     }, 800);
-  }).observe(videoEl);
+  }).observe(videoBox);
 }
 
 audio.volume = videoEl.volume = usePlayer.getState().volume;
 audio.muted = videoEl.muted = usePlayer.getState().muted;
+standbyVideo().muted = true;
 
 export const selectCurrent = (s: PlayerState): Track | null => s.queue[s.index] ?? null;
 

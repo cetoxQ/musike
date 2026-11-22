@@ -143,8 +143,10 @@ export function httpBackend(opts: HttpBackendOptions) {
       }),
     loudness: (id: string) => request<{ loudnessDb: number | null }>(`/api/loudness/${id}`).then((r) => r.loudnessDb),
     videoQualities: (id: string) => request<{ qualities: number[]; max: number }>(`/api/video-qualities/${id}`),
-    prepareVideo: (id: string, height: number) =>
-      request<{ ready: boolean }>(`/api/prepare/${id}/video?h=${height}`, { method: "POST" }).then(() => undefined),
+    prepareVideo: (id: string, height: number, signal?: AbortSignal) =>
+      request<{ ready: boolean; height?: number }>(`/api/prepare/${id}/video?h=${height}`, { method: "POST", signal }).then(
+        (r) => r.height || height, // an older server doesn't say: the one asked for
+      ),
     prefetchAudio: (id: string) => request<{ queued: boolean }>(`/api/prefetch/${id}/audio`, { method: "POST" }).then(() => undefined),
 
     library: () => request<Library>("/api/library"),

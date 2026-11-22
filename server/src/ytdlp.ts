@@ -86,8 +86,11 @@ type Lane = keyof typeof LANES;
 const running: Record<Lane, number> = { quick: 0, download: 0 };
 const waiting: Record<Lane, (() => void)[]> = { quick: [], download: [] };
 
-/** Waits for a free place in the lane; the function it returns gives the place to the next in line. */
-function turn(lane: Lane): Promise<() => void> {
+/**
+ * Waits for a free place in the lane; the function it returns gives the place to the next in line. Given up while
+ * waiting (`signal`), it leaves the line.
+ */
+function turn(lane: Lane, signal?: AbortSignal): Promise<() => void> {
   const release = () => {
     let done = false;
     return () => {
@@ -98,11 +101,24 @@ function turn(lane: Lane): Promise<() => void> {
       else running[lane]--;
     };
   };
+  if (signal?.aborted) return Promise.reject(signal.reason);
   if (running[lane] < LANES[lane]) {
     running[lane]++;
     return Promise.resolve(release());
   }
-  return new Promise((resolve) => waiting[lane].push(() => resolve(release())));
+  return new Promise((resolve, reject) => {
+    const go = () => {
+      signal?.removeEventListener("abort", leave);
+      resolve(release());
+    };
+    const leave = () => {
+      const at = waiting[lane].indexOf(go);
+      if (at >= 0) waiting[lane].splice(at, 1);
+      reject(signal!.reason);
+    };
+    signal?.addEventListener("abort", leave, { once: true });
+    waiting[lane].push(go);
+  });
 }
 
 /**
@@ -127,23 +143,31 @@ export function withYoutubeArg(extra: string[], arg: string): string[] {
   return [...out, "--extractor-args", `youtube:${arg}`];
 }
 
-async function run(args: string[], timeoutMs: number, lane: Lane = "quick", youtubeArg?: string): Promise<string> {
+interface RunOptions {
+  /** Joined to the youtube extractor arguments (see withYoutubeArg). */
+  youtubeArg?: string;
+  /** Stops the run: out of the line if it's still waiting, the process ended if it's running. */
+  signal?: AbortSignal;
+}
+
+async function run(args: string[], timeoutMs: number, lane: Lane = "quick", opts: RunOptions = {}): Promise<string> {
   if (maintenance) await maintenance.catch(() => {});
   const { ytdlp, env } = tools();
   if (!ytdlp) {
     throw new HttpError(503, msg("ytdlpMissing"), "tool_missing");
   }
-  const done = await turn(lane);
+  const done = await turn(lane, opts.signal);
   try {
-    const extra = youtubeArg ? withYoutubeArg(config.ytdlpExtraArgs, youtubeArg) : config.ytdlpExtraArgs;
-    return await spawnYtdlp(ytdlp, env, [...extra, ...args], timeoutMs);
+    const extra = opts.youtubeArg ? withYoutubeArg(config.ytdlpExtraArgs, opts.youtubeArg) : config.ytdlpExtraArgs;
+    return await spawnYtdlp(ytdlp, env, [...extra, ...args], timeoutMs, opts.signal);
   } finally {
     done();
   }
 }
 
-function spawnYtdlp(ytdlp: string, env: NodeJS.ProcessEnv, args: string[], timeoutMs: number): Promise<string> {
+function spawnYtdlp(ytdlp: string, env: NodeJS.ProcessEnv, args: string[], timeoutMs: number, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
     const child = spawn(ytdlp, args, { windowsHide: true, env });
     let stdout = "";
     let stderr = "";
@@ -151,6 +175,13 @@ function spawnYtdlp(ytdlp: string, env: NodeJS.ProcessEnv, args: string[], timeo
       child.kill();
       reject(new HttpError(504, msg("ytdlpTimeout")));
     }, timeoutMs);
+    const stop = () => {
+      clearTimeout(timer);
+      child.kill();
+      reject(signal!.reason);
+    };
+    signal?.addEventListener("abort", stop, { once: true });
+    child.on("close", () => signal?.removeEventListener("abort", stop));
     child.stdout.on("data", (d) => (stdout += d));
     child.stderr.on("data", (d) => (stderr += d));
     child.on("error", (err) => {
@@ -412,7 +443,57 @@ export async function loudnessOf(id: string): Promise<number | null> {
   return (await resolveAudio(id)).loudnessDb ?? null;
 }
 
-const downloads = new Map<string, Promise<string>>();
+/**
+ * Downloads under way, shared by whoever asks for the same video in the same quality. Each asker can give up (the
+ * player skipped the track): when nobody is left the download stops after a moment, so tracks skipped one after the
+ * other don't fill the download lane ahead of the one that's going to play. The moment covers the same video asked
+ * for again (a skip back, the track fetched ahead becoming the one playing).
+ */
+interface Download {
+  done: Promise<string>;
+  askers: number;
+  stop: AbortController;
+  idle?: ReturnType<typeof setTimeout>;
+}
+const downloads = new Map<string, Download>();
+const ABANDONED_MS = 5_000;
+
+/** One more asker of a download; `signal`: it gives up. Without one, it waits to the end. */
+function join(job: Download, signal?: AbortSignal): Promise<string> {
+  job.askers++;
+  if (job.idle) clearTimeout(job.idle);
+  job.idle = undefined;
+  if (!signal) return job.done;
+  return new Promise((resolve, reject) => {
+    const leave = () => {
+      job.askers--;
+      reject(signal.reason);
+      if (job.askers === 0) job.idle = setTimeout(() => job.stop.abort(new Error("nobody wants this download")), ABANDONED_MS);
+    };
+    if (signal.aborted) return leave();
+    signal.addEventListener("abort", leave, { once: true });
+    job.done.then(
+      (file) => {
+        signal.removeEventListener("abort", leave);
+        resolve(file);
+      },
+      (err) => {
+        signal.removeEventListener("abort", leave);
+        reject(err);
+      },
+    );
+  });
+}
+
+/** What a stopped or failed download leaves: the video and audio parts, and their pieces. */
+async function removeParts(id: string, height: number) {
+  const prefix = `${id}.${height}.part`;
+  const names = await readdir(config.cacheDir).catch(() => [] as string[]);
+  await Promise.all(names.filter((n) => n.startsWith(prefix)).map((n) => rm(path.join(config.cacheDir, n), { force: true })));
+}
+
+/** The quality a cached video file really has (its name ends in .<height>.mp4). */
+export const heightOfFile = (file: string) => Number(/\.(\d+)\.mp4$/.exec(file)?.[1]) || 0;
 
 /** Pieces of a video downloaded at the same time (10 MB each: a 1080p music video is about ten). */
 const FRAGMENTS_AT_ONCE = 6;
@@ -431,6 +512,14 @@ export async function pruneCache(): Promise<void> {
       return { p, size: s.size, used: s.mtimeMs };
     }),
   );
+  // Parts of downloads cut short by a restart.
+  const now = Date.now();
+  for (const n of await readdir(config.cacheDir)) {
+    if (!n.includes(".part")) continue;
+    const p = path.join(config.cacheDir, n);
+    const s = await stat(p).catch(() => null);
+    if (s && now - s.mtimeMs > 3600_000) await rm(p, { force: true });
+  }
   let total = files.reduce((sum, f) => sum + f.size, 0);
   for (const f of files.sort((a, b) => a.used - b.used)) {
     if (total <= config.cacheMaxBytes) break;
@@ -444,7 +533,7 @@ export async function pruneCache(): Promise<void> {
  * cache, for playback with seeking. The file is named after the quality it really has, so asking for 1080 on a video
  * that stops at 720 reuses the 720 file.
  */
-export async function downloadVideo(id: string, wanted: number): Promise<string> {
+export async function downloadVideo(id: string, wanted: number, signal?: AbortSignal): Promise<string> {
   // Already downloaded in the very quality asked for: no need to ask YouTube which qualities there are first (a
   // yt-dlp run of a few seconds once the resolution has expired, or after a restart).
   const exact = path.join(config.cacheDir, `${id}.${Math.min(wanted, config.videoMaxHeight)}.mp4`);
@@ -470,7 +559,7 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
   }
   const key = `${id}.${height}`;
   const inflight = downloads.get(key);
-  if (inflight) return inflight;
+  if (inflight) return join(inflight, signal);
 
   // The format picked from the formats YouTube listed, then yt-dlp's own pick for that height as a fallback.
   const picked = choice && resolved?.audioFormatId ? `${choice.formatId}+${resolved.audioFormatId}/` : "";
@@ -478,8 +567,9 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
     `${picked}bv*[height<=${height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${height}]+ba[ext=m4a]/` +
     `bv*[height<=${height}]+ba/b[height<=${height}]/b`;
   const tmp = path.join(config.cacheDir, `${id}.${height}.part.mp4`);
+  const stop = new AbortController();
   // Merging video + audio needs FFmpeg; the desktop app fetches it on first use if it isn't there yet.
-  const job = (tools().ffmpeg || !config.binDir ? Promise.resolve() : ensureComponent("ffmpeg"))
+  const done = (tools().ffmpeg || !config.binDir ? Promise.resolve() : ensureComponent("ffmpeg"))
     .then(() => mkdir(config.cacheDir, { recursive: true }))
     .then(() =>
       run(
@@ -497,7 +587,7 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
         "download",
         // YouTube's formats as pieces of 10 MB (DASH), so -N fetches several at once: a plain HTTPS format downloads
         // as one sequence of requests, whatever -N says, and a 1080p video took minutes behind a slow connection.
-        "formats=dashy",
+        { youtubeArg: "formats=dashy", signal: stop.signal },
       ),
     )
     .then(async () => {
@@ -506,13 +596,16 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
       return file;
     })
     .catch(async (err) => {
-      await rm(tmp, { force: true });
+      await removeParts(id, height);
       throw err;
     })
     .finally(() => downloads.delete(key));
 
+  const job: Download = { done, askers: 0, stop };
   downloads.set(key, job);
-  return job;
+  // The first asker's own promise; a failure nobody waits for anymore isn't an unhandled rejection.
+  done.catch(() => {});
+  return join(job, signal);
 }
 
 export async function ytdlpSearch(query: string, limit = 20) {

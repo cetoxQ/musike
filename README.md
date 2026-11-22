@@ -78,7 +78,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
 
 **Player**
-- **Video quality:** Auto, or any quality YouTube has for the video up to the server's limit (`MUSIKE_VIDEO_MAX_HEIGHT`, 1080 unless you raise it, up to 4K). Auto starts in SD, which plays at once, and when the video shows bigger (cinema view, full screen, a wide window) downloads the quality that fits the screen and switches to it from the same point. A quality you chose works the same way: SD plays while it downloads (in pieces, several at once), unless it's already in the cache
+- **Video quality:** Auto, or any quality YouTube has for the video up to the server's limit (`MUSIKE_VIDEO_MAX_HEIGHT`, 1080 unless you raise it, up to 4K). Auto starts in SD, which plays at once, and when the video shows bigger (cinema view, full screen, a wide window) downloads the quality that fits the screen and switches to it. The quality you choose stays the one every video plays in (a video that doesn't go that high plays in the nearest under it, and the button says which); SD plays while it downloads (in pieces, several at once), unless it's already in the cache. A new quality takes over without a gap: it gets ready in a second, hidden player and the two trade places on the same frame. Skipping through tracks quickly in Video mode only loads the one you stop on, and the server stops the downloads nobody waits for anymore
 - **The same volume for every track:** loud tracks are turned down to YouTube's reference level (Settings > Playback). Needs the loudness YouTube gives with the direct audio: on the phone always, on a server with `MUSIKE_DIRECT_AUDIO=first`
 - **Sleep timer:** the moon button stops the music in 15 to 90 minutes or at the end of the track, fading out
 - When YouTube asks to confirm you're not a bot, the track stops and is tried again after 1 and 3 minutes, instead of skipping through the queue; video falls back to audio for a while
@@ -149,7 +149,7 @@ Setting up `https://`:
 - Instant seeking (HTTP Range streaming) and what comes next got ready while a track plays: the next two tracks' audio fetched into the server's cache; in Video mode their music videos looked up, and the next one checked (a clip that can't play is skipped for its song's audio, without waiting on it) and downloaded in the quality it will play in, after the current track's own download
 
 **Video**
-- Video mode in the side panel, full screen on phones, or in a floating mini player
+- Video mode in the side panel, full screen on phones, or in a floating mini player you can drag anywhere on the screen and close (the track plays on). Controlling another device, there's none: that device plays the video
 - **Official music video** found automatically for songs (only from the artist's own channel)
 - **Cinema mode:** maximize the video (button, double-click or `F`), with controls that fade while you watch (on a touch screen a tap brings them back, the next one pauses), and true full screen (in the Android app, full screen hides the system bars and turns a landscape video sideways, even with auto-rotate off; Back leaves it)
 - SD quality (starts fast) or HD 720p (cached locally)
