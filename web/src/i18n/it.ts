@@ -6,6 +6,7 @@ export const it: Messages = {
   locale: "it-IT",
 
   common: {
+    dragToReorder: "Trascina per spostare",
     scrollBack: "Scorri indietro",
     scrollForward: "Scorri avanti",
     close: "Chiudi",
@@ -78,6 +79,9 @@ export const it: Messages = {
   },
 
   collection: {
+    reorder: "Cambia l'ordine",
+    reorderHint: "Trascina i brani dalla maniglia.",
+    reorderDone: "Fatto",
     labelPlaylist: "Playlist",
     labelFavorites: "Raccolta",
     labelHistory: "Cronologia",

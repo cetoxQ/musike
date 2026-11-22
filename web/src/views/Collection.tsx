@@ -1,10 +1,21 @@
-import { DotsThreeIcon, MagnifyingGlassIcon, PauseIcon, PencilSimpleIcon, PlayIcon, ShuffleIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+  ArrowsDownUpIcon,
+  DotsThreeIcon,
+  MagnifyingGlassIcon,
+  PauseIcon,
+  PencilSimpleIcon,
+  PlayIcon,
+  ShuffleIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
 import { IconButton, PlayDisc } from "../components/IconButton";
+import { Artwork } from "../components/Artwork";
 import { Modal } from "../components/Modal";
+import { ReorderList } from "../components/ReorderList";
 import { EmptyState, PageHeader } from "../components/Page";
 import { Action } from "../components/Selection";
 import { TrackList } from "../components/TrackList";
@@ -31,6 +42,8 @@ export default function Collection({ kind }: Props) {
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Putting the playlist in order: the tracks as they're being dragged, saved with Done. */
+  const [order, setOrder] = useState<Track[] | null>(null);
   const t = useT();
 
   const playlist = kind === "playlist" ? lib.playlists.find((p) => p.id === id) : undefined;
@@ -115,7 +128,35 @@ export default function Collection({ kind }: Props) {
       </div>
 
       <div className="px-2 md:px-3">
-        {tracks.length > 0 ? (
+        {order && playlist ? (
+          <div className="px-2 md:px-3">
+            <div className="mb-2 flex items-center justify-between gap-3 px-1">
+              <p className="text-sm text-fg-2">{t.collection.reorderHint}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  void lib.reorderPlaylist(playlist.id, order.map((x) => x.id));
+                  setOrder(null);
+                }}
+                className="h-9 shrink-0 rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink"
+              >
+                {t.collection.reorderDone}
+              </button>
+            </div>
+            <ReorderList items={order} keyOf={(x) => x.id} onReorder={setOrder} rowClassName="rounded-xl bg-surface-1">
+              {(track, handle) => (
+                <div className="flex items-center gap-3 rounded-xl px-1 py-1.5">
+                  {handle}
+                  <Artwork src={track.thumb} className="size-10 rounded-[8px]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{track.title}</span>
+                    <span className="block truncate text-xs text-fg-2">{track.artist}</span>
+                  </span>
+                </div>
+              )}
+            </ReorderList>
+          </div>
+        ) : tracks.length > 0 ? (
           <TrackList
             key={kind === "playlist" ? playlist?.id : kind}
             tracks={tracks}
@@ -174,6 +215,18 @@ export default function Collection({ kind }: Props) {
               >
                 <PencilSimpleIcon size={18} className="text-fg-2" /> {t.collection.rename}
               </button>
+              {playlist.tracks.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    setOrder(playlist.tracks);
+                  }}
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-surface-3"
+                >
+                  <ArrowsDownUpIcon size={18} className="text-fg-2" /> {t.collection.reorder}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

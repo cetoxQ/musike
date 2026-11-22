@@ -206,6 +206,7 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
   deletePlaylist: (id) => call(() => lib.deletePlaylist(id)),
   addToPlaylist: (id, t) => call(() => lib.addToPlaylist(id, Array.isArray(t) ? tracks(t) : library.sanitizeTrack(t))),
   removeFromPlaylist: (id, trackId) => call(() => lib.removeFromPlaylist(id, trackId)),
+  reorderPlaylist: (id, ids) => call(() => lib.reorderPlaylist(id, ids)),
   recent: (signal) => call(() => lib.recent(), signal),
   pushRecent: (item) => call(async () => lib.pushRecent(library.sanitizeRecent(item))),
   removeRecent: (kind, id) => call(() => lib.removeRecent(kind, id)),

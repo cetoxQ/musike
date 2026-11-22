@@ -191,6 +191,7 @@ export function httpBackend(opts: HttpBackendOptions) {
       request<Playlist>(`/api/playlists/${id}/tracks`, { method: "POST", json: Array.isArray(t) ? { tracks: t } : t }),
     removeFromPlaylist: (id: string, trackId: string) =>
       request<Playlist>(`/api/playlists/${id}/tracks/${trackId}`, { method: "DELETE" }),
+    reorderPlaylist: (id: string, ids: string[]) => request<Playlist>(`/api/playlists/${id}/order`, { method: "PUT", json: { ids } }),
 
     recent: (signal?: AbortSignal) => request<{ recent: RecentItem[] }>("/api/recent", { signal }).then((r) => r.recent),
     pushRecent: (item: RecentInput) => request<{ recent: RecentItem[] }>("/api/recent", { method: "POST", json: item }).then((r) => r.recent),

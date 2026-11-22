@@ -27,6 +27,8 @@ interface LibraryState extends Library {
   deletePlaylist: (id: string) => Promise<void>;
   addToPlaylist: (id: string, t: Track | Track[]) => Promise<void>;
   removeFromPlaylist: (id: string, trackId: string) => Promise<void>;
+  /** The playlist's tracks in this order (shown at once, saved behind). */
+  reorderPlaylist: (id: string, ids: string[]) => Promise<void>;
   /** Many at once (picked in a list): one notice for all. */
   removeFavorites: (ids: string[]) => Promise<void>;
   removeManyFromPlaylist: (id: string, trackIds: string[]) => Promise<void>;
@@ -243,6 +245,23 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     } catch (e) {
       toast((e as Error).message, "error");
       void get().load();
+    }
+  },
+
+  reorderPlaylist: async (id, ids) => {
+    const prev = get().playlists;
+    const at = new Map(ids.map((tid, i) => [tid, i]));
+    set({
+      playlists: prev.map((p) =>
+        p.id === id ? { ...p, tracks: [...p.tracks].sort((a, b) => (at.get(a.id) ?? 1e9) - (at.get(b.id) ?? 1e9)) } : p,
+      ),
+    });
+    try {
+      const p = await api.reorderPlaylist(id, ids);
+      set((s) => ({ playlists: replacePlaylist(s.playlists, p) }));
+    } catch (e) {
+      set({ playlists: prev });
+      toast((e as Error).message, "error");
     }
   },
 

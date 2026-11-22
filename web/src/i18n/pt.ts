@@ -6,6 +6,7 @@ export const pt: Messages = {
   locale: "pt-BR",
 
   common: {
+    dragToReorder: "Arraste para mover",
     scrollBack: "Rolar para trás",
     scrollForward: "Rolar para frente",
     close: "Fechar",
@@ -78,6 +79,9 @@ export const pt: Messages = {
   },
 
   collection: {
+    reorder: "Mudar a ordem",
+    reorderHint: "Arraste as músicas pela alça.",
+    reorderDone: "Pronto",
     labelPlaylist: "Playlist",
     labelFavorites: "Coleção",
     labelHistory: "Histórico",

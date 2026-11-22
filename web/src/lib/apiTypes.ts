@@ -255,6 +255,8 @@ export interface MusikeApi {
   deletePlaylist(id: string): Promise<void>;
   addToPlaylist(id: string, t: Track | Track[]): Promise<Playlist>;
   removeFromPlaylist(id: string, trackId: string): Promise<Playlist>;
+  /** The playlist's tracks in this order (their ids). */
+  reorderPlaylist(id: string, ids: string[]): Promise<Playlist>;
   importLibrary(backup: unknown, mode: "merge" | "replace"): Promise<ImportResult>;
   /** The Search page's "Recent" list, newest first. */
   recent(signal?: AbortSignal): Promise<RecentItem[]>;

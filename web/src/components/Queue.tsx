@@ -1,9 +1,21 @@
 import { QueueIcon, XIcon } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import { selectShownIndex, selectShownQueue, usePlayer } from "../player/player";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
+import { ReorderList } from "./ReorderList";
+import type { Track } from "../lib/types";
+
+/** A stable key for each queued track object while it's in the queue (the same song can be queued more than once). */
+const keys = new WeakMap<Track, string>();
+let nextKey = 0;
+const upcomingKey = (track: Track) => {
+  let key = keys.get(track);
+  if (!key) keys.set(track, (key = `q${nextKey++}`));
+  return key;
+};
 
 export function QueueList({ compact = false }: { compact?: boolean }) {
   const t = useT();
@@ -14,6 +26,8 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
   const jumpTo = usePlayer((s) => s.jumpTo);
   const removeAt = usePlayer((s) => s.removeAt);
   const clearUpcoming = usePlayer((s) => s.clearUpcoming);
+  const reorderUpcoming = usePlayer((s) => s.reorderUpcoming);
+  const remote = usePlayer((s) => !!s.remote);
   const autoRadio = usePlayer((s) => s.remote?.autoRadio ?? s.autoRadio);
   const setAutoRadio = usePlayer((s) => s.setAutoRadio);
 
@@ -32,10 +46,15 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
     );
   }
 
-  const row = (i: number, isCurrent: boolean) => {
+  // Up next can be dragged into a new order on this device (not on one being controlled), when no track object is
+  // in it twice (the rows are told apart by them).
+  const reorderable = !remote && new Set(upcoming).size === upcoming.length;
+
+  const row = (i: number, isCurrent: boolean, handle?: ReactNode) => {
     const track = queue[i];
-    return (
-      <li key={`${track.id}-${i}`} className="group relative flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-surface-3">
+    const body = (
+      <>
+        {handle}
         <button type="button" onClick={() => jumpTo(i)} className="absolute inset-0 rounded-xl" aria-label={t.common.playX(track.title)} />
         <Artwork src={track.thumb} className="pointer-events-none size-10 rounded-[8px]" />
         <div className="pointer-events-none min-w-0 flex-1">
@@ -60,6 +79,13 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
             </button>
           </>
         )}
+      </>
+    );
+    return handle !== undefined ? (
+      <div className="group relative flex items-center gap-2 rounded-xl py-1.5 pr-2 hover:bg-surface-3">{body}</div>
+    ) : (
+      <li key={`${track.id}-${i}`} className="group relative flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-surface-3">
+        {body}
       </li>
     );
   };
@@ -83,7 +109,13 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
           )}
         </div>
         {upcoming.length ? (
-          <ul>{upcoming.map((_, k) => row(index + 1 + k, false))}</ul>
+          reorderable ? (
+            <ReorderList items={upcoming} keyOf={(track) => upcomingKey(track)} onReorder={reorderUpcoming}>
+              {(track, handle) => row(index + 1 + upcoming.indexOf(track), false, handle)}
+            </ReorderList>
+          ) : (
+            <ul>{upcoming.map((_, k) => row(index + 1 + k, false))}</ul>
+          )
         ) : (
           <p className="px-2 text-sm text-fg-2">
             {t.queue.nothingQueued} {autoRadio ? t.queue.radioContinues : ""}

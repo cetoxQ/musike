@@ -132,6 +132,8 @@ interface PlayerState {
   removeAt: (i: number) => void;
   jumpTo: (i: number) => void;
   clearUpcoming: () => void;
+  /** The tracks after the current one, in a new order (dragged in the queue). This device only. */
+  reorderUpcoming: (tracks: Track[]) => void;
   startRadio: (track: Track) => Promise<void>;
   toggle: () => void;
   /** Stops, without toggling: another device of the account took over. A track still loading won't start. */
@@ -763,6 +765,14 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (!s.queue.length) return get().playList([track]);
       set({ queue: [...s.queue, track], original: s.original ? [...s.original, track] : null });
       toast(getT().player.addedToQueue(track.title));
+    },
+
+    reorderUpcoming: (tracks) => {
+      if (elsewhere()) return;
+      const s = get();
+      const next = s.queue[s.index + 1];
+      set({ queue: [...s.queue.slice(0, s.index + 1), ...tracks] });
+      if (tracks[0] !== next) warmUpcoming();
     },
 
     removeAt: (i) => {

@@ -728,7 +728,14 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return libOf(req).addToPlaylist((req.params as { pid: string }).pid, tracks);
   });
 
-  app.delete("/api/playlists/:pid/tracks/:id", async (req) =>
+  /** The playlist's tracks in a new order: `{ ids: [...] }`. */
+  app.put("/api/playlists/:pid/order", async (req) => {
+    const { ids } = (req.body ?? {}) as { ids?: unknown };
+    if (!Array.isArray(ids)) throw new HttpError(400, msg("tracksRequired"));
+    const clean = ids.slice(0, 5000).filter((id): id is string => typeof id === "string" && VIDEO_ID.test(id));
+    return libOf(req).reorderPlaylist((req.params as { pid: string }).pid, clean);
+  });
+    app.delete("/api/playlists/:pid/tracks/:id", async (req) =>
     libOf(req).removeFromPlaylist((req.params as { pid: string }).pid, videoId(req.params)),
   );
 

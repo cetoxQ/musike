@@ -36,6 +36,14 @@ export type PlayRow = [string, number, number, 0 | 1];
 /** At most this many rows of the play log at once (years of listening). */
 export const PLAY_LOG_LIMIT = 200_000;
 
+/** Tracks put in the order of `ids`; the ones `ids` leaves out follow, in the order they had. */
+export function inOrder<T extends { id: string }>(tracks: T[], ids: string[]): T[] {
+  const byId = new Map(tracks.map((t) => [t.id, t]));
+  const first = [...new Set(ids)].flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const placed = new Set(first.map((t) => t.id));
+  return [...first, ...tracks.filter((t) => !placed.has(t.id))];
+}
+
 export interface LibraryStore {
   getLibrary(): Promise<Library>;
   /** The library without the play log, which can be large and is fetched on its own (playsFor, allPlays). */
@@ -82,6 +90,8 @@ export interface LibraryStore {
   deletePlaylist(pid: string): Promise<void>;
   addToPlaylist(pid: string, tracks: Track | Track[]): Promise<Playlist>;
   removeFromPlaylist(pid: string, trackId: string): Promise<Playlist>;
+  /** The playlist's tracks in this order (ids); ones left out keep their order after them, unknown ids are ignored. */
+  reorderPlaylist(pid: string, ids: string[]): Promise<Playlist>;
   /**
    * "merge" adds what is missing and never deletes (playlists match by id, then by name).
    * "replace" swaps the whole library for the backup's.
@@ -584,6 +594,15 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
       const lib = await load();
       const p = findPlaylist(lib, pid);
       p.tracks = p.tracks.filter((t) => t.id !== trackId);
+      p.updatedAt = Date.now();
+      await persist();
+      return p;
+    },
+
+    async reorderPlaylist(pid, ids) {
+      const lib = await load();
+      const p = findPlaylist(lib, pid);
+      p.tracks = inOrder(p.tracks, ids);
       p.updatedAt = Date.now();
       await persist();
       return p;

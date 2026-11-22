@@ -9,6 +9,7 @@ export const en = {
   locale: "en-US",
 
   common: {
+    dragToReorder: "Drag to move",
     scrollBack: "Scroll back",
     scrollForward: "Scroll forward",
     close: "Close",
@@ -83,6 +84,9 @@ export const en = {
   },
 
   collection: {
+    reorder: "Change the order",
+    reorderHint: "Drag the tracks by their handle.",
+    reorderDone: "Done",
     labelPlaylist: "Playlist",
     labelFavorites: "Collection",
     labelHistory: "History",

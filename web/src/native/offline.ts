@@ -55,6 +55,7 @@ const WRITES = [
   "deletePlaylist",
   "addToPlaylist",
   "removeFromPlaylist",
+  "reorderPlaylist",
   "pushRecent",
   "removeRecent",
   "clearRecent",
@@ -87,7 +88,7 @@ const CATALOG = [
 ] as const;
 
 /** Changes that name a playlist by its id (first argument): one created offline gets the server's id. */
-const ON_PLAYLIST = new Set<string>(["renamePlaylist", "deletePlaylist", "addToPlaylist", "removeFromPlaylist"]);
+const ON_PLAYLIST = new Set<string>(["renamePlaylist", "deletePlaylist", "addToPlaylist", "removeFromPlaylist", "reorderPlaylist"]);
 
 /** The server didn't answer (as opposed to answering "no"): no network, refused, timed out, or a proxy's 502-504. */
 export function unreachable(e: unknown): boolean {

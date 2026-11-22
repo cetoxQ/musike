@@ -4,6 +4,7 @@ import {
   cleanLibrary,
   HISTORY_LIMIT,
   importLists,
+  inOrder,
   type LibraryStore,
   PLAY_LOG_LIMIT,
   playedAt,
@@ -182,6 +183,7 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
   const ptBottom = one(`SELECT COALESCE(MAX(pos), -1) AS v FROM playlist_tracks WHERE user_id = ? AND playlist_id = ?`);
   const ptInsert = run(`INSERT OR IGNORE INTO playlist_tracks (user_id, playlist_id, track_id, pos) VALUES (?, ?, ?, ?)`);
   const ptRemove = run(`DELETE FROM playlist_tracks WHERE user_id = ? AND playlist_id = ? AND track_id = ?`);
+  const ptMove = run(`UPDATE playlist_tracks SET pos = ? WHERE user_id = ? AND playlist_id = ? AND track_id = ?`);
 
   const toPlaylist = (r: Row, tracks: Track[]): Playlist => ({
     id: String(r.id),
@@ -418,6 +420,14 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
           tx(() => {
             playlist(uid, pid);
             ptRemove(uid, pid, trackId);
+            plTouch(Date.now(), uid, pid);
+            return playlist(uid, pid);
+          }),
+
+        reorderPlaylist: (pid, ids) =>
+          tx(() => {
+            const current = playlist(uid, pid);
+            inOrder(current.tracks, ids).forEach((t, pos) => ptMove(pos, uid, pid, t.id));
             plTouch(Date.now(), uid, pid);
             return playlist(uid, pid);
           }),
