@@ -120,6 +120,8 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       const r = await resolveAudio(id);
       return { id, title: r.title, duration: r.duration, hasSdVideo: false };
     }, signal),
+  // Video needs a server: the phone on its own never asks.
+  prepareHd: () => Promise.reject(fail(404, "noSdVideo")),
 
   library: () => call(() => lib.getLibraryLite()),
   addFavorite: (t) => call(async () => ({ favorites: await lib.addFavorite(library.sanitizeTrack(t)) })),

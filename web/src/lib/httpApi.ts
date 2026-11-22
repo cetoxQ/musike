@@ -141,6 +141,7 @@ export function httpBackend(opts: HttpBackendOptions) {
         method: "POST",
         signal,
       }),
+    prepareHd: (id: string) => request<{ ready: boolean }>(`/api/prepare/${id}/hd`, { method: "POST" }).then(() => undefined),
 
     library: () => request<Library>("/api/library"),
     addFavorite: (t: Track) => request<{ favorites: Track[] }>(`/api/favorites/${t.id}`, { method: "PUT", json: t }),

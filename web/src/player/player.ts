@@ -110,6 +110,8 @@ interface PlayerState {
   repeat: Repeat;
   preferVideo: boolean;
   quality: Quality;
+  /** What the video plays in now: the chosen quality, or HD fetched because the video is shown big. */
+  videoQuality: Quality;
   autoRadio: boolean;
 
   playList: (tracks: Track[], start?: number) => void;
@@ -150,6 +152,19 @@ videoEl.className = "block h-full w-full object-contain bg-black";
 const mediaFor = (k: Kind): HTMLMediaElement => (k === "video" ? videoEl : audio);
 
 let loaded: { id: string; kind: Kind; quality: Quality } | null = null;
+/**
+ * A video shown big (cinema view, full screen, a wide window) while SD is chosen: its HD is fetched in the background
+ * and takes over from where SD was. The choice stays SD, so the next video still starts fast.
+ */
+const hdFetched = new Set<string>();
+/** Videos put back to SD by hand while shown big: not fetched in HD again. */
+const sdKept = new Set<string>();
+let shownBig = false;
+let fetchingHd: string | null = null;
+/** Wider than this on screen (CSS pixels), SD's 640x360 looks blurry. */
+const BIG_PX = 720;
+/** Told by the video's size on screen (see the observer after the store). */
+let onShownBig: (big: boolean) => void = () => {};
 let pendingSeek = 0;
 let token = 0;
 /** YouTube's bot check (see botCheck): until when video waits, the retries left for audio and their timer. */
@@ -242,6 +257,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
   /** The YouTube id to stream: the song itself, or its music video in Video mode. */
   const mediaIdFor = (track: Track, kind: Kind) =>
     kind === "video" && track.kind !== "video" ? clipFor.get(track.id)! : track.id;
+  /** The quality a video plays in: the chosen one, or HD where it was fetched for the big screen. */
+  const qualityOf = (track: Track, kind: Kind): Quality =>
+    get().quality === "hd" || (kind === "video" && hdFetched.has(mediaIdFor(track, kind))) ? "hd" : "sd";
   const noteFor = (track: Track) =>
     get().preferVideo && capabilities.video && track.kind === "song" && clipFor.get(track.id) === null
       ? ("noClip" as const)
@@ -288,7 +306,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     }
 
     token++;
-    loaded = { id: track.id, kind, quality: s.quality };
+    const quality = qualityOf(track, kind);
+    loaded = { id: track.id, kind, quality };
     pendingSeek = opts.startAt ?? 0;
     // The same track again from where it was (a retry, Audio/Video switched): the same play. Anything else is a new one.
     const key = `${index}:${track.id}`;
@@ -299,7 +318,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
       mediaKind: kind,
       status: autoplay ? "loading" : "paused",
       // Video may need a server-side download first (HD, or videos without a combined SD stream).
-      statusText: kind === "video" ? (s.quality === "hd" ? "preparingHd" : "loadingVideo") : null,
+      statusText: kind === "video" ? (quality === "hd" ? "preparingHd" : "loadingVideo") : null,
+      videoQuality: quality,
       videoNote: noteFor(track),
       position: pendingSeek,
       duration: track.duration,
@@ -313,7 +333,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (autoplay) play(media);
     };
     // The server's proxy URL is known right away; on Android the stream is first resolved on the phone.
-    const source = streamSource(mediaIdFor(track, kind), kind, s.quality);
+    const source = streamSource(mediaIdFor(track, kind), kind, quality);
     if (typeof source === "string") start(source);
     else {
       const mine = token;
@@ -323,7 +343,34 @@ export const usePlayer = create<PlayerState>((set, get) => {
       );
     }
     setMetadata(track);
+    if (kind === "video" && quality === "sd") upgradeIfBig();
   }
+
+  /** Shown big with SD playing: HD downloads in the background, then plays from where SD is. */
+  function upgradeIfBig() {
+    const s = get();
+    const track = s.queue[s.index];
+    if (!shownBig || !track || elsewhere() || loaded?.id !== track.id || loaded.kind !== "video" || loaded.quality === "hd") return;
+    const id = mediaIdFor(track, "video");
+    if (fetchingHd === id || sdKept.has(id)) return;
+    fetchingHd = id;
+    api
+      .prepareHd(id)
+      .then(() => {
+        hdFetched.add(id);
+        const now = get();
+        if (now.queue[now.index]?.id !== track.id || loaded?.id !== track.id || loaded.kind !== "video" || loaded.quality === "hd") return;
+        load(now.index, { startAt: now.position, autoplay: now.status === "playing" || now.status === "loading" });
+      })
+      .catch(() => {}) // HD didn't come: SD goes on
+      .finally(() => {
+        if (fetchingHd === id) fetchingHd = null;
+      });
+  }
+  onShownBig = (big) => {
+    shownBig = big;
+    if (big) upgradeIfBig();
+  };
 
   async function continueWithRadio() {
     const s = get();
@@ -545,7 +592,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     const wasPlaying = s.status === "playing" || s.status === "loading";
     if (needsClipLookup(track, s.preferVideo)) return load(s.index, { startAt: s.position, autoplay: wasPlaying });
     const kind = kindFor(track);
-    if (loaded.kind === kind && (kind === "audio" || loaded.quality === s.quality)) return;
+    if (loaded.kind === kind && (kind === "audio" || loaded.quality === qualityOf(track, kind))) return;
     load(s.index, { startAt: s.position, autoplay: wasPlaying });
   };
 
@@ -569,6 +616,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     // Builds without video (Android) always play audio, whatever a backup or an old session says.
     preferVideo: capabilities.video && (saved.preferVideo ?? false),
     quality: saved.quality ?? "sd",
+    videoQuality: saved.quality ?? "sd",
     autoRadio: saved.autoRadio ?? true,
 
     playList: (tracks, start = 0) => {
@@ -700,7 +748,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
         !loaded ||
         loaded.id !== track.id ||
         loaded.kind !== kind ||
-        (kind === "video" && loaded.quality !== s.quality) ||
+        (kind === "video" && loaded.quality !== qualityOf(track, kind)) ||
         needsClipLookup(track, s.preferVideo);
       if (stale || s.status === "error") return load(s.index, { startAt: s.position });
       const media = mediaFor(kind);
@@ -823,6 +871,13 @@ export const usePlayer = create<PlayerState>((set, get) => {
     setQuality: (quality) => {
       const r = elsewhere();
       if (r) return r.setQuality(quality);
+      // The badge shows what plays: SD chosen on a video shown in HD keeps that video in SD.
+      const track = get().queue[get().index];
+      const id = track && loaded?.id === track.id && loaded.kind === "video" ? mediaIdFor(track, "video") : null;
+      if (id && quality === "sd") {
+        hdFetched.delete(id);
+        sdKept.add(id);
+      } else if (id) sdKept.delete(id);
       set({ quality });
       reloadIfKindChanged();
     },
@@ -842,6 +897,16 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
   };
 });
+
+// The video's size on screen decides when SD isn't enough (see hdFetched), once a resize has settled: an animation
+// passing through a big size doesn't count.
+if (typeof ResizeObserver !== "undefined") {
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  new ResizeObserver(() => {
+    clearTimeout(settle);
+    settle = setTimeout(() => onShownBig(videoEl.clientWidth > BIG_PX), 800);
+  }).observe(videoEl);
+}
 
 audio.volume = videoEl.volume = usePlayer.getState().volume;
 audio.muted = videoEl.muted = usePlayer.getState().muted;

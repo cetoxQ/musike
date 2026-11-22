@@ -241,7 +241,8 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
   // This device's mode, or the one of the device it controls (which may not play videos: the phone's own library).
   const preferVideo = usePlayer((s) => s.remote?.preferVideo ?? s.preferVideo);
   const setPreferVideo = usePlayer((s) => s.setPreferVideo);
-  const quality = usePlayer((s) => s.remote?.quality ?? s.quality);
+  // What the video plays in (HD fetched for the big screen counts), or the controlled device's choice.
+  const quality = usePlayer((s) => s.remote?.quality ?? (s.mediaKind === "video" ? s.videoQuality : s.quality));
   const setQuality = usePlayer((s) => s.setQuality);
   const showingVideo = usePlayer((s) => s.remote?.showingVideo ?? s.mediaKind === "video");
   const canVideo = useVideoAvailable();

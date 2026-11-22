@@ -547,6 +547,12 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return { id: r.id, title: r.title, duration: r.duration, hasSdVideo: !!r.video };
   });
 
+  /** A video's HD downloaded ahead (shown big while SD plays): the player switches to it when this answers. */
+  app.post("/api/prepare/:id/hd", async (req) => {
+    await downloadHd(videoId(req.params));
+    return { ready: true };
+  });
+
   app.get("/api/stream/:id/audio", (req, reply) => proxyStream(req, reply, videoId(req.params), "audio"));
 
   app.get("/api/stream/:id/video", async (req, reply) => {

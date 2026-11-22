@@ -213,6 +213,8 @@ export interface MusikeApi {
   /** The track's lyrics (timed when the source has them timed), or null when there are none. */
   lyrics(t: Track, signal?: AbortSignal): Promise<Lyrics | null>;
   prepare(id: string, signal?: AbortSignal): Promise<Prepared>;
+  /** Downloads a video's HD version ahead, on the server: resolves when it's ready to play. */
+  prepareHd(id: string): Promise<void>;
 
   library(): Promise<Library>;
   addFavorite(t: Track): Promise<{ favorites: Track[] }>;
