@@ -44,7 +44,7 @@ import { lyricsFor } from "./lyrics.js";
 import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./system.js";
 import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
-import { downloadVideo, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
+import { downloadVideo, loudnessOf, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -578,6 +578,9 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const r = await resolveStreams(videoId(req.params));
     return { id: r.id, title: r.title, duration: r.duration, hasSdVideo: !!r.video };
   });
+
+  /** How much louder than YouTube's reference the track is (dB), or null: the player evens out the volume with it. */
+  app.get("/api/loudness/:id", async (req) => ({ loudnessDb: await loudnessOf(videoId(req.params)).catch(() => null) }));
 
   /** The video qualities a track comes in here (lines, e.g. 720), under MUSIKE_VIDEO_MAX_HEIGHT. */
   app.get("/api/video-qualities/:id", async (req) => videoQualities(videoId(req.params)));

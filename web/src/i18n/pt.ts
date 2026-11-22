@@ -473,6 +473,9 @@ export const pt: Messages = {
   },
 
   settings: {
+    playback: "Reprodução",
+    evenVolume: "O mesmo volume em todas as músicas",
+    evenVolumeBody: "Músicas altas são abaixadas ao nível de referência do YouTube, neste aparelho. Num servidor precisa do áudio direto (MUSIKE_DIRECT_AUDIO=first).",
     title: "Ajustes",
     appearance: "Aparência",
     theme: "Tema",

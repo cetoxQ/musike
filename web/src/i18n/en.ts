@@ -479,6 +479,9 @@ export const en = {
   },
 
   settings: {
+    playback: "Playback",
+    evenVolume: "The same volume for every track",
+    evenVolumeBody: "Loud tracks are turned down to YouTube's reference level, on this device. Needs the direct audio on a server (MUSIKE_DIRECT_AUDIO=first).",
     title: "Settings",
     appearance: "Appearance",
     theme: "Theme",

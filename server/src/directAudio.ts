@@ -25,6 +25,8 @@ export interface DirectAudio {
   duration: number;
   /** When the URL stops working (ms). */
   expiresAt: number;
+  /** How much louder than YouTube's reference level the track is, in dB (positive: louder), when YouTube says. */
+  loudnessDb?: number;
 }
 
 export const validClients = (v: unknown): string[] | null =>
@@ -46,6 +48,8 @@ export async function fetchRemoteClients(key: "clients" | "ios" = "clients"): Pr
   }
   return null; // keep what we have
 }
+
+const finite = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
 /** Tries each client in turn. Throws with YouTube's reason (or an empty message) when none of them has audio. */
 export async function directAudio(id: string, clients: string[], lang?: Lang): Promise<DirectAudio> {
@@ -73,6 +77,7 @@ export async function directAudio(id: string, clients: string[], lang?: Lang): P
         title: info.basic_info?.title ?? "",
         duration: info.basic_info?.duration ?? 0,
         expiresAt: expire || Date.now() + 3 * 3600_000,
+        loudnessDb: finite(best.loudness_db) ?? finite(info.player_config?.audio_config?.loudness_db),
       };
     } catch (e) {
       reason = (e as Error).message || reason;

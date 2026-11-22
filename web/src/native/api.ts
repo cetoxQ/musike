@@ -120,6 +120,7 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       const r = await resolveAudio(id);
       return { id, title: r.title, duration: r.duration, hasSdVideo: false };
     }, signal),
+  loudness: (id) => call(async () => (VIDEO_ID.test(id) ? ((await resolveAudio(id)).loudnessDb ?? null) : null)),
   // Video needs a server: the phone on its own never asks.
   videoQualities: () => Promise.reject(fail(404, "noSdVideo")),
   prepareVideo: () => Promise.reject(fail(404, "noSdVideo")),

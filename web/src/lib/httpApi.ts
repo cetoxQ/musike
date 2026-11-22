@@ -141,6 +141,7 @@ export function httpBackend(opts: HttpBackendOptions) {
         method: "POST",
         signal,
       }),
+    loudness: (id: string) => request<{ loudnessDb: number | null }>(`/api/loudness/${id}`).then((r) => r.loudnessDb),
     videoQualities: (id: string) => request<{ qualities: number[]; max: number }>(`/api/video-qualities/${id}`),
     prepareVideo: (id: string, height: number) =>
       request<{ ready: boolean }>(`/api/prepare/${id}/video?h=${height}`, { method: "POST" }).then(() => undefined),

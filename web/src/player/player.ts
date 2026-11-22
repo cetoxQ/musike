@@ -151,6 +151,9 @@ interface PlayerState {
    * null when it's off.
    */
   sleep: number | "track" | null;
+  /** The same volume for every track: loud ones are turned down to YouTube's reference level. */
+  evenVolume: boolean;
+  setEvenVolume: (on: boolean) => void;
   /** Stops playback in `minutes`, at the end of this track ("track"), or turns the timer off (null). */
   setSleep: (minutes: number | "track" | null) => void;
   /** Another device hands its playback over: its queue, from where it was, playing. */
@@ -185,6 +188,13 @@ let fetching: string | null = null;
 /** Told by the video's size on screen. */
 let onShown: (height: number) => void = () => {};
 let sleepTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * Each track's volume factor for the even volume: YouTube says how many dB louder than its reference a track is, and
+ * a louder one is turned down by as much (a quieter one can't go above full volume). Known before the track starts
+ * when it comes next in the queue.
+ */
+const gains = new Map<string, number>();
+const gainFrom = (db: number | null) => (db && db > 0 ? Math.max(0.2, 10 ** (-db / 20)) : 1);
 let pendingSeek = 0;
 let token = 0;
 /** YouTube's bot check (see botCheck): until when video waits, the retries left for audio and their timer. */
@@ -203,6 +213,7 @@ let listening = { key: "", seconds: 0, last: -1, counted: false };
 const STORAGE_KEY = "musike:player";
 
 interface Saved {
+  evenVolume: boolean;
   queue: Track[];
   original: Track[] | null;
   index: number;
@@ -289,6 +300,25 @@ export const usePlayer = create<PlayerState>((set, get) => {
       : null;
   const activeMedia = (): HTMLMediaElement | null => (loaded ? mediaFor(loaded.kind) : null);
 
+  /** The volume chosen, times the playing track's factor when the volume is evened out. */
+  const applyVolume = () => {
+    const s = get();
+    const gain = s.evenVolume && loaded ? (gains.get(loaded.media) ?? 1) : 1;
+    audio.volume = videoEl.volume = s.volume * gain;
+  };
+  /** Asks for a track's loudness once, and evens the volume when it's the one playing. */
+  const learnGain = (id: string) => {
+    if (gains.has(id) || !get().evenVolume) return;
+    gains.set(id, 1); // asked once
+    api.loudness(id).then(
+      (db) => {
+        gains.set(id, gainFrom(db));
+        if (loaded?.media === id) applyVolume();
+      },
+      () => gains.delete(id),
+    );
+  };
+
   function play(media: HTMLMediaElement) {
     media.play().catch((err: DOMException) => {
       if (err.name === "AbortError") return; // src changed mid-start
@@ -348,8 +378,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
       duration: track.duration,
       buffered: 0,
     });
-    media.volume = s.volume;
     media.muted = s.muted;
+    applyVolume();
+    if (kind === "audio") learnGain(loaded.media);
     const start = (src: string) => {
       media.src = src;
       lastProgress = Date.now();
@@ -419,7 +450,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (step < steps) return;
       clearInterval(fade);
       get().pause();
-      media.volume = get().volume;
+      applyVolume();
     }, 6000 / steps);
   }
 
@@ -452,7 +483,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
     const upcoming = s.queue[s.index + 1];
     if (!upcoming) return;
     if (s.preferVideo) void lookupClip(upcoming).then((id) => api.prepare(id ?? upcoming.id).catch(() => {}));
-    else api.prepare(upcoming.id).catch(() => {});
+    else {
+      api.prepare(upcoming.id).catch(() => {});
+      learnGain(upcoming.id);
+    }
   }
 
   function onStarted() {
@@ -669,6 +703,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     preferVideo: capabilities.video && (saved.preferVideo ?? false),
     quality: toQuality(saved.quality),
     sleep: null,
+    evenVolume: saved.evenVolume ?? true,
     videoQuality: SD,
     autoRadio: saved.autoRadio ?? true,
 
@@ -874,10 +909,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const r = elsewhere();
       if (r) return r.setVolume(Math.max(0, Math.min(1, v)));
       const volume = Math.max(0, Math.min(1, v));
-      audio.volume = videoEl.volume = volume;
       const muted = volume === 0 ? true : false;
       audio.muted = videoEl.muted = muted;
       set({ volume, muted });
+      applyVolume();
     },
 
     toggleMute: () => {
@@ -932,6 +967,13 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const r = elsewhere();
       if (r) return r.setAutoRadio(autoRadio);
       set({ autoRadio });
+    },
+
+    setEvenVolume: (evenVolume) => {
+      set({ evenVolume });
+      const id = loaded?.media;
+      if (evenVolume && id && loaded?.kind === "audio") learnGain(id);
+      applyVolume();
     },
 
     setSleep: (minutes) => {
@@ -1008,6 +1050,7 @@ function persist() {
     preferVideo: s.preferVideo,
     quality: s.quality,
     autoRadio: s.autoRadio,
+    evenVolume: s.evenVolume,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));

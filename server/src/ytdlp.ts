@@ -20,6 +20,8 @@ export interface StreamFormat {
    * ad would have played, and answer 403 until then; yt-dlp reports the moment as `available_at` and waits for it.
    */
   availableAt?: number;
+  /** How much louder than YouTube's reference the track is (dB), when the direct audio says: see loudnessOf. */
+  loudnessDb?: number;
 }
 
 export interface Resolved {
@@ -275,7 +277,7 @@ async function resolveDirect(id: string, ytdlpError: unknown): Promise<Resolved>
       id,
       title: direct.title,
       duration: direct.duration,
-      audio: { formatId: "direct", url: direct.url, headers: {}, mime: direct.mime },
+      audio: { formatId: "direct", url: direct.url, headers: {}, mime: direct.mime, loudnessDb: direct.loudnessDb },
       expiresAt: direct.expiresAt - 10 * 60_000,
     };
   } catch {
@@ -290,7 +292,7 @@ async function resolveDirect(id: string, ytdlpError: unknown): Promise<Resolved>
 export async function directAudioStream(id: string): Promise<StreamFormat | null> {
   try {
     const direct = await directAudio(id, await clientsForDirect());
-    const audio: StreamFormat = { formatId: "direct", url: direct.url, headers: {}, mime: direct.mime };
+    const audio: StreamFormat = { formatId: "direct", url: direct.url, headers: {}, mime: direct.mime, loudnessDb: direct.loudnessDb };
     // Point the cache at the URL that works, so the next Range request doesn't go through this again.
     const expiresAt = direct.expiresAt - 10 * 60_000;
     const resolved = resolvedAt.get(id);
@@ -354,16 +356,37 @@ export async function resolveAudio(id: string): Promise<StreamFormat> {
   if (config.directAudioFirst) {
     const hit = directResolved.get(id);
     if (hit && hit.expiresAt > Date.now()) return hit;
+    // One request to YouTube for the stream and the loudness asked at the same time.
+    let job = directInflight.get(id);
+    if (!job) {
+      job = (async () => {
+        const d = await directAudio(id, await clientsForDirect());
+        const fmt = { formatId: "direct", url: d.url, headers: {}, mime: d.mime, expiresAt: d.expiresAt - 10 * 60_000, loudnessDb: d.loudnessDb };
+        directResolved.set(id, fmt);
+        return fmt;
+      })().finally(() => directInflight.delete(id));
+      directInflight.set(id, job);
+    }
     try {
-      const d = await directAudio(id, await clientsForDirect());
-      const fmt = { formatId: "direct", url: d.url, headers: {}, mime: d.mime, expiresAt: d.expiresAt - 10 * 60_000 };
-      directResolved.set(id, fmt);
-      return fmt;
+      return await job;
     } catch {
       // yt-dlp below says more when it fails too
     }
   }
   return (await resolveStreams(id)).audio;
+}
+
+const directInflight = new Map<string, Promise<StreamFormat & { expiresAt: number }>>();
+
+/**
+ * How much louder than YouTube's reference a track is (dB), for the same volume on every track: known from the
+ * direct audio (MUSIKE_DIRECT_AUDIO=first, or when yt-dlp failed). Without it, null: no extra request to YouTube.
+ */
+export async function loudnessOf(id: string): Promise<number | null> {
+  const known = resolvedAt.get(id)?.audio.loudnessDb ?? directResolved.get(id)?.loudnessDb;
+  if (known !== undefined) return known;
+  if (!config.directAudioFirst) return null;
+  return (await resolveAudio(id)).loudnessDb ?? null;
 }
 
 const downloads = new Map<string, Promise<string>>();

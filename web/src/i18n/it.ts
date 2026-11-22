@@ -473,6 +473,9 @@ export const it: Messages = {
   },
 
   settings: {
+    playback: "Riproduzione",
+    evenVolume: "Stesso volume per ogni brano",
+    evenVolumeBody: "I brani più forti vengono abbassati al livello di riferimento di YouTube, su questo dispositivo. Su un server serve l'audio diretto (MUSIKE_DIRECT_AUDIO=first).",
     title: "Impostazioni",
     appearance: "Aspetto",
     theme: "Tema",

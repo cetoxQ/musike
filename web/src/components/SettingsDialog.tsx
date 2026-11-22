@@ -5,6 +5,7 @@ import {
   CarProfileIcon,
   MoonIcon,
   ShareNetworkIcon,
+  SpeakerHighIcon,
   SunIcon,
   UserCircleIcon,
   TranslateIcon,
@@ -19,6 +20,7 @@ import { useShare } from "../lib/share";
 import { saveAccountSettings, useAccountSettings } from "../lib/accountSettings";
 import { DEFAULT_PERIODS, periodName, type PeriodId } from "../lib/periods";
 import { car } from "../lib/api";
+import { usePlayer } from "../player/player";
 import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
 import { useUi } from "../stores/ui";
@@ -187,6 +189,8 @@ export function SettingsDialog() {
           />
         </section>
 
+        <PlaybackSection />
+
         <ShareSection />
 
         <ProfileSection />
@@ -292,6 +296,41 @@ export function SettingsDialog() {
 }
 
 /** Where shared links open: YouTube (the default) or YouTube Music. */
+/** How this device plays: the same volume for every track. */
+function PlaybackSection() {
+  const t = useT();
+  const even = usePlayer((s) => s.evenVolume);
+  const setEven = usePlayer((s) => s.setEvenVolume);
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-1.5 text-xs font-medium text-fg-3">
+        <SpeakerHighIcon size={14} /> {t.settings.playback}
+      </h3>
+      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <span>
+          <span className="block text-sm font-medium">{t.settings.evenVolume}</span>
+          <span className="block text-xs text-fg-2">{t.settings.evenVolumeBody}</span>
+        </span>
+        <input type="checkbox" checked={even} onChange={(e) => setEven(e.target.checked)} className="peer sr-only" />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200 peer-focus-visible:outline-2 peer-focus-visible:outline-accent",
+            even ? "bg-accent" : "bg-surface-4",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-1 left-1 size-4 rounded-full transition-transform duration-200 ease-out-expo",
+              even ? "translate-x-4 bg-accent-ink" : "bg-fg-2",
+            )}
+          />
+        </span>
+      </label>
+    </section>
+  );
+}
+
 function ShareSection() {
   const t = useT();
   const site = useShare((s) => s.site) ?? "youtube";
