@@ -37,6 +37,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 - [Installation](#installation)
 - [Moving your library (backup)](#moving-your-library-backup)
 - [Accounts](#accounts)
+- [Backups](#backups)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Configuration](#configuration)
 - [API](#api)
@@ -70,12 +71,17 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **Remove from your listening:** take a track off Recently played, or **Damnatio Memoriae**: erase every play of it, from the history, the statistics and the suggestions, as if it had never played
 
 **Library**
-- Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search and save a copy as your own playlist
+- Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search, or by pasting or sharing its link, and save a copy as your own playlist
+- **Put things in order:** drag up next in the queue, and a playlist's tracks (its menu > Change the order)
 - Recent searches remember what you opened (song, video, artist, album, playlist), each removable
 - **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
 
 **Player**
+- **Video quality:** Auto, or any quality YouTube has for the video up to the server's limit (`MUSIKE_VIDEO_MAX_HEIGHT`, 1080 unless you raise it, up to 4K). Auto starts in SD, which plays at once, and when the video shows bigger (cinema view, full screen, a wide window) downloads the quality that fits the screen and switches to it from the same point
+- **The same volume for every track:** loud tracks are turned down to YouTube's reference level (Settings > Playback). Needs the loudness YouTube gives with the direct audio: on the phone always, on a server with `MUSIKE_DIRECT_AUDIO=first`
+- **Sleep timer:** the moon button stops the music in 15 to 90 minutes or at the end of the track, fading out
+- When YouTube asks to confirm you're not a bot, the track stops and is tried again after 1 and 3 minutes, instead of skipping through the queue; video falls back to audio for a while
 - The loading spinner is a stop button: a track stuck loading can be let go
 - In a narrow window (half a screen) the volume stays reachable: the speaker opens the slider
 
@@ -92,7 +98,10 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 **Server**
 - A track YouTube holds back for a few seconds (it answers 403 until then) starts as soon as YouTube serves it, instead of failing
 - `MUSIKE_DIRECT_AUDIO=first`: audio straight from YouTube's API, about half a second to start. Without it, audio still comes from there when YouTube refuses yt-dlp's URL
-- Can run behind a VPN, see [Docker behind a VPN](#docker-behind-a-vpn)
+- Can run behind a VPN, see [Docker behind a VPN](#docker-behind-a-vpn), with the `pot` service for YouTube's proof-of-origin tokens
+- **A copy of the library every day** in `<data>/backups`, the newest 7 kept (`MUSIKE_BACKUPS`, 0 for none): see [Backups](#backups)
+- **Setup code:** with accounts on, creating the admin asks for a code the server prints in its log, so whoever reaches Musike first can't take the account
+- At most 4 yt-dlp processes resolve tracks at once, and 2 download videos: the rest wait instead of filling the memory
 
 ## On its own or with a server
 
@@ -381,9 +390,10 @@ volumes:
 
 ```bash
 docker compose up -d   # then open http://<that machine>:4180 and create the admin account
+docker logs musike     # the setup code it asks for
 ```
 
-Over plain `http://` there are no Devices and no live changes between devices: see [HTTP or HTTPS](#http-or-https). Every variable in [Configuration](#configuration) goes under `environment:` the same way, for example `YTDLP_CHANNEL: "nightly"` to keep yt-dlp up to date, `MUSIKE_CACHE_MAX_MB: "4096"` for a bigger video cache, or `MUSIKE_TRUST_PROXY` behind a reverse proxy. Without `MUSIKE_AUTH` there are no accounts: one library, open to anyone who reaches the port.
+Over plain `http://` there are no Devices and no live changes between devices: see [HTTP or HTTPS](#http-or-https). Every variable in [Configuration](#configuration) goes under `environment:` the same way, for example `YTDLP_CHANNEL: "nightly"` to keep yt-dlp up to date, `MUSIKE_CACHE_MAX_MB: "4096"` for a bigger video cache, `MUSIKE_VIDEO_MAX_HEIGHT: "2160"` to offer 4K, or `MUSIKE_TRUST_PROXY` behind a reverse proxy. Without `MUSIKE_AUTH` there are no accounts: one library, open to anyone who reaches the port.
 
 The same file, with comments, is this fork's [docker-compose.yml](docker-compose.yml): `curl -O https://raw.githubusercontent.com/yourboiava/musike/local/docker-compose.yml` downloads it. Behind a VPN, see [below](#docker-behind-a-vpn).
 
@@ -513,7 +523,11 @@ On import the server validates every track (YouTube ID, sizes, `https://` images
 
 A Musike server can have accounts (`MUSIKE_AUTH=on`, Docker and the Node server). Everyone then signs in and has their own library: favorites, playlists, history, saved artists, albums and playlists, and play counts.
 
-1. **First visit:** Musike asks for the admin's username and password. Until that's done, anyone who opens Musike can do it, so do it right after turning accounts on. The library you had becomes the admin's.
+1. **First visit:** Musike asks for the admin's username, password and the **setup code**, which the server prints in its log when it starts waiting for the admin (`docker logs musike`, or the terminal of the Node server):
+   ```
+     Setup code: ABCD-2345 (asked when you create the admin)
+   ```
+   Without it nobody can create the admin, even if they reach Musike before you. Case, spaces and dashes don't matter, wrong guesses are slowed down like passwords, and a restart prints a new code. The library you had becomes the admin's.
 2. **New accounts:** in **Settings > Users**, the admin creates an account and gets a temporary password, shown once. The new user changes it at the first sign-in.
 3. **Forgotten password:** the admin resets it in **Settings > Users**: a new temporary password, and that user's devices are signed out. There is no email reset.
 4. **Your password:** **Settings > Account > Change password** signs out your other devices.
@@ -531,12 +545,20 @@ pnpm --filter @musike/server start reset-password <username>          # Node ser
 - Passwords are stored as scrypt hashes, session tokens as SHA-256 hashes.
 - After 5 wrong passwords in a row for a username or an address, each attempt waits longer (30 seconds, doubling, up to 15 minutes); attempts sent at once count before they're checked, and at most 8 password checks run at a time. Every failure is logged at `warn` with the address (`"event":"login_failed"`), for tools like fail2ban.
 - Behind a reverse proxy, set `MUSIKE_TRUST_PROXY` so the addresses in the logs and the limits are the clients', not the proxy's. Outside your home network, use HTTPS: the cookie is marked `Secure` when the request came over HTTPS.
+- Apps can't put the session token in an audio element, so their stream URLs carry `?st=`: a token signed for that one track (`id/kind`), valid for hours and ended by signing out. A reverse proxy's access log shows these URLs: a token seen there only opens the track it names until it expires, nothing else in the account. To keep them out of the log anyway, leave the proxy's access log off or drop query strings from it.
+- Android leaves the session token out of Google's cloud backup: after restoring the phone, sign in again.
 - Accounts need the library in SQLite. The desktop and Android apps have no accounts: their library is on the device.
 
 With or without accounts, the server also:
 
 - refuses requests that change something (`POST`, `PUT`, `PATCH`, `DELETE`) when the browser says they come from another origin, other ports of the same address included (`"event":"cross_origin_refused"` in the log), and accepts only JSON bodies. Requests without `Origin` (curl, scripts) and apps using `Authorization: Bearer` aren't affected. Behind a proxy, pass the original `Host` on (or set `MUSIKE_TRUST_PROXY`, which reads `X-Forwarded-Host`), or list the public address in `MUSIKE_ALLOWED_ORIGINS`;
 - sends a Content-Security-Policy with its pages (scripts only from Musike, artwork from `https:`, no framing by other sites), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, and `Cache-Control: no-store` on API answers.
+
+## Backups
+
+Every day the server keeps a copy of the library in `<data>/backups` (in Docker, the `/data` volume): `musike-2026-11-22.db`, a complete and consistent copy of `musike.db` made while Musike runs, or `library.json` as it is. The newest 7 are kept; `MUSIKE_BACKUPS` sets how many, 0 turns them off. The first copy is made a minute after starting.
+
+To go back to one, stop Musike and copy it over `musike.db` (in Docker: `docker compose down`, copy the file into the volume, `docker compose up -d`). The copies sit next to the library: they help after a mistake or a damaged file, not if the disk is lost, so copy the folder somewhere else too. Profile pictures (`avatars/`) and per-account settings (`settings/`) aren't in them. A backup file from **Settings > Backup** (the library of your account, as JSON) works on any Musike.
 
 ## Keyboard shortcuts
 
@@ -576,6 +598,8 @@ Server environment variables (all optional):
 | `MUSIKE_LIBRARY` | automatic | `sqlite`: require the database. `json`: keep `library.json` (what the desktop app does). Unset: SQLite when Node has it (22.13 or later), `library.json` otherwise |
 | `MUSIKE_CACHE_DIR` | `server/cache` (`/cache` in Docker) | Downloaded HD videos |
 | `MUSIKE_CACHE_MAX_MB` | `2048` | Video cache limit (least recently played go first) |
+| `MUSIKE_VIDEO_MAX_HEIGHT` | `1080` | The highest video quality offered (1440, 2160 for 4K). Higher qualities take long to download, fill the cache, and above 1080 come only as VP9 or AV1, which older devices decode slowly |
+| `MUSIKE_BACKUPS` | `7` | Daily copies of the library kept in `<data>/backups` (0: none). See [Backups](#backups) |
 | `MUSIKE_BIN_DIR` | | Private tools folder (the desktop app uses `%APPDATA%\Musike\bin`) |
 | `MUSIKE_LANG` | `en` | YouTube Music language when a request doesn't say (the app always sends the chosen language) |
 | `MUSIKE_LOCATION` | `BR` | Country for YouTube Music results, as a two-letter code (`IT`, `US`) |
@@ -602,8 +626,11 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `GET` | `/api/video-for/:id?title=&artist=&duration=` | A song's official music video |
 | `GET` | `/api/lyrics/:id?title=&artist=&album=&duration=` | The track's lyrics (timed when available), or `null` |
 | `POST` | `/api/prepare/:id` | Resolves a stream before playing |
+| `POST` | `/api/prepare/:id/video?h=` | Downloads a video in a quality ahead (`h`: a quality line, e.g. `1080`) and answers when it's ready |
+| `GET` | `/api/video-qualities/:id` | The video's qualities here (`{ qualities: [360, 720, …], max }`, under `MUSIKE_VIDEO_MAX_HEIGHT`) |
+| `GET` | `/api/loudness/:id` | How much louder than YouTube's reference the track is, in dB (`{ loudnessDb }`, `null` when unknown) |
 | `GET` | `/api/stream/:id/audio` | Audio with HTTP Range |
-| `GET` | `/api/stream/:id/video?q=sd\|hd` | Video with HTTP Range |
+| `GET` | `/api/stream/:id/video?h=` | Video with HTTP Range: without `h` (or `360`) YouTube's ready-made SD stream, otherwise that quality, downloaded first. The older `?q=hd` means 720 |
 | `GET` | `/api/library` | The whole library, without the play log |
 | `GET` | `/api/plays?artist=&name=` | Your plays of one artist's tracks, most played first (`artist` is the `UC…` ID, `name` matches tracks saved without one) |
 | `GET` | `/api/plays` | The whole play log, most recently played first |
@@ -615,6 +642,7 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `POST` | `/api/playlists` | Creates a playlist |
 | `PATCH` / `DELETE` | `/api/playlists/:pid` | Renames / deletes |
 | `POST` / `DELETE` | `/api/playlists/:pid/tracks[/:id]` | Adds (one track or `{ tracks }`) / removes a track |
+| `PUT` | `/api/playlists/:pid/order` | The tracks in a new order (`{ ids }`; ones left out follow in their order) |
 | `PUT` / `DELETE` | `/api/library/artists/:aid` | Saves / removes an artist in the library |
 | `PUT` / `DELETE` | `/api/library/albums/:alid` | Saves / removes an album in the library |
 | `PUT` / `DELETE` | `/api/library/yt-playlists/:pid` | Saves / removes a YouTube Music playlist (a link) in the library |
@@ -622,16 +650,16 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `GET` | `/api/system` | yt-dlp, Deno and FFmpeg versions and downloads |
 | `POST` | `/api/system/ytdlp` | Updates or installs yt-dlp (`{ channel: "stable" \| "nightly" }`); admins only with accounts on |
 | `GET` | `/api/auth/status` | Accounts on or off, whether the admin still has to be set up, and who is signed in |
-| `POST` | `/api/auth/setup` | First visit: the admin's `{ username, password }` (only while nobody has a password) |
+| `POST` | `/api/auth/setup` | First visit: the admin's `{ username, password, code }`, `code` being the setup code printed in the server's log (only while nobody has a password) |
 | `POST` | `/api/auth/login` | `{ username, password, client?: "app" }`: sets the session cookie, or returns `{ token }` for apps |
 | `POST` | `/api/auth/logout` | Ends this session |
 | `POST` | `/api/auth/password` | Changes your password (`{ current, password }`) and signs out your other devices |
-| `POST` | `/api/auth/stream-link` | Apps: a signed token for stream URLs (`?st=`), 12 hours, ends with the session |
+| `POST` | `/api/auth/stream-link` | Apps: `{ session, expiresAt, key }` to sign stream URLs with, 12 hours, ends with the session |
 | `GET` / `POST` | `/api/users` | Admins: the accounts / creates one (`{ username, role }`, answers its temporary password) |
 | `PATCH` / `DELETE` | `/api/users/:uid` | Admins: changes the role (`{ role }`) / deletes the account and its library |
 | `POST` | `/api/users/:uid/password` | Admins: a new temporary password; the user's devices are signed out |
 
-With accounts on, every route except `/api/health`, `/api/auth/status`, `/api/auth/setup`, `/api/auth/login` and `/api/auth/logout` needs a session, and answers `401` (`code: "auth_required"`) without one, or `403` (`code: "password_change_required"`) while a temporary password is still in use. Apps can't put their token in a media element's request: `POST /api/auth/stream-link` gives them a signed token for stream URLs (`/api/stream/...?st=<token>`), valid 12 hours, which only opens streams and ends with the session.
+With accounts on, every route except `/api/health`, `/api/auth/status`, `/api/auth/setup`, `/api/auth/login` and `/api/auth/logout` needs a session, and answers `401` (`code: "auth_required"`) without one, or `403` (`code: "password_change_required"`) while a temporary password is still in use. Apps can't put their token in a media element's request: `POST /api/auth/stream-link` gives them a key, and each stream URL carries `?st=<session>.<expiresAt>.<signature>`, the signature being HMAC-SHA256 with that key of the track it opens (`<id>/audio` or `<id>/video`, base64url). It opens only that track, until `expiresAt`, and ends with the session.
 
 ## Project structure
 

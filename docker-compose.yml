@@ -11,7 +11,8 @@ services:
       - musike-data:/data # library: playlists, favorites, history
       - musike-cache:/cache # HD videos already downloaded
     environment:
-      # Accounts, each with its own library: open Musike right away and create the admin.
+      # Accounts, each with its own library: open Musike and create the admin, with the setup code from
+      # "docker logs musike".
       MUSIKE_AUTH: "on"
       # Audio straight from YouTube, about half a second to start; yt-dlp when that's refused.
       MUSIKE_DIRECT_AUDIO: "first"
@@ -23,6 +24,8 @@ services:
       # HD video cache, in MB.
       MUSIKE_CACHE_MAX_MB: "2048"
       # More in the README's Configuration table, for example:
+      # MUSIKE_VIDEO_MAX_HEIGHT: "2160" # offer video up to 4K (default 1080)
+      # MUSIKE_BACKUPS: "14"            # daily library copies kept in /data/backups (default 7)
       # YTDLP_CHANNEL: "nightly"   # keeps yt-dlp up to date on that channel
       # MUSIKE_TRUST_PROXY: "true" # behind a reverse proxy
     depends_on: [pot]
