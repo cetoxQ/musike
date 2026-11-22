@@ -1,12 +1,12 @@
 import { ArrowSquareOutIcon, CaretDownIcon, FileArrowUpIcon, WarningCircleIcon } from "@phosphor-icons/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { restoreBackup } from "../lib/backup";
 import { cn } from "../lib/format";
 import { EXPORTIFY_URL, matchSong, readSpotifyFiles, SpotifyFileError, toBackup, type SpotifyExport } from "../lib/spotify";
 import type { Track } from "../lib/types";
 import { getT, useT } from "../i18n";
-import { toast } from "../stores/ui";
+import { toast, useUi } from "../stores/ui";
 
 /** A few searches at a time, like Search a list: fast enough without hammering YouTube. */
 const CONCURRENCY = 3;
@@ -35,6 +35,8 @@ interface SpotifyState {
 
 // Bumped by every new run and by Stop, so answers from an older run never land in the new one.
 let runId = 0;
+// Settings opened from the "search finished" notice: the section scrolls to its card.
+let reveal = false;
 
 const empty = { data: null, matches: new Map<string, Track | null>(), found: 0, missing: [], failed: [], stopped: [], done: 0, queued: 0 };
 
@@ -94,7 +96,19 @@ const useSpotify = create<SpotifyState>((set, get) => ({
       }
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, keys.length) }, worker));
-    if (id === runId) set({ status: "ready" });
+    if (id !== runId) return;
+    set({ status: "ready" });
+    // Settings closed meanwhile: say it's done, and open it on the card to import.
+    if (!useUi.getState().settingsOpen) {
+      const t = getT().spotify;
+      toast(t.done(get().found), "info", {
+        label: t.review,
+        run: () => {
+          reveal = true;
+          useUi.getState().setSettingsOpen(true);
+        },
+      });
+    }
   },
 
   cancel: () => {
@@ -117,7 +131,15 @@ export function SpotifyImport() {
   const input = useRef<HTMLInputElement>(null);
   const { status, file, data, matches, found, missing, failed, stopped, done, queued, pick, match, cancel, reset } = useSpotify();
   const [showMissing, setShowMissing] = useState(false);
+  const card = useRef<HTMLDivElement>(null);
   const t = useT();
+
+  // Settings scrolls: a file picked near the bottom of it would get its card out of sight. Brought into view as soon as
+  // the file is being read, and when Settings opens from the "search finished" notice.
+  useEffect(() => {
+    if (status === "reading" || status === "matching" || reveal) card.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    reveal = false;
+  }, [status]);
 
   const total = data?.songs.size ?? 0;
   const busy = status === "reading" || status === "matching" || status === "importing";
@@ -169,8 +191,17 @@ export function SpotifyImport() {
         />
       </div>
 
+      {status === "reading" && (
+        <div ref={card} className="flex flex-col gap-1 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line" role="status" aria-live="polite">
+          <p className="truncate text-sm font-medium" title={file}>
+            {file}
+          </p>
+          <p className="text-xs text-fg-2">{t.spotify.readingFile}</p>
+        </div>
+      )}
+
       {data && status !== "reading" && (
-        <div className="flex flex-col gap-3 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
+        <div ref={card} className="flex flex-col gap-3 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
           <div>
             <p className="truncate text-sm font-medium" title={file}>
               {file}
