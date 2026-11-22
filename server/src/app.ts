@@ -35,6 +35,7 @@ import * as library from "./library.js";
 import { discover, type Discover } from "./profile.js";
 import { findVideoFor, radio, search, suggestions } from "./search.js";
 import { passwordGate, sameOriginWrites, securityHeaders } from "./security.js";
+import { keepBackups } from "./backups.js";
 import { openServerLibrary } from "./storage.js";
 import { proxyStream, serveFile } from "./stream.js";
 import { syncHub, type LibraryPart } from "./sync.js";
@@ -752,6 +753,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
 
   pruneCache().catch(() => {});
   const stopChannel = config.ytdlpChannel ? keepChannel(config.ytdlpChannel) : () => {};
+  const stopBackups = keepBackups(store);
   return {
     port,
     tools: found,
@@ -760,6 +762,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     setupCode: users?.needsSetup() ? code : null,
     close: async () => {
       stopChannel();
+      stopBackups();
       sync.close();
       await app.close();
       store.close();

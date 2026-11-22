@@ -46,6 +46,8 @@ export const config = {
    * The highest video quality offered (lines: 1080 is Full HD, 2160 is 4K). Higher ones are left out: they take long
    * to download and fill the cache, and 1440/2160 exist only as VP9/AV1, which older devices decode slowly.
    */
+  /** Daily copies of the library kept in <data>/backups (0: none). */
+  backups: Math.max(0, Math.trunc(Number(process.env.MUSIKE_BACKUPS ?? 7)) || 0),
   videoMaxHeight: Math.max(144, Math.min(Math.trunc(Number(process.env.MUSIKE_VIDEO_MAX_HEIGHT)) || 1080, 4320)),
   webDist: process.env.MUSIKE_WEB_DIST ?? path.resolve(root, "..", "web", "dist"),
   /**
