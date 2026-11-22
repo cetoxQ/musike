@@ -80,7 +80,7 @@ export const it: Messages = {
 
   collection: {
     reorder: "Cambia l'ordine",
-    reorderHint: "Trascina i brani dalla maniglia.",
+    reorderHint: "Trascina i brani dalla maniglia, o tienine premuto uno e spostalo.",
     reorderDone: "Fatto",
     labelPlaylist: "Playlist",
     labelFavorites: "Raccolta",

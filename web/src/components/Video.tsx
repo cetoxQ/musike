@@ -147,6 +147,8 @@ export function Theater() {
   const [fullscreen, setFullscreen] = useState(false);
   /** In the Android app's own full screen (appFullscreen), rather than the browser's. */
   const inApp = useRef(false);
+  /** The pointer that began the last tap ("mouse", "touch", "pen"), and whether the controls were hidden then. */
+  const tap = useRef({ mouse: true, hidden: false });
   const visible = open && isVideo && !!track;
 
   const setInApp = useCallback((on: boolean) => {
@@ -236,11 +238,21 @@ export function Theater() {
           exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           onPointerMove={wake}
+          // Noted before wake() brings the controls back.
+          onPointerDownCapture={(e) => (tap.current = { mouse: e.pointerType === "mouse", hidden: !chrome })}
           onPointerDown={wake}
           className={cn("fixed inset-0 z-50 bg-black", !chrome && "cursor-none")}
         >
-          {/* Click toggles play, double-click toggles fullscreen, like most video players. */}
-          <div className="absolute inset-0" onClick={() => toggle()} onDoubleClick={toggleFullscreen}>
+          {/*
+            Mouse: click toggles play, double-click toggles fullscreen, like most video players. Finger: with the
+            controls hidden a tap only shows them (the moving mouse already does that); with them showing, it toggles
+            play. No double-tap for full screen there: its first tap would pause, and the button is at hand.
+          */}
+          <div
+            className="absolute inset-0"
+            onClick={() => (tap.current.mouse || !tap.current.hidden) && toggle()}
+            onDoubleClick={() => tap.current.mouse && void toggleFullscreen()}
+          >
             <VideoSlot priority={SLOT.theater} className="size-full bg-black" />
           </div>
 

@@ -80,7 +80,7 @@ export const pt: Messages = {
 
   collection: {
     reorder: "Mudar a ordem",
-    reorderHint: "Arraste as músicas pela alça.",
+    reorderHint: "Arraste as músicas pela alça, ou segure uma e mova-a.",
     reorderDone: "Pronto",
     labelPlaylist: "Playlist",
     labelFavorites: "Coleção",

@@ -8,7 +8,7 @@ import {
   ShuffleIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
@@ -46,6 +46,9 @@ export default function Collection({ kind }: Props) {
   const [order, setOrder] = useState<Track[] | null>(null);
   const t = useT();
 
+  // Another playlist opened from this one (the page stays mounted): out of the previous one's ordering.
+  useEffect(() => setOrder(null), [id]);
+
   const playlist = kind === "playlist" ? lib.playlists.find((p) => p.id === id) : undefined;
   const tracks: Track[] = kind === "favorites" ? lib.favorites : kind === "history" ? lib.history : playlist?.tracks ?? [];
   const name = kind === "favorites" ? t.nav.favorites : kind === "history" ? t.nav.recentlyPlayed : playlist?.name ?? "";
@@ -70,6 +73,11 @@ export default function Collection({ kind }: Props) {
       </>
     );
   }
+
+  const saveOrder = () => {
+    if (playlist && order) void lib.reorderPlaylist(playlist.id, order.map((x) => x.id));
+    setOrder(null);
+  };
 
   const total = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
   // The queue holds exactly these tracks, so this collection is the current playback context.
@@ -120,6 +128,17 @@ export default function Collection({ kind }: Props) {
         >
           <ShuffleIcon size={24} />
         </IconButton>
+        {/* Any playlist of yours, made here or saved as a copy: the order in plain sight, not only in the menu. */}
+        {playlist && playlist.tracks.length > 1 && (
+          <IconButton
+            label={order ? t.collection.reorderDone : t.collection.reorder}
+            size="lg"
+            active={!!order}
+            onClick={() => (order ? saveOrder() : setOrder(playlist.tracks))}
+          >
+            <ArrowsDownUpIcon size={24} />
+          </IconButton>
+        )}
         {kind === "playlist" && (
           <IconButton label={t.collection.more} size="lg" onClick={() => setMoreOpen(true)}>
             <DotsThreeIcon size={26} weight="bold" />
@@ -134,10 +153,7 @@ export default function Collection({ kind }: Props) {
               <p className="text-sm text-fg-2">{t.collection.reorderHint}</p>
               <button
                 type="button"
-                onClick={() => {
-                  void lib.reorderPlaylist(playlist.id, order.map((x) => x.id));
-                  setOrder(null);
-                }}
+                onClick={saveOrder}
                 className="h-9 shrink-0 rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink"
               >
                 {t.collection.reorderDone}

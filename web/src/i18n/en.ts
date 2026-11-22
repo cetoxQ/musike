@@ -85,7 +85,7 @@ export const en = {
 
   collection: {
     reorder: "Change the order",
-    reorderHint: "Drag the tracks by their handle.",
+    reorderHint: "Drag the tracks by their handle, or hold one and move it.",
     reorderDone: "Done",
     labelPlaylist: "Playlist",
     labelFavorites: "Collection",
