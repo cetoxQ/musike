@@ -48,7 +48,10 @@ export function inkFor(hex: string): string {
   return contrast(base, BLACK) >= contrast(base, WHITE) ? "#0b0c0f" : "#ffffff";
 }
 
-/** CSS that overrides the theme's accent variables. Selectors outrank styles.css whatever the load order. */
+/**
+ * CSS that overrides the theme's accent variables. Selectors outrank styles.css whatever the load order, on the page
+ * and on the parts that force a theme of their own (the cinema view's controls are always dark).
+ */
 export function accentCss(hex: string): string {
   const base = toRgb(hex);
   const ink = inkFor(hex);
@@ -56,8 +59,8 @@ export function accentCss(hex: string): string {
   const lightText = readable(base, BLACK, LIGHT_SURFACE);
   const rgb = (c: Rgb) => c.map(Math.round).join(" ");
   return (
-    `html:root,html[data-theme="dark"]{--accent:${hex};--accent-ink:${ink};--accent-text:${toHex(darkText)};--accent-soft:rgb(${rgb(base)} / 0.13)}` +
-    `html[data-theme="light"]{--accent:${hex};--accent-ink:${ink};--accent-text:${toHex(lightText)};--accent-soft:rgb(${rgb(lightText)} / 0.12)}`
+    `html:root,html[data-theme="dark"],html [data-theme="dark"]{--accent:${hex};--accent-ink:${ink};--accent-text:${toHex(darkText)};--accent-soft:rgb(${rgb(base)} / 0.13)}` +
+    `html[data-theme="light"],html [data-theme="light"]{--accent:${hex};--accent-ink:${ink};--accent-text:${toHex(lightText)};--accent-soft:rgb(${rgb(lightText)} / 0.12)}`
   );
 }
 
