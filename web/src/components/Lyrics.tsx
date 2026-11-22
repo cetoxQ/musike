@@ -292,15 +292,16 @@ export function LyricsView({ mode = "panel", className }: { mode?: "panel" | "pa
                   {line.text}
                   {isActive &&
                     length > 0.4 &&
-                    // Fills under the line over its length, so it's clear how far into it playback is.
+                    // Fills under the line over its length, so it's clear how far into it playback is. Drawn again
+                    // mid-line (back from the queue, the other tab), it starts from where playback is, not from zero.
                     (playing ? (
                       <motion.span
                         aria-hidden="true"
                         key={`${line.time}-bar`}
                         className="absolute inset-x-0 -bottom-0.5 h-0.5 origin-left rounded-full bg-accent/50"
-                        initial={{ scaleX: 0 }}
+                        initial={{ scaleX: lineFraction(line, length) }}
                         animate={{ scaleX: 1 }}
-                        transition={{ duration: Math.min(length, 30), ease: "linear" }}
+                        transition={{ duration: Math.min(length * (1 - lineFraction(line, length)), 30), ease: "linear" }}
                       />
                     ) : (
                       <span
