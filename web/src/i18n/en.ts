@@ -616,6 +616,8 @@ export const en = {
     newPassword: "New password",
     signIn: "Sign in",
     createAdmin: "Create admin",
+    setupCode: "Setup code",
+    setupCodeHint: "Printed in the server's log when it started (with Docker: docker logs musike).",
     working: "One moment",
     mismatch: "The passwords don't match.",
     tooShort: "At least 8 characters.",

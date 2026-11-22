@@ -81,6 +81,24 @@ export function temporaryPassword(): string {
   return Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => chars[randomInt(chars.length)]).join("")).join("-");
 }
 
+/**
+ * The setup code: printed in the server's log when it starts waiting for the admin, and asked when the admin is
+ * created. Whoever reaches Musike before you can't take the admin account without reading that log.
+ */
+export function setupCode(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 2 }, () => Array.from({ length: 4 }, () => chars[randomInt(chars.length)]).join("")).join("-");
+}
+
+/** The code as typed: case, spaces and dashes don't matter. */
+export function sameSetupCode(typed: unknown, code: string): boolean {
+  const clean = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (typeof typed !== "string") return false;
+  const a = Buffer.from(clean(typed));
+  const b = Buffer.from(clean(code));
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 const sha256 = (token: string) => createHash("sha256").update(token).digest("hex");
 
 const toUser = (r: Row): PublicUser => ({
@@ -283,20 +301,24 @@ export function accounts(db: Db) {
     },
 
     /**
-     * A link token for the audio of this session: a media element can't send "Authorization", so apps put this in
-     * the stream URL (?st=). Signed, expiring, and tied to the session: signing out or a reset ends it too.
+     * What an app signs its stream URLs with: a media element can't send "Authorization", so each stream URL carries
+     * `?st=session.expiry.signature`, the signature made with `key` over that one track ("id/kind"). A URL seen in a
+     * proxy's log only opens that track until the expiry, nothing else. Signing out or a reset ends it too.
      */
-    streamLink(sessionId: string): { token: string; expiresAt: number } {
+    streamLink(sessionId: string): { session: string; expiresAt: number; key: string } {
       const expiresAt = Date.now() + STREAM_LINK_MS;
-      const data = `${sessionId}.${expiresAt}`;
-      return { token: `${data}.${sign(data)}`, expiresAt };
+      return { session: sessionId, expiresAt, key: sign(`${sessionId}.${expiresAt}`) };
     },
 
-    /** The session a stream link token belongs to, if the token is genuine, unexpired and the session still on. */
-    streamSession(token: string): { id: string; user: PublicUser } | null {
+    /**
+     * The session a stream URL's token belongs to, if it's genuine for this track ("id/kind"), unexpired and the
+     * session still on.
+     */
+    streamSession(token: string, track: string): { id: string; user: PublicUser } | null {
       const [sid, exp, sig] = token.split(".");
       if (!sid || !exp || !sig || sid.length !== 64 || Number(exp) < Date.now()) return null;
-      const want = Buffer.from(sign(`${sid}.${exp}`));
+      const key = sign(`${sid}.${exp}`);
+      const want = Buffer.from(createHmac("sha256", key).update(track).digest("base64url"));
       const got = Buffer.from(sig);
       if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
       const r = sessionById.get(sid) as Row | undefined;

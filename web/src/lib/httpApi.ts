@@ -207,8 +207,8 @@ export function httpBackend(opts: HttpBackendOptions) {
         if (e instanceof ApiError && e.status === 404) return { enabled: false, setup: false, user: null };
         throw e;
       }),
-    setup: async (username: string, password: string) => {
-      const r = await request<{ user: AuthUser }>("/api/auth/setup", { method: "POST", json: { username, password } });
+    setup: async (username: string, password: string, code: string) => {
+      const r = await request<{ user: AuthUser }>("/api/auth/setup", { method: "POST", json: { username, password, code } });
       // The setup answers with a cookie; an app signs in again for its token.
       if (opts.token) await login(username, password);
       return r;

@@ -93,6 +93,7 @@ function SignInScreen({ setup }: { setup: boolean }) {
   const [username, setUsername] = useState(setup ? "admin" : "");
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
+  const [code, setCode] = useState("");
   const { busy, error, setError, run } = useAction();
 
   const submit = (e: FormEvent) => {
@@ -100,7 +101,7 @@ function SignInScreen({ setup }: { setup: boolean }) {
     if (setup) {
       if (password.length < 8) return setError(t.account.tooShort);
       if (password !== repeat) return setError(t.account.mismatch);
-      return void run(() => setupAdmin(username.trim(), password));
+      return void run(() => setupAdmin(username.trim(), password, code));
     }
     void run(() => login(username.trim(), password));
   };
@@ -121,8 +122,14 @@ function SignInScreen({ setup }: { setup: boolean }) {
         {setup && (
           <Field id="auth-repeat" label={t.account.repeatPassword} type="password" value={repeat} onChange={setRepeat} autoComplete="new-password" />
         )}
+        {setup && (
+          <div className="flex flex-col gap-1">
+            <Field id="auth-code" label={t.account.setupCode} value={code} onChange={setCode} autoComplete="off" />
+            <p className="px-1 text-xs text-fg-3">{t.account.setupCodeHint}</p>
+          </div>
+        )}
         <ErrorText text={error} />
-        <button type="submit" disabled={busy || !username.trim() || !password} className={`${primaryButton} mt-1`}>
+        <button type="submit" disabled={busy || !username.trim() || !password || (setup && !code.trim())} className={`${primaryButton} mt-1`}>
           {busy ? t.account.working : setup ? t.account.createAdmin : t.account.signIn}
         </button>
       </form>

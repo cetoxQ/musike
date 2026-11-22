@@ -21,7 +21,7 @@ interface AuthState {
   setup: boolean;
   user: AuthUser | null;
   load: () => Promise<void>;
-  setupAdmin: (username: string, password: string) => Promise<void>;
+  setupAdmin: (username: string, password: string, code: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (current: string, password: string) => Promise<void>;
@@ -70,8 +70,8 @@ export const useAuth = create<AuthState>((set, get) => {
       }
     },
 
-    setupAdmin: async (username, password) => {
-      const { user } = await api.setup(username, password);
+    setupAdmin: async (username, password, code) => {
+      const { user } = await api.setup(username, password, code);
       signedIn(user);
     },
 

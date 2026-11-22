@@ -609,6 +609,8 @@ export const pt: Messages = {
     newPassword: "Nova senha",
     signIn: "Entrar",
     createAdmin: "Criar admin",
+    setupCode: "Código de configuração",
+    setupCodeHint: "Impresso no log do servidor quando ele iniciou (com Docker: docker logs musike).",
     working: "Um momento",
     mismatch: "As senhas não são iguais.",
     tooShort: "Pelo menos 8 caracteres.",

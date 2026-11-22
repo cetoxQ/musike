@@ -3,7 +3,17 @@ import path from "node:path";
 import { createServer } from "node:net";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
-import { accounts, checkPassword, checkUsername, loginThrottle, type PublicUser, type Role, SESSION_DAYS } from "./auth.js";
+import {
+  accounts,
+  checkPassword,
+  checkUsername,
+  loginThrottle,
+  type PublicUser,
+  type Role,
+  sameSetupCode,
+  SESSION_DAYS,
+  setupCode,
+} from "./auth.js";
 import {
   ALBUM_ID,
   album,
@@ -100,6 +110,8 @@ export interface RunningServer {
   accounts: "off" | "on" | "setup";
   /** Where the library lives: data/musike.db, or data/library.json. */
   library: "sqlite" | "json";
+  /** While accounts wait for the admin: the code to print, asked when the admin is created. */
+  setupCode: string | null;
   close: () => Promise<void>;
 }
 
@@ -150,6 +162,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   }
   const users = config.auth && store.db ? accounts(store.db) : null;
   users?.pruneSessions();
+  const code = users?.needsSetup() ? setupCode() : null;
   /** Devices of one account playing in step (see sync.ts). */
   const sync = syncHub({ sessionAlive: users ? (id) => users.sessionAlive(id) : undefined });
   const throttle = loginThrottle();
@@ -179,9 +192,9 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     app.addHook("onRequest", async (req) => {
       const path = req.url.split("?")[0];
       if (!path.startsWith("/api/")) return;
-      // Stream URLs carry their own signed token (apps' media elements can't send a header).
+      // Stream URLs carry their own token, signed for that track (apps' media elements can't send a header).
       const link = path.startsWith("/api/stream/") ? (req.query as { st?: unknown }).st : undefined;
-      const s = typeof link === "string" ? users.streamSession(link) : users.session(tokenOf(req));
+      const s = typeof link === "string" ? users.streamSession(link, path.slice("/api/stream/".length)) : users.session(tokenOf(req));
       if (s) {
         req.user = s.user;
         req.sessionId = s.id;
@@ -229,7 +242,17 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     const accounts = enabled();
     // Checked before hashing anything: once set up, this costs nothing to ask.
     if (!accounts.needsSetup()) throw new HttpError(409, msg("setupDone"));
-    const body = (req.body ?? {}) as { username?: unknown; password?: unknown };
+    const body = (req.body ?? {}) as { username?: unknown; password?: unknown; code?: unknown };
+    // The code from the server's log: guessing it is throttled like a password.
+    const keys = [`setup:${req.ip}`];
+    const wait = throttle.wait(keys);
+    if (wait) throw new HttpError(429, msg("tooManyAttempts", { seconds: wait }));
+    if (!code || !sameSetupCode(body.code, code)) {
+      throttle.fail(keys);
+      app.log.warn({ event: "setup_code_wrong", ip: req.ip }, "wrong setup code");
+      throw new HttpError(403, msg("setupCodeWrong"));
+    }
+    throttle.succeed(keys);
     const username = checkUsername(body.username ?? "admin");
     const password = checkPassword(body.password);
     const user = await checkingPassword(() => accounts.setup(username, password));
@@ -259,7 +282,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return signIn(req, reply, user, body.client === "app" ? "app" : "web");
   });
 
-  /** For apps: a token to put in stream URLs (?st=), valid for hours, ended with the session. */
+  /** For apps: the key to sign stream URLs with (?st=, one track each), valid for hours, ended with the session. */
   app.post("/api/auth/stream-link", async (req) => enabled().streamLink(req.sessionId!));
 
   // A change to the library, from any device: the account's other devices are told, to fetch it again (sync.ts).
@@ -715,6 +738,7 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     tools: found,
     library: store.kind,
     accounts: !users ? "off" : users.needsSetup() ? "setup" : "on",
+    setupCode: users?.needsSetup() ? code : null,
     close: async () => {
       stopChannel();
       sync.close();

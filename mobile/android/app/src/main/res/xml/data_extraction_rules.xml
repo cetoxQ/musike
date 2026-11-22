@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and later. Google's cloud backup leaves out the web view's local storage: it holds the session token
+     for your Musike server, which shouldn't live on in a backup. Everything else is kept (the phone's own library is
+     in files/); after restoring, connect and sign in again. A transfer to a new phone over cable or Wi-Fi keeps it all. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview/Default/Local Storage/" />
+        <exclude domain="root" path="app_webview/Local Storage/" />
+    </cloud-backup>
+</data-extraction-rules>

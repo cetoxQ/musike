@@ -609,6 +609,8 @@ export const it: Messages = {
     newPassword: "Nuova password",
     signIn: "Accedi",
     createAdmin: "Crea amministratore",
+    setupCode: "Codice di configurazione",
+    setupCodeHint: "Stampato nel log del server all'avvio (con Docker: docker logs musike).",
     working: "Un momento",
     mismatch: "Le password non coincidono.",
     tooShort: "Almeno 8 caratteri.",

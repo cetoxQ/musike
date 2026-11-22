@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and earlier: backups leave out the web view's local storage, where the session token for your Musike
+     server is kept (see data_extraction_rules.xml for Android 12 and later). -->
+<full-backup-content>
+    <exclude domain="root" path="app_webview/Default/Local Storage/" />
+    <exclude domain="root" path="app_webview/Local Storage/" />
+</full-backup-content>

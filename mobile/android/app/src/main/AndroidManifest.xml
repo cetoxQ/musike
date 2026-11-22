@@ -14,9 +14,12 @@
     <!-- Lets Android Auto open the app in the background (granted by the user in Settings > Android Auto). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- usesCleartextTraffic: a Musike server on the home network is often plain http (the app warns about it). -->
+    <!-- usesCleartextTraffic: a Musike server on the home network is often plain http (the app warns about it).
+         Backups leave out the session token: res/xml/backup_rules.xml and data_extraction_rules.xml. -->
     <application
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/banner"
         android:label="@string/app_name"

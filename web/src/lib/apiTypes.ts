@@ -262,7 +262,8 @@ export interface MusikeApi {
   updateYtdlp(channel: Channel): Promise<SystemJob>;
 
   authStatus(): Promise<AuthStatus>;
-  setup(username: string, password: string): Promise<{ user: AuthUser }>;
+  /** `code`: the setup code the server printed in its log when it started. */
+  setup(username: string, password: string, code: string): Promise<{ user: AuthUser }>;
   login(username: string, password: string): Promise<{ user: AuthUser }>;
   logout(): Promise<void>;
   changePassword(current: string, password: string): Promise<{ user: AuthUser }>;

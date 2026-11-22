@@ -28,7 +28,7 @@ if (process.argv[2] === "reset-password") {
   process.exit();
 }
 
-const { port, tools, library, accounts } = await startServer();
+const { port, tools, library, accounts, setupCode } = await startServer();
 
 const lan = Object.values(networkInterfaces())
   .flat()
@@ -44,5 +44,6 @@ if (!tools.ffmpeg) console.log(`  FFmpeg:  not found (HD video unavailable)`);
 console.log(`  Data:    ${path.relative(process.cwd(), config.dataDir) || config.dataDir}`);
 console.log(`  Library: ${library === "sqlite" ? "musike.db (SQLite)" : "library.json"}`);
 console.log(
-  `  Accounts: ${accounts === "off" ? "off" : accounts === "setup" ? "on, waiting for the admin: open Musike in a browser to choose the password" : "on"}\n`,
+  `  Accounts: ${accounts === "off" ? "off" : accounts === "setup" ? "on, waiting for the admin: open Musike in a browser to choose the password" : "on"}${setupCode ? "" : "\n"}`,
 );
+if (setupCode) console.log(`  Setup code: ${setupCode} (asked when you create the admin)\n`);

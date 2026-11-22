@@ -62,26 +62,36 @@ function unproxied(src: string): string {
   return at === -1 ? src : decodeURIComponent(src.slice(at + PROXY.length));
 }
 
+/** HMAC-SHA256 of `data` with `key` (its UTF-8 bytes), base64url: what the server checks a stream URL's token with. */
+async function hmac(key: string, data: string): Promise<string> {
+  const enc = new TextEncoder();
+  const k = await crypto.subtle.importKey("raw", enc.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(data)));
+  return btoa(String.fromCharCode(...sig)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 /** The Musike server as the app's backend: its API with the app's token, and its stream proxy for the audio. */
 export function serverBackend(url: string) {
   const http = httpBackend({ base: url, fetch: nativeFetch, token, headers: HEADERS });
 
-  // A media element can't send the token: stream URLs carry a signed link token instead, renewed before it runs out.
-  // A server without accounts needs none.
-  let link: { token: string; expiresAt: number } | "none" | null = null;
-  async function linkToken(): Promise<string | null> {
+  // A media element can't send the token: each stream URL carries one signed for that track alone (a URL in a proxy's
+  // log opens nothing else), with a key renewed before it runs out. A server without accounts needs none.
+  type Link = { session: string; expiresAt: number; key: string };
+  let link: Link | "none" | null = null;
+  async function linkToken(track: string): Promise<string | null> {
     if (link === "none") return null;
-    if (link && link.expiresAt - Date.now() > 60 * 60_000) return link.token;
-    try {
-      link = await http.request<{ token: string; expiresAt: number }>("/api/auth/stream-link", { method: "POST" });
-      return link.token;
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        link = "none";
-        return null;
+    if (!link || link.expiresAt - Date.now() <= 60 * 60_000) {
+      try {
+        link = await http.request<Link>("/api/auth/stream-link", { method: "POST" });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) {
+          link = "none";
+          return null;
+        }
+        throw e;
       }
-      throw e;
     }
+    return `${link.session}.${link.expiresAt}.${await hmac(link.key, track)}`;
   }
 
   return {
@@ -94,7 +104,7 @@ export function serverBackend(url: string) {
         }
       : null,
     async streamUrl(id: string, kind: "audio" | "video" = "audio", quality: "sd" | "hd" = "sd"): Promise<string> {
-      const st = await linkToken();
+      const st = await linkToken(`${id}/${kind}`);
       const path = http.streamPath(id, kind, quality);
       const direct = url + path + (st ? `${path.includes("?") ? "&" : "?"}st=${encodeURIComponent(st)}` : "");
       // The app's page is https://localhost: the web view won't play audio from an http:// server itself. Android's
