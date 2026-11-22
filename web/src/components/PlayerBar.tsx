@@ -7,7 +7,7 @@ import { ArtistLink } from "./ArtistLink";
 import { DevicesButton, ElsewhereNote } from "./Devices";
 import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume, VolumePopover } from "./Controls";
+import { FavoriteButton, ModeSwitch, Scrubber, SleepButton, Transport, Volume, VolumePopover } from "./Controls";
 import { IconButton } from "./IconButton";
 import { LyricsButton, useLyricsNavigation } from "./Lyrics";
 
@@ -67,6 +67,7 @@ export function PlayerBar() {
           <ModeSwitch className="max-2xl:hidden" />
           <LyricsButton />
           <DevicesButton />
+          <SleepButton />
           <IconButton
             label={t.player.queue}
             size="sm"

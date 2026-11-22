@@ -1,4 +1,5 @@
 import {
+  MoonStarsIcon,
   HeartIcon,
   MusicNotesIcon,
   PauseIcon,
@@ -229,6 +230,84 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
     >
       <HeartIcon size={size === "lg" ? 24 : 19} weight={isFavorite ? "fill" : "regular"} />
     </IconButton>
+  );
+}
+
+const SLEEP_MINUTES = [15, 30, 45, 60, 90];
+
+/** The sleep timer: playback stops after a while, or at the end of the track. Shows the minutes left while it runs. */
+export function SleepButton({ className, size = "sm" }: { className?: string; size?: "sm" | "md" }) {
+  const t = useT();
+  const sleep = usePlayer((s) => s.sleep);
+  const setSleep = usePlayer((s) => s.setSleep);
+  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState<CSSProperties>({});
+  const [, tick] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+
+  // The minutes left, kept current while the timer runs.
+  useEffect(() => {
+    if (typeof sleep !== "number") return;
+    const timer = setInterval(() => tick((n) => n + 1), 15_000);
+    return () => clearInterval(timer);
+  }, [sleep]);
+
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+
+  const toggle = () => {
+    const r = box.current?.getBoundingClientRect();
+    if (r && !open) {
+      const right = Math.max(8, window.innerWidth - r.right);
+      setAt(r.top > 360 ? { right, bottom: window.innerHeight - r.top + 10 } : { right, top: r.bottom + 10 });
+    }
+    setOpen((o) => !o);
+  };
+  const pick = (v: number | "track" | null) => {
+    setSleep(v);
+    setOpen(false);
+  };
+  const left = typeof sleep === "number" ? Math.max(1, Math.ceil((sleep - Date.now()) / 60_000)) : null;
+  const status = sleep === "track" ? t.player.sleepAtEnd : left !== null ? t.player.sleepLeft(left) : t.player.sleep;
+  const item = (on: boolean) =>
+    cn("flex w-full items-center rounded-lg px-3 py-2 text-left text-[13px]", on ? "bg-accent-soft text-accent-text" : "text-fg hover:bg-surface-4");
+
+  return (
+    <div ref={box} className={cn("relative flex items-center", className)}>
+      <IconButton label={status} size={size} active={sleep !== null || open} onClick={toggle} aria-expanded={open} aria-haspopup="menu">
+        <MoonStarsIcon size={size === "md" ? 22 : 18} weight={sleep !== null ? "fill" : "regular"} />
+      </IconButton>
+      {left !== null && <span className="pointer-events-none absolute -right-1 -bottom-0.5 font-mono text-[10px] text-accent-text">{left}</span>}
+      {open && (
+        <div role="menu" aria-label={t.player.sleep} style={at} className="fixed z-50 w-56 rounded-2xl bg-surface-3 p-1.5 shadow-lg ring-1 ring-line">
+          <p className="px-3 pt-1.5 pb-2 text-[12px] text-fg-3">{status}</p>
+          <button type="button" role="menuitemradio" aria-checked={sleep === "track"} className={item(sleep === "track")} onClick={() => pick("track")}>
+            {t.player.sleepEndOfTrack}
+          </button>
+          {SLEEP_MINUTES.map((m) => (
+            <button key={m} type="button" role="menuitem" className={item(false)} onClick={() => pick(m)}>
+              {t.player.sleepMinutes(m)}
+            </button>
+          ))}
+          {sleep !== null && (
+            <button type="button" role="menuitem" className={item(false)} onClick={() => pick(null)}>
+              {t.player.sleepOff}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

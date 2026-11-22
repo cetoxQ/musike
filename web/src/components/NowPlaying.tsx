@@ -23,7 +23,7 @@ import { AlbumLink, ArtistLink } from "./ArtistLink";
 import { DevicesButton, ElsewhereNote } from "./Devices";
 import { Marquee } from "./Marquee";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport, useVideoAvailable, Volume } from "./Controls";
+import { FavoriteButton, ModeSwitch, Scrubber, SleepButton, Transport, useVideoAvailable, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
 import { LyricsView, useLyricsNavigation } from "./Lyrics";
 import { QueueList } from "./Queue";
@@ -395,6 +395,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
               <IconButton label={t.common.close} onClick={onClose} className="-ml-2 text-fg">
                 <CaretDownIcon size={24} />
               </IconButton>
+              <SleepButton size="md" className="-mr-2" />
               {/* In the middle of the sheet, whatever the buttons on either side. */}
               <div className="pointer-events-none absolute top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-3/50" />
             </div>

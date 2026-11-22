@@ -146,6 +146,13 @@ interface PlayerState {
   setPreferVideo: (on: boolean) => void;
   setQuality: (q: Quality) => void;
   setAutoRadio: (on: boolean) => void;
+  /**
+   * The sleep timer: when playback stops by itself (ms since epoch), "track" at the end of the track playing, or
+   * null when it's off.
+   */
+  sleep: number | "track" | null;
+  /** Stops playback in `minutes`, at the end of this track ("track"), or turns the timer off (null). */
+  setSleep: (minutes: number | "track" | null) => void;
   /** Another device hands its playback over: its queue, from where it was, playing. */
   takeOver: (queue: Track[], index: number, position: number, shuffle: boolean, repeat: Repeat) => void;
 }
@@ -177,6 +184,7 @@ let shownHeight = 0;
 let fetching: string | null = null;
 /** Told by the video's size on screen. */
 let onShown: (height: number) => void = () => {};
+let sleepTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingSeek = 0;
 let token = 0;
 /** YouTube's bot check (see botCheck): until when video waits, the retries left for audio and their timer. */
@@ -396,6 +404,25 @@ export const usePlayer = create<PlayerState>((set, get) => {
     fitToScreen();
   };
 
+  /** The sleep timer runs out: the music fades over a few seconds, then pauses, and the volume comes back. */
+  function asleep() {
+    clearTimeout(sleepTimer);
+    set({ sleep: null });
+    const media = activeMedia();
+    if (elsewhere() || !media || media.paused) return get().pause();
+    const from = media.volume;
+    const steps = 16;
+    let step = 0;
+    const fade = setInterval(() => {
+      step++;
+      media.volume = from * (1 - step / steps);
+      if (step < steps) return;
+      clearInterval(fade);
+      get().pause();
+      media.volume = get().volume;
+    }, 6000 / steps);
+  }
+
   async function continueWithRadio() {
     const s = get();
     const last = s.queue[s.index];
@@ -454,6 +481,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
   function onEnded() {
     const s = get();
+    if (s.sleep === "track") return asleep();
     if (s.repeat === "one") {
       const media = activeMedia();
       if (media) {
@@ -640,6 +668,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     // Builds without video (Android) always play audio, whatever a backup or an old session says.
     preferVideo: capabilities.video && (saved.preferVideo ?? false),
     quality: toQuality(saved.quality),
+    sleep: null,
     videoQuality: SD,
     autoRadio: saved.autoRadio ?? true,
 
@@ -903,6 +932,21 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const r = elsewhere();
       if (r) return r.setAutoRadio(autoRadio);
       set({ autoRadio });
+    },
+
+    setSleep: (minutes) => {
+      clearTimeout(sleepTimer);
+      if (minutes === null) return set({ sleep: null });
+      if (minutes === "track") {
+        set({ sleep: "track" });
+        // Another device playing: its track's end isn't heard here, so it's the time left in it.
+        const r = get().remote;
+        if (r) sleepTimer = setTimeout(asleep, Math.max(0, (r.duration - r.position) * 1000));
+        return;
+      }
+      const at = Date.now() + minutes * 60_000;
+      set({ sleep: at });
+      sleepTimer = setTimeout(asleep, minutes * 60_000);
     },
 
     takeOver: (queue, index, position, shuffle, repeat) => {
