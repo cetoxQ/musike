@@ -72,7 +72,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 
 **Library**
 - Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search, or by pasting or sharing its link, and save a copy as your own playlist
-- **Put things in order:** drag up next in the queue, and a playlist's tracks (its menu > Change the order)
+- **Put things in order:** drag up next in the queue, and a playlist's tracks (its menu > Change the order), by the handle at the start of a row; on a phone you can also hold a row for a moment and then move it
 - Recent searches remember what you opened (song, video, artist, album, playlist), each removable
 - **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
@@ -151,7 +151,7 @@ Setting up `https://`:
 **Video**
 - Video mode in the side panel, full screen on phones, or in a floating mini player
 - **Official music video** found automatically for songs (only from the artist's own channel)
-- **Cinema mode:** maximize the video (button, double-click or `F`), with controls that fade while you watch, and true full screen
+- **Cinema mode:** maximize the video (button, double-click or `F`), with controls that fade while you watch, and true full screen (in the Android app, full screen hides the system bars and turns a landscape video sideways, even with auto-rotate off; Back leaves it)
 - SD quality (starts fast) or HD 720p (cached locally)
 
 **Library**
@@ -746,12 +746,12 @@ iOS limits background playback for PWAs; Audio mode works better than Video.
 - [x] Android Auto
 - [x] Timed lyrics
 - [x] Fewer bot checks in Docker (proof-of-origin tokens)
+- [x] Reorder the queue and playlists by dragging
 
 **Open ideas, no promises**
 - [ ] Video on Android on its own
 - [ ] Import YouTube playlists from a link (today: from search)
 - [ ] Download playlists to listen without a connection
-- [ ] Reorder tracks by dragging
 - [ ] Artists in Android Auto
 - [ ] Automatic updates for the Windows app
 

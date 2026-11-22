@@ -135,6 +135,12 @@ export const openedLinks: ((open: (url: string) => void) => () => void) | null =
 export const car: CarSettings | null = null;
 
 /**
+ * The cinema view's full screen, done by the Android app itself (native/api.ts): its web view doesn't keep a page in
+ * full screen. Elsewhere the browser's Fullscreen API does it.
+ */
+export const appFullscreen: ((on: boolean, landscape: boolean) => Promise<void>) | null = null;
+
+/**
  * Devices in step (see stores/devices.ts): the WebSocket address, with a fresh single-use ticket. Only over https:
  * on plain http the app works as it always did, on its own. (The desktop app is http://localhost: never.)
  */

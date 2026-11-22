@@ -233,6 +233,21 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
   );
 }
 
+/**
+ * Where a small menu opens, fixed to the window so no panel's edge cuts it: above its button when the button is low,
+ * under it otherwise; lined up with the button's right edge (or in the middle of the window, `centred`), and always
+ * inside the window (on a phone the button can sit in the middle of the row, where a menu lined up with it would run
+ * off the screen). `width`: the menu's, in px.
+ */
+function menuPlace(button: DOMRect, width: number, centred = false): CSSProperties {
+  const w = Math.min(width, window.innerWidth - 16);
+  const at = centred ? (window.innerWidth - w) / 2 : button.right - w;
+  const left = Math.round(Math.min(Math.max(8, at), window.innerWidth - w - 8));
+  return button.top > 360
+    ? { left, width: w, bottom: window.innerHeight - button.top + 10, maxHeight: button.top - 18 }
+    : { left, width: w, top: button.bottom + 10, maxHeight: window.innerHeight - button.bottom - 18 };
+}
+
 const SLEEP_MINUTES = [15, 30, 45, 60, 90];
 
 /** The sleep timer: playback stops after a while, or at the end of the track. Shows the minutes left while it runs. */
@@ -268,10 +283,7 @@ export function SleepButton({ className, size = "sm" }: { className?: string; si
 
   const toggle = () => {
     const r = box.current?.getBoundingClientRect();
-    if (r && !open) {
-      const right = Math.max(8, window.innerWidth - r.right);
-      setAt(r.top > 360 ? { right, bottom: window.innerHeight - r.top + 10 } : { right, top: r.bottom + 10 });
-    }
+    if (r && !open) setAt(menuPlace(r, 224));
     setOpen((o) => !o);
   };
   const pick = (v: number | "track" | null) => {
@@ -290,7 +302,7 @@ export function SleepButton({ className, size = "sm" }: { className?: string; si
       </IconButton>
       {left !== null && <span className="pointer-events-none absolute -right-1 -bottom-0.5 font-mono text-[10px] text-accent-text">{left}</span>}
       {open && (
-        <div role="menu" aria-label={t.player.sleep} style={at} className="fixed z-50 w-56 rounded-2xl bg-surface-3 p-1.5 shadow-lg ring-1 ring-line">
+        <div role="menu" aria-label={t.player.sleep} style={at} className="scroll-area fixed z-50 overflow-y-auto rounded-2xl bg-surface-3 p-1.5 shadow-lg ring-1 ring-line">
           <p className="px-3 pt-1.5 pb-2 text-[12px] text-fg-3">{status}</p>
           <button type="button" role="menuitemradio" aria-checked={sleep === "track"} className={item(sleep === "track")} onClick={() => pick("track")}>
             {t.player.sleepEndOfTrack}
@@ -331,15 +343,12 @@ export function QualityButton({ compact }: { compact: boolean }) {
   const track = usePlayer(selectCurrent);
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<number[] | null>(null);
-  /** Where the menu shows: fixed to the window, above the button or under it, so no panel's edge cuts it. */
   const [at, setAt] = useState<CSSProperties>({});
   const box = useRef<HTMLDivElement>(null);
   const toggle = () => {
     const r = box.current?.getBoundingClientRect();
-    if (r && !open) {
-      const right = Math.max(8, window.innerWidth - r.right);
-      setAt(r.top > 360 ? { right, bottom: window.innerHeight - r.top + 10 } : { right, top: r.bottom + 10 });
-    }
+    // On a phone the menu takes most of the width: in the middle of the screen, over the row it opened from.
+    if (r && !open) setAt(menuPlace(r, 256, window.innerWidth < 768));
     setOpen((o) => !o);
   };
   const shown = remote ? (chosen === "auto" ? null : chosen) : playing;
@@ -395,20 +404,28 @@ export function QualityButton({ compact }: { compact: boolean }) {
         aria-haspopup="menu"
         title={t.player.quality}
         className={cn(
-          "rounded-full font-mono font-semibold ring-1 transition-colors",
+          "rounded-full font-mono font-semibold whitespace-nowrap ring-1 transition-colors",
           compact
             ? cn("h-5 px-1.5 text-[10px] leading-none", high ? "bg-accent text-accent-ink ring-accent" : "bg-surface-2 text-fg-2 ring-line")
             : cn("h-9 px-3 text-[12px]", high ? "bg-accent-soft text-accent-text ring-accent/40" : "text-fg-2 ring-line hover:text-fg"),
         )}
       >
-        {compact ? (shown ? qualityLabel(shown, true) : "A") : label}
+        {compact ? (
+          shown ? qualityLabel(shown, true) : "A"
+        ) : (
+          <>
+            <span className="max-md:hidden">{label}</span>
+            {/* A phone's cinema view has less room beside the controls: just the quality playing. */}
+            <span className="md:hidden">{shown ? qualityLabel(shown) : t.player.qualityAuto}</span>
+          </>
+        )}
       </button>
       {open && (
         <div
           role="menu"
           aria-label={t.player.quality}
           style={at}
-          className="fixed z-50 w-64 rounded-2xl bg-surface-3 p-1.5 shadow-lg ring-1 ring-line"
+          className="scroll-area fixed z-50 overflow-y-auto rounded-2xl bg-surface-3 p-1.5 shadow-lg ring-1 ring-line"
         >
           <button type="button" role="menuitemradio" aria-checked={chosen === "auto"} className={item(chosen === "auto")} onClick={() => pick("auto")}>
             <span className="flex flex-col">

@@ -24,7 +24,7 @@ import { findVideoFor, radio, search, suggestions } from "../../../server/src/se
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
 import { ApiError, type CarSettings, type Connection, type MusikeApi, type ServerLink, type SystemInfo } from "../lib/apiTypes";
-import "./android";
+import { androidFullscreen } from "./android";
 import { makeConnection, savedConnection, serverBackend } from "./connection";
 import { media, Playback } from "./media";
 import { offlineCapable } from "./offline";
@@ -332,7 +332,6 @@ export const capabilities = {
 /** Android Auto's lists and searches (native/car.ts), loaded only in the app. */
 export const startCar: (() => void) | null = () => void import("./car").then((m) => m.startCar());
 
-/** Settings > Android Auto: opening the app from the car, and the car's log. */
 /**
  * YouTube links opened with Musike, or shared to it (MainActivity turns a share into the same link). The App plugin
  * keeps the one the app was started with until this listener asks for it.
@@ -342,6 +341,7 @@ export const openedLinks: ((open: (url: string) => void) => () => void) | null =
   return () => void sub.then((s) => s.remove());
 };
 
+/** Settings > Android Auto: opening the app from the car, and the car's log. */
 export const car: CarSettings | null = {
   info: () => Playback.carInfo(),
   openBackgroundSettings: () => Playback.openBackgroundSettings(),
@@ -349,6 +349,9 @@ export const car: CarSettings | null = {
     await Share.share({ title: "Musike Android Auto", text, dialogTitle: "Musike Android Auto" }).catch(() => {});
   },
 };
+
+/** The cinema view's full screen: the app hides the system bars and turns the screen itself (native/android.ts). */
+export const appFullscreen: ((on: boolean, landscape: boolean) => Promise<void>) | null = androidFullscreen;
 
 /** Devices in step: only connected to a Musike server over https (see native/connection.ts). */
 export const syncAddress: (() => Promise<string>) | null = server?.syncAddress ?? null;

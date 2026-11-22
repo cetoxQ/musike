@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { create } from "zustand";
 import { MD, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
+import { appFullscreen } from "../lib/api";
 import { cn } from "../lib/format";
 import { selectCurrent, usePlayer, useStatusText, videoEl } from "../player/player";
 import { useUi } from "../stores/ui";
@@ -144,7 +145,22 @@ export function Theater() {
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [chrome, setChrome] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  /** In the Android app's own full screen (appFullscreen), rather than the browser's. */
+  const inApp = useRef(false);
   const visible = open && isVideo && !!track;
+
+  const setInApp = useCallback((on: boolean) => {
+    if (!appFullscreen || inApp.current === on) return;
+    inApp.current = on;
+    setFullscreen(on);
+    void appFullscreen(on, on && usePlayer.getState().videoAspect > 1);
+  }, []);
+
+  // The cinema view going away (closed, Back, Audio mode, the queue emptying) leaves the app's full screen too.
+  useEffect(() => {
+    if (!visible) return;
+    return () => setInApp(false);
+  }, [visible, setInApp]);
 
   // Leaving Video mode (or the queue emptying) closes the cinema view.
   useEffect(() => {
@@ -162,8 +178,10 @@ export function Theater() {
   useEffect(() => {
     if (!visible) return;
     wake();
+    // Escape (Back, in the Android app) leaves full screen first, then the cinema view.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.fullscreenElement) setTheater(false);
+      if (e.key === "Escape" && inApp.current) setInApp(false);
+      else if (e.key === "Escape" && !document.fullscreenElement) setTheater(false);
       wake();
     };
     const onFs = () => setFullscreen(!!document.fullscreenElement);
@@ -174,7 +192,7 @@ export function Theater() {
       document.removeEventListener("fullscreenchange", onFs);
       if (idle.current) clearTimeout(idle.current);
     };
-  }, [visible, wake, setTheater]);
+  }, [visible, wake, setTheater, setInApp]);
 
   // Paused: keep the controls on screen.
   useEffect(() => {
@@ -183,11 +201,13 @@ export function Theater() {
   }, [playing, visible, wake]);
 
   const close = async () => {
+    setInApp(false);
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
     setTheater(false);
   };
 
   const toggleFullscreen = async () => {
+    if (appFullscreen) return setInApp(!inApp.current);
     if (document.fullscreenElement) return document.exitFullscreen().catch(() => {});
     if (box.current?.requestFullscreen) {
       await box.current.requestFullscreen().catch(() => {});
@@ -210,6 +230,7 @@ export function Theater() {
           role="dialog"
           aria-modal="true"
           aria-label={t.video.label(track.title)}
+          data-escape-closes
           initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
@@ -225,7 +246,9 @@ export function Theater() {
 
           <div
             className={cn(
-              "overlay-top pointer-events-none absolute inset-x-0 top-0 bg-linear-to-b from-black/80 to-transparent px-4 pb-12 md:px-6",
+              "overlay-top pointer-events-none absolute inset-x-0 top-0 bg-linear-to-b from-black/80 to-transparent pb-12",
+              // Sideways, a phone's notch or navigation buttons can be on either side.
+              "pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))] md:pl-[max(1.5rem,env(safe-area-inset-left))]",
               fade,
             )}
           >
@@ -249,7 +272,10 @@ export function Theater() {
 
           <div
             className={cn(
-              "safe-bottom pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/85 to-transparent px-4 pt-16 pb-4 md:px-8 md:pb-6",
+              "pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/85 to-transparent pt-16",
+              // Above the phone's navigation buttons or gesture bar, and clear of them sideways.
+              "pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+              "pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:pr-[max(2rem,env(safe-area-inset-right))] md:pl-[max(2rem,env(safe-area-inset-left))]",
               fade,
             )}
           >

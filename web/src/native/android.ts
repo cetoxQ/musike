@@ -2,10 +2,23 @@ import { App } from "@capacitor/app";
 import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { installTvMode } from "../tv/tvMode";
 
-/** MusikeDevicePlugin.java: what kind of device this is. */
-const Device = registerPlugin<{ info(): Promise<{ tv: boolean }> }>("MusikeDevice", {
-  web: () => ({ info: async () => ({ tv: false }) }),
+/** MusikeDevicePlugin.java: what kind of device this is, and the cinema view's full screen. */
+const Device = registerPlugin<{
+  info(): Promise<{ tv: boolean }>;
+  fullscreen(options: { on: boolean; landscape: boolean }): Promise<void>;
+}>("MusikeDevice", {
+  web: () => ({ info: async () => ({ tv: false }), fullscreen: async () => {} }),
 });
+
+/**
+ * Full screen in the Android app: the system bars hide (a swipe from the edge shows them for a moment) and a landscape
+ * clip turns the screen sideways, whatever the rotation setting; off, both come back as they were. The web view's own
+ * Fullscreen API ends at once (Capacitor's BridgeWebChromeClient), so the page can't do it alone.
+ */
+export const androidFullscreen =
+  Capacitor.getPlatform() === "android"
+    ? (on: boolean, landscape: boolean) => Device.fullscreen({ on, landscape }).catch(() => {})
+    : null;
 
 // How the app fits into Android itself: Android TV, the Back button and the system bars.
 if (Capacitor.isNativePlatform()) {

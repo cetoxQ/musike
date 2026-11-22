@@ -342,10 +342,12 @@ function SheetRow({ track, view, setView }: { track: Track; view: SheetView; set
   const columns = hasVideo
     ? `repeat(${left.length}, ${right.length / left.length}fr) auto repeat(${right.length}, 1fr)`
     : `repeat(${left.length + right.length}, 1fr)`;
+  // A little apart from Play, and as wide as the sheet allows (into its side margins), with room around Audio/Video:
+  // seven things in a phone's width.
   return (
-    <div className="grid items-center justify-items-center" style={{ gridTemplateColumns: columns }}>
+    <div className="-mx-3 mt-3 grid items-center justify-items-center" style={{ gridTemplateColumns: columns }}>
       {left}
-      {hasVideo && <ModeSwitch key="mode" compact />}
+      {hasVideo && <ModeSwitch key="mode" compact className="mx-1" />}
       {right}
     </div>
   );
