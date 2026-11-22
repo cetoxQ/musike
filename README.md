@@ -551,7 +551,12 @@ Spotify doesn't let other apps read your library directly, so the import goes th
 
 1. **Settings > Import from Spotify > Open Exportify**, sign in with Spotify and click **Export All**. It saves a zip with one CSV per playlist (Liked Songs included). On the phone the site opens in the browser and the zip goes to Downloads.
 2. Back in Musike, **Choose file** and pick the zip (or one or more of its CSV files).
-3. Musike looks for every song on YouTube Music, a few at a time: the title, the main artist and the length must match, and covers, karaoke, remixes, live and sped-up versions lose out unless the Spotify title says so. A song with nothing close enough counts as **not found** rather than risk a wrong one. A big library takes a few minutes: Settings can be closed meanwhile, **Stop** keeps what was found and **Continue** searches the rest, **Retry** searches again the ones whose search failed.
+3. Musike looks for every song on YouTube Music, six at a time: the title, the main artist and the length must match, and covers, karaoke, remixes, live and sped-up versions lose out unless the Spotify title says so. A song with nothing close enough counts as **not found** rather than risk a wrong one. Some songs need no search at all:
+   - the same song under another Spotify id (the single and the album version, in two playlists) is searched once for all of them; a live or remixed version, with its own title, is searched on its own;
+   - a song already in your library (favorites, playlists, history) with the same title, main artist and length is taken from there, so importing an updated export later only searches the new songs;
+   - songs searched before the app closed or reloaded: pick the same file again and it goes on from where it was (what was searched stays on the device until the import).
+
+   If YouTube starts refusing searches, Musike slows down to three at a time for the rest of the run. A big library still takes a while (thousands of songs, about 20 minutes): Settings can be closed meanwhile and a notice says when the search is done, **Stop** keeps what was found and **Continue** searches the rest, **Retry** searches again the ones whose search failed.
 4. **Songs not found** lists the ones left out. **Import N songs** adds the rest to your library.
 
 What comes over:

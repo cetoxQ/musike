@@ -192,7 +192,7 @@ export function scoreMatch(candidate: Track, song: SpotifySong): number {
 }
 
 /** A sure match stops early; below `MIN_SCORE` the song counts as not found rather than risk a wrong one. */
-const SURE_SCORE = 6;
+export const SURE_SCORE = 6;
 const MIN_SCORE = 3.5;
 
 /** The best YouTube Music match for a song, or null when nothing is close enough. Throws when the search itself fails. */
@@ -207,6 +207,103 @@ export async function matchSong(song: SpotifySong): Promise<Track | null> {
     if (best && best.score >= SURE_SCORE) break;
   }
   return best && best.score >= MIN_SCORE ? best.track : null;
+}
+
+/**
+ * The same song under another Spotify id (the single and the album, a relinked track): same title and main artist,
+ * versions in brackets included, so a live or remixed one is still searched on its own.
+ */
+export function sameSong(song: SpotifySong): string {
+  const light = (v: string) =>
+    v.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return `${light(song.title)}|${light(mainArtist(song.artist))}`;
+}
+
+/**
+ * Songs already in the library need no search: a track there that matches for sure (title, main artist, length) is
+ * taken as it is. Indexed by title, so thousands of songs against a big library stay quick.
+ */
+export function libraryMatcher(tracks: Track[]): (song: SpotifySong) => Track | null {
+  const byTitle = new Map<string, Track[]>();
+  const seen = new Set<string>();
+  for (const t of tracks) {
+    if (seen.has(t.id)) continue;
+    seen.add(t.id);
+    const key = norm(t.title);
+    byTitle.set(key, [...(byTitle.get(key) ?? []), t]);
+  }
+  return (song) => {
+    let best: { score: number; track: Track } | null = null;
+    for (const track of byTitle.get(norm(song.title)) ?? []) {
+      const score = scoreMatch(track, song);
+      if (!best || score > best.score) best = { score, track };
+    }
+    return best && best.score >= SURE_SCORE ? best.track : null;
+  };
+}
+
+/**
+ * Songs searched already, kept on the device (IndexedDB) until the import: if the app closes or reloads halfway,
+ * picking the same file again goes on from there. Keyed by the Spotify id, so a match is right for any export.
+ */
+const CACHE_DB = "musike-spotify";
+const CACHE_STORE = "matches";
+let cacheDb: Promise<IDBDatabase | null> | null = null;
+
+function openCache(): Promise<IDBDatabase | null> {
+  cacheDb ??= new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(CACHE_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(CACHE_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null); // no IndexedDB (private mode): nothing kept, nothing breaks
+    }
+  });
+  return cacheDb;
+}
+
+/** Everything searched so far: a track, or null for a song with nothing close enough. */
+export async function cachedMatches(): Promise<Map<string, Track | null>> {
+  const db = await openCache();
+  const out = new Map<string, Track | null>();
+  if (!db) return out;
+  return new Promise((resolve) => {
+    try {
+      const req = db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return resolve(out);
+        out.set(String(cursor.key), cursor.value as Track | null);
+        cursor.continue();
+      };
+      req.onerror = () => resolve(out);
+    } catch {
+      resolve(out);
+    }
+  });
+}
+
+export function cacheMatch(key: string, track: Track | null): void {
+  void openCache().then((db) => {
+    try {
+      db?.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE).put(track, key);
+    } catch {
+      /* full or closed: the search just isn't kept */
+    }
+  });
+}
+
+/** After the import: the library has the songs now, the device doesn't need them twice. */
+export function clearMatches(): void {
+  void openCache().then((db) => {
+    try {
+      db?.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE).clear();
+    } catch {
+      /* nothing to clear */
+    }
+  });
 }
 
 /** The server keeps up to this many tracks per playlist (and in Favorites): longer lists are split into parts. */

@@ -3,13 +3,30 @@ import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { restoreBackup } from "../lib/backup";
 import { cn } from "../lib/format";
-import { EXPORTIFY_URL, matchSong, readSpotifyFiles, SpotifyFileError, toBackup, type SpotifyExport } from "../lib/spotify";
+import {
+  cachedMatches,
+  cacheMatch,
+  clearMatches,
+  EXPORTIFY_URL,
+  libraryMatcher,
+  matchSong,
+  readSpotifyFiles,
+  sameSong,
+  SpotifyFileError,
+  toBackup,
+  type SpotifyExport,
+} from "../lib/spotify";
 import type { Track } from "../lib/types";
 import { getT, useT } from "../i18n";
+import { useLibrary } from "../stores/library";
 import { toast, useUi } from "../stores/ui";
 
-/** A few searches at a time, like Search a list: fast enough without hammering YouTube. */
-const CONCURRENCY = 3;
+/**
+ * Searches at a time: six, about twice as fast as three without being a flood. A search that fails even after its
+ * retry (YouTube pushing back) takes it down by two, to three at the least, for the rest of the run.
+ */
+const CONCURRENCY = 6;
+const MIN_CONCURRENCY = 3;
 
 interface SpotifyState {
   status: "idle" | "reading" | "matching" | "ready" | "importing";
@@ -75,27 +92,53 @@ const useSpotify = create<SpotifyState>((set, get) => ({
       failed: s.failed.filter((k) => !retrying.has(k)),
       stopped: s.stopped.filter((k) => !retrying.has(k)),
     }));
+    // No search for what is known already: songs searched before the app closed (same file picked again), songs
+    // already in the library, and the same song under another Spotify id (searched once, for all of them).
+    const lib = useLibrary.getState();
+    const inLibrary = libraryMatcher([...lib.favorites, ...lib.playlists.flatMap((p) => p.tracks), ...lib.history]);
+    const cached = await cachedMatches();
+    if (id !== runId) return;
+    const searching = new Map<string, Promise<Track | null | undefined>>();
+    const find = (key: string): Track | null | undefined | Promise<Track | null | undefined> => {
+      if (cached.has(key)) return cached.get(key);
+      const song = data.songs.get(key)!;
+      const known = inLibrary(song);
+      if (known) return known;
+      const same = sameSong(song);
+      let pending = searching.get(same);
+      if (!pending) {
+        pending = matchSong(song).then(
+          (track) => (cacheMatch(key, track), track),
+          () => undefined, // the search failed: "Retry" later
+        );
+        searching.set(same, pending);
+      } else pending = pending.then((track) => (track !== undefined && cacheMatch(key, track), track));
+      return pending;
+    };
     let next = 0;
+    let limit = Math.min(CONCURRENCY, keys.length);
+    let running = 0;
     const worker = async () => {
-      while (id === runId && next < keys.length) {
-        const key = keys[next++];
-        let found: Track | null | undefined;
-        try {
-          found = await matchSong(data.songs.get(key)!);
-        } catch {
-          found = undefined;
+      running++;
+      try {
+        while (id === runId && next < keys.length && running <= limit) {
+          const key = keys[next++];
+          const found = await find(key);
+          if (id !== runId) return; // Stop already counted this song as unsearched
+          if (found !== undefined) matches.set(key, found);
+          else limit = Math.max(MIN_CONCURRENCY, limit - 2);
+          set((s) => ({
+            done: s.done + 1,
+            found: s.found + (found ? 1 : 0),
+            missing: found === null ? [...s.missing, key] : s.missing,
+            failed: found === undefined ? [...s.failed, key] : s.failed,
+          }));
         }
-        if (id !== runId) return; // Stop already counted this song as unsearched
-        if (found !== undefined) matches.set(key, found);
-        set((s) => ({
-          done: s.done + 1,
-          found: s.found + (found ? 1 : 0),
-          missing: found === null ? [...s.missing, key] : s.missing,
-          failed: found === undefined ? [...s.failed, key] : s.failed,
-        }));
+      } finally {
+        running--;
       }
     };
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, keys.length) }, worker));
+    await Promise.all(Array.from({ length: limit }, worker));
     if (id !== runId) return;
     set({ status: "ready" });
     // Settings closed meanwhile: say it's done, and open it on the card to import.
@@ -156,6 +199,7 @@ export function SpotifyImport() {
         r.favoritesAdded && t.backup.addedFavorites(r.favoritesAdded),
       ].filter((p): p is string => !!p);
       toast(parts.length ? t.backup.imported(parts) : t.backup.nothingNew);
+      clearMatches();
       reset();
     } catch (e) {
       toast((e as Error).message, "error");

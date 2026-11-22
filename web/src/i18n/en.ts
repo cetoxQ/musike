@@ -601,7 +601,7 @@ export const en = {
     files: (n: number) => `${n} files`,
     summary: (playlists: number, songs: number) => `${count(playlists, "playlist", "playlists")} · ${count(songs, "song", "songs")}`,
     matching: (done: number, total: number, found: number) => `Searching ${done}/${total} · ${found} found`,
-    keepOpen: "Big libraries take a few minutes. You can close Settings; the search keeps going.",
+    keepOpen: "Big libraries take a few minutes. You can close Settings; the search keeps going. If the app closes, pick the same file again: it goes on from where it was.",
     found: "found",
     notFound: "not found",
     failed: "search failed",

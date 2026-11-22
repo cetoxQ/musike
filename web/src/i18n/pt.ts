@@ -595,7 +595,7 @@ export const pt: Messages = {
     files: (n) => `${n} arquivos`,
     summary: (playlists, songs) => `${count(playlists, "playlist", "playlists")} · ${count(songs, "música", "músicas")}`,
     matching: (done, total, found) => `Buscando ${done}/${total} · ${count(found, "encontrada", "encontradas")}`,
-    keepOpen: "Bibliotecas grandes levam alguns minutos. Pode fechar as Configurações; a busca continua.",
+    keepOpen: "Bibliotecas grandes levam alguns minutos. Pode fechar as Configurações; a busca continua. Se o app fechar, escolha o mesmo arquivo de novo: ela continua de onde parou.",
     found: "encontradas",
     notFound: "não encontradas",
     failed: "falha na busca",
