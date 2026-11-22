@@ -36,6 +36,8 @@ interface LibraryState extends Library {
   makeRadioPlaylist: (seed: Track, tracks: Track[]) => Promise<void>;
   /** A track of the radio playlist kept, or no longer kept. */
   toggleKeep: (id: string, trackId: string) => Promise<void>;
+  /** The radio playlist's kept tracks, all at once (all of them, or none). */
+  setKept: (id: string, trackIds: string[]) => Promise<void>;
   /** The radio playlist being regenerated (its id), while it is. */
   regenerating: string | null;
   /**
@@ -47,14 +49,18 @@ interface LibraryState extends Library {
   saveRadioPlaylist: (id: string) => Promise<void>;
 }
 
-/** Tracks whose radio a regeneration asks for: spread over the ones kept. */
-const RADIO_SEEDS = 5;
+/** Radios asked for at once while regenerating. */
+const RADIO_SEEDS = 4;
+/** Rounds of radios at most: each round's seeds come after the last's (see regenerateRadio). */
+const RADIO_ROUNDS = 4;
 /** A regenerated radio playlist has at least this many tracks. */
 const RADIO_MIN = 25;
 
 /** Up to `n` of the list, spread evenly over it. */
 function spread<T>(list: T[], n: number): T[] {
+  if (n <= 0) return [];
   if (list.length <= n) return list;
+  if (n === 1) return [list[Math.floor(list.length / 2)]!];
   return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))]!);
 }
 
@@ -219,10 +225,15 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   },
 
   toggleKeep: async (id, trackId) => {
+    const p = get().playlists.find((x) => x.id === id);
+    if (!p?.radio) return;
+    await get().setKept(id, p.radio.kept.includes(trackId) ? p.radio.kept.filter((k) => k !== trackId) : [...p.radio.kept, trackId]);
+  },
+
+  setKept: async (id, kept) => {
     const prev = get().playlists;
     const p = prev.find((x) => x.id === id);
     if (!p?.radio) return;
-    const kept = p.radio.kept.includes(trackId) ? p.radio.kept.filter((k) => k !== trackId) : [...p.radio.kept, trackId];
     // At once here; the server's copy follows, and the other devices with it.
     set({ playlists: replacePlaylist(prev, { ...p, radio: { ...p.radio, kept, edited: true } }) });
     try {
@@ -240,22 +251,44 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const radio = p.radio;
     const keptIds = new Set(radio.kept);
     const kept = p.tracks.filter((t) => keptIds.has(t.id));
-    const seeds = spread(kept.length ? kept.map((t) => t.id) : [radio.seed], RADIO_SEEDS);
+    const dropped = p.tracks.filter((t) => !keptIds.has(t.id));
     set({ regenerating: id });
     try {
-      const lists = await Promise.all(seeds.map((s) => api.radio(s).catch(() => [] as Track[])));
-      const dropped = p.tracks.filter((t) => !keptIds.has(t.id)).map((t) => t.id);
-      const out = new Set([...keptIds, ...radio.discarded, ...dropped]);
       const want = Math.max(p.tracks.length, RADIO_MIN) - kept.length;
-      // A little from each kept track's radio in turn, so all of them count.
+      // What can't come in: the kept tracks (they stay), the ones going out now and the ones out before.
+      const out = new Set([...keptIds, ...radio.discarded, ...dropped.map((t) => t.id)]);
       const fresh: Track[] = [];
-      for (let i = 0; fresh.length < want && lists.some((l) => i < l.length); i++) {
-        for (const list of lists) {
-          const t = list[i];
-          if (!t || out.has(t.id)) continue;
-          out.add(t.id);
-          fresh.push(t);
-          if (fresh.length >= want) break;
+      // Radios to ask, in order: the kept tracks first (they're what the new ones should be like), then the ones
+      // going out and the track it started from, then the new ones found. A track out of the playlist can still lead
+      // to others: a single track's radio is mostly what's already here (or was), and alone ran dry in a few rounds.
+      const found: string[] = [];
+      const groups = [kept.map((t) => t.id), [...new Set([radio.seed, ...dropped.map((t) => t.id)])], found];
+      const asked = new Set<string>();
+      /** The next radios to ask: from the first group with some left, spread over it, topped up from the next. */
+      const nextBatch = () => {
+        const batch: string[] = [];
+        for (const group of groups) {
+          const left = group.filter((s) => !asked.has(s) && !batch.includes(s));
+          batch.push(...spread(left, RADIO_SEEDS - batch.length));
+          if (batch.length >= RADIO_SEEDS) break;
+        }
+        return batch;
+      };
+      for (let round = 0; round < RADIO_ROUNDS && fresh.length < want; round++) {
+        const batch = nextBatch();
+        if (!batch.length) break;
+        batch.forEach((s) => asked.add(s));
+        const lists = await Promise.all(batch.map((s) => api.radio(s).catch(() => [] as Track[])));
+        // A little from each radio in turn, so all of them count.
+        for (let i = 0; fresh.length < want && lists.some((l) => i < l.length); i++) {
+          for (const list of lists) {
+            const t = list[i];
+            if (!t || out.has(t.id)) continue;
+            out.add(t.id);
+            fresh.push(t);
+            found.push(t.id);
+            if (fresh.length >= want) break;
+          }
         }
       }
       if (!fresh.length) {
@@ -265,7 +298,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       const updated = await api.updateRadioPlaylist(id, {
         tracks: [...kept, ...fresh],
         kept: [...keptIds],
-        discarded: [...radio.discarded, ...dropped],
+        discarded: [...radio.discarded, ...dropped.map((t) => t.id)],
       });
       set((s) => ({ playlists: replacePlaylist(s.playlists, updated) }));
       toast(getT().radio.regenerated(fresh.length));

@@ -48,6 +48,8 @@ export interface RemoteView {
   quality: Quality;
   showingVideo: boolean;
   autoRadio: boolean;
+  /** Its browser waits for a click on it before playing (after a reload). */
+  blocked: boolean;
   /** Its queue (up to 500 tracks around the current one) and the current track in it. */
   queue: Track[];
   index: number;
@@ -108,6 +110,13 @@ interface PlayerState {
   status: Status;
   /** What playback is busy with (or why it failed), shown instead of the artist. See `useStatusText`. */
   statusText: StatusNote | null;
+  /**
+   * The browser refused to play: a page plays sound only after someone clicked on it, so after a reload a command from
+   * another device can't start it. A click on the button that shows meanwhile plays (see AutoplayPrompt).
+   */
+  blocked: boolean;
+  /** Plays what the browser refused, from a click (the click is what the browser waits for). */
+  unblock: () => void;
   /** Which media element is driving playback right now. */
   mediaKind: Kind;
   /** Set when Video mode is on but the current song has no music video on YouTube. */
@@ -372,7 +381,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
   function play(media: HTMLMediaElement) {
     media.play().catch((err: DOMException) => {
       if (err.name === "AbortError") return; // src changed mid-start
-      if (err.name === "NotAllowedError") set({ status: "paused" }); // autoplay blocked
+      if (err.name === "NotAllowedError") set({ status: "paused", blocked: true }); // autoplay blocked: needs a click here
     });
   }
 
@@ -910,7 +919,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     media.addEventListener("playing", () => {
       if (!isActive()) return;
       botRetries = 0;
-      set({ status: "playing", statusText: null });
+      set({ status: "playing", statusText: null, blocked: false });
       onStarted();
       syncPlaybackState();
     });
@@ -985,6 +994,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     status: saved.queue?.length ? "paused" : "idle",
     remote: null,
     statusText: null,
+    blocked: false,
     mediaKind: "audio",
     videoNote: null,
     videoAspect: 16 / 9,
@@ -1162,7 +1172,16 @@ export const usePlayer = create<PlayerState>((set, get) => {
       else media.pause();
     },
 
+    unblock: () => {
+      set({ blocked: false });
+      const s = get();
+      const media = loaded ? mediaFor(loaded.kind) : null;
+      if (media?.getAttribute("src")) play(media);
+      else load(s.index, { startAt: s.position });
+    },
+
     pause: () => {
+      if (get().blocked) set({ blocked: false });
       const s = get();
       if (s.status !== "playing" && s.status !== "loading") return;
       if (s.status === "loading") {

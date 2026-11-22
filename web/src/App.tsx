@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from "react-router";
-import { DevicesDialog } from "./components/Devices";
+import { AutoplayPrompt, DevicesDialog } from "./components/Devices";
 import { AddToPlaylistDialog, ForgetDialog, RadioReplaceDialog, ShareDialog, ShortcutsDialog } from "./components/Dialogs";
 import { MiniPlayer, TabBar } from "./components/MobileChrome";
 import { NowPlayingSheet, PanelDrawer, SidePanel } from "./components/NowPlaying";
@@ -235,6 +235,7 @@ export default function App() {
       <ShareDialog />
       <ForgetDialog />
       <RadioReplaceDialog />
+      <AutoplayPrompt />
       <ShortcutsDialog />
       <DevicesDialog />
       <SettingsDialog />

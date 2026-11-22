@@ -1,4 +1,4 @@
-import { DesktopIcon, DeviceMobileIcon, DevicesIcon, SpeakerHighIcon } from "@phosphor-icons/react";
+import { DesktopIcon, DeviceMobileIcon, DevicesIcon, PlayIcon, SpeakerHighIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
@@ -22,6 +22,33 @@ export function DevicesButton({ size = "sm", className }: { size?: "sm" | "md"; 
   );
 }
 
+/**
+ * The browser refused to play here (after a reload, a page may play sound only after a click on it), typically when
+ * another device asked: a button in plain sight, whose click is the one the browser waits for.
+ */
+export function AutoplayPrompt() {
+  const blocked = usePlayer((s) => s.blocked && !s.remote);
+  const unblock = usePlayer((s) => s.unblock);
+  const t = useT();
+  if (!blocked) return null;
+  return (
+    <button
+      type="button"
+      onClick={unblock}
+      title={t.devices.clickToPlayHint}
+      className="fixed top-[calc(env(safe-area-inset-top)+12px)] left-1/2 z-50 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-3 rounded-full bg-accent py-2.5 pr-5 pl-3 text-accent-ink shadow-[0_12px_32px_rgb(0_0_0/0.45)]"
+    >
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-black/15">
+        <PlayIcon size={16} weight="fill" />
+      </span>
+      <span className="min-w-0 text-left">
+        <span className="block text-sm font-semibold">{t.devices.clickToPlay}</span>
+        <span className="block truncate text-xs opacity-80">{t.devices.clickToPlayHint}</span>
+      </span>
+    </button>
+  );
+}
+
 /** "Playing on Pixel 7", under the player, while the player shows (and controls) another device. */
 export function ElsewhereNote({ className }: { className?: string }) {
   const controlled = useControlled();
@@ -35,7 +62,13 @@ export function ElsewhereNote({ className }: { className?: string }) {
       className={cn("flex w-full min-w-0 items-center gap-1.5 px-3 text-xs font-medium text-accent", className)}
     >
       <SpeakerHighIcon size={14} weight="fill" className="shrink-0" />
-      <span className="truncate">{controlled.playing ? t.devices.playingOn(controlled.name) : t.devices.pausedOn(controlled.name)}</span>
+      <span className="truncate">
+        {controlled.blocked
+          ? t.devices.needsClick(controlled.name)
+          : controlled.playing
+            ? t.devices.playingOn(controlled.name)
+            : t.devices.pausedOn(controlled.name)}
+      </span>
     </button>
   );
 }

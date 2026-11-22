@@ -1,4 +1,4 @@
-import { ClockIcon, DotsThreeIcon, HeartIcon, PushPinIcon, VideoCameraIcon } from "@phosphor-icons/react";
+import { ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { memo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
@@ -28,7 +28,7 @@ interface RowProps {
   onToggle?: () => void;
   /** A touch screen rather than a mouse (see TrackList). */
   touch?: boolean;
-  /** In the radio playlist: the track is kept (see TrackList's keep). */
+  /** In the radio playlist: the checkbox keeps the track, on every device (see TrackList's keep). */
   kept?: boolean;
   onKeep?: () => void;
 }
@@ -55,7 +55,7 @@ const TrackRow = memo(function TrackRow({
   const openMenu = useUi((s) => s.openMenu);
   const art = useRef<HTMLDivElement>(null);
   const t = useT();
-  const checks = !!(selectable && (selecting || !touch));
+  const checks = !!onKeep || !!(selectable && (selecting || !touch));
 
   const menuAt = (e: MouseEvent) => {
     e.preventDefault();
@@ -105,12 +105,13 @@ const TrackRow = memo(function TrackRow({
         <button
           type="button"
           role="checkbox"
-          aria-checked={!!selected}
-          aria-label={t.selection.select(track.title)}
-          onClick={onToggle}
+          aria-checked={onKeep ? !!kept : !!selected}
+          aria-label={onKeep ? (kept ? t.radio.unkeep(track.title) : t.radio.keep(track.title)) : t.selection.select(track.title)}
+          title={onKeep ? (kept ? t.radio.unkeep(track.title) : t.radio.keep(track.title)) : undefined}
+          onClick={onKeep ?? onToggle}
           className="relative z-10 -my-1.5 -ml-2 flex h-14 w-10 items-center justify-center"
         >
-          <Check on={!!selected} />
+          <Check on={onKeep ? !!kept : !!selected} />
         </button>
       )}
 
@@ -163,32 +164,15 @@ const TrackRow = memo(function TrackRow({
         </span>
       </div>
 
-      <div className="relative z-10 flex items-center">
-        {onKeep && (
-          <button
-            type="button"
-            onClick={onKeep}
-            aria-pressed={!!kept}
-            aria-label={kept ? t.radio.unkeep(track.title) : t.radio.keep(track.title)}
-            title={kept ? t.radio.unkeep(track.title) : t.radio.keep(track.title)}
-            className={cn(
-              "grid size-9 place-items-center rounded-full transition-[color,background-color,transform] hover:bg-surface-3 active:scale-90",
-              kept ? "text-accent-text" : "text-fg-3 hover:text-fg",
-            )}
-          >
-            <PushPinIcon size={18} weight={kept ? "fill" : "regular"} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={menuAt}
-          aria-label={t.trackList.moreFor(track.title)}
-          title={t.trackList.more}
-          className="grid size-9 place-items-center rounded-full text-fg-2 transition-[opacity,background-color] hover:bg-surface-3 hover:text-fg md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-        >
-          <DotsThreeIcon size={22} weight="bold" />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={menuAt}
+        aria-label={t.trackList.moreFor(track.title)}
+        title={t.trackList.more}
+        className="relative z-10 grid size-9 place-items-center rounded-full text-fg-2 transition-[opacity,background-color] hover:bg-surface-3 hover:text-fg md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+      >
+        <DotsThreeIcon size={22} weight="bold" />
+      </button>
     </li>
   );
 });
@@ -214,8 +198,11 @@ interface ListProps {
    * artwork picks a track, and so does "Select" in the row's menu. A selection bar plays, favorites or adds them.
    */
   selection?: ListSelection;
-  /** The radio playlist: each row has a pin to keep the track (regenerating replaces the others). */
-  keep?: { kept: ReadonlySet<string>; toggle: (track: Track) => void };
+  /**
+   * The radio playlist: each row's checkbox keeps the track (regenerating replaces the others), shown on every device,
+   * a phone too; it takes the place of picking tracks.
+   */
+  keep?: { kept: ReadonlySet<string>; toggle: (track: Track) => void; setAll: (on: boolean) => void };
 }
 
 export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true, selection, keep }: ListProps) {
@@ -228,7 +215,9 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const chosen = selection ? tracks.filter((x) => picked.has(x.id)) : [];
   const allSelected = tracks.length > 0 && chosen.length === tracks.length;
-  const checks = !!selection && (chosen.length > 0 || !touch);
+  const checks = !!keep || (!!selection && (chosen.length > 0 || !touch));
+  const keptHere = keep ? tracks.filter((x) => keep.kept.has(x.id)).length : 0;
+  const allKept = !!keep && tracks.length > 0 && keptHere === tracks.length;
   const toggle = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
@@ -237,7 +226,22 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
     });
   return (
     <div>
-      {selection && (
+      {keep && (
+        <div className="-mx-2 mb-2 flex items-center gap-3 px-2 md:-mx-3 md:px-3">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={allKept}
+            onClick={() => keep.setAll(!allKept)}
+            className="flex h-10 items-center gap-2.5 rounded-full pr-3 pl-1.5 text-sm font-medium text-fg-2 hover:text-fg"
+          >
+            <Check on={allKept} />
+            {allKept ? t.radio.keepNone : t.radio.keepAll}
+          </button>
+          <span className="font-mono text-xs text-fg-3">{t.radio.keptCount(keptHere)}</span>
+        </div>
+      )}
+      {selection && !keep && (
         <SelectionBar
           className="-mx-2 mb-2 md:-mx-3"
           chosen={chosen}
@@ -270,7 +274,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
           <span className="flex w-[84px] justify-end pr-0.5">
             <ClockIcon size={15} aria-label={t.trackList.duration} />
           </span>
-          <span className={keep ? "w-[72px]" : "w-9"} />
+          <span className="w-9" />
         </div>
       )}
       <ul className="flex flex-col">
@@ -285,10 +289,10 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
               playList(context ?? tracks, i);
               pushRecent({ kind: "track", track: tracks[i] });
             }}
-            selectable={!!selection}
+            selectable={!!selection && !keep}
             selected={picked.has(t.id)}
             selecting={chosen.length > 0}
-            onToggle={selection ? () => toggle(t.id) : undefined}
+            onToggle={selection && !keep ? () => toggle(t.id) : undefined}
             touch={touch}
             kept={keep?.kept.has(t.id)}
             onKeep={keep ? () => keep.toggle(t) : undefined}

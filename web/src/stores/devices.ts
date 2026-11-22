@@ -51,6 +51,8 @@ export interface PlayState {
   autoRadio: boolean;
   /** Of the current track, in the whole queue. */
   index: number;
+  /** Its browser waits for a click before it plays (see the player's blocked). */
+  blocked?: boolean;
 }
 
 export interface Device {
@@ -162,6 +164,7 @@ function current(): PlayState {
     showingVideo: s.mediaKind === "video",
     autoRadio: s.autoRadio,
     index: s.index,
+    blocked: s.blocked,
   };
 }
 
@@ -269,6 +272,7 @@ export const useDevices = create<DevicesState>((set, get) => {
       quality: s.quality,
       showingVideo: s.showingVideo,
       autoRadio: s.autoRadio,
+      blocked: s.blocked === true,
       queue,
       index,
     });
@@ -636,7 +640,8 @@ export const useDevices = create<DevicesState>((set, get) => {
           s.preferVideo !== prev.preferVideo ||
           s.quality !== prev.quality ||
           s.mediaKind !== prev.mediaKind ||
-          s.autoRadio !== prev.autoRadio
+          s.autoRadio !== prev.autoRadio ||
+          s.blocked !== prev.blocked
         ) {
           report();
         }
@@ -663,9 +668,10 @@ export const useDevices = create<DevicesState>((set, get) => {
 });
 
 /** The device this one controls (the player shows it), if any. */
-export function useControlled(): { id: string; name: string; playing: boolean } | null {
+export function useControlled(): { id: string; name: string; playing: boolean; blocked: boolean } | null {
   const id = usePlayer((s) => s.remote?.device ?? null);
   const name = usePlayer((s) => s.remote?.name ?? "");
   const playing = usePlayer((s) => !!s.remote?.playing);
-  return id ? { id, name, playing } : null;
+  const blocked = usePlayer((s) => !!s.remote?.blocked);
+  return id ? { id, name, playing, blocked } : null;
 }

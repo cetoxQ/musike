@@ -163,7 +163,7 @@ export default function Collection({ kind }: Props) {
         )}
       </div>
 
-      {/* The radio playlist, not saved yet: keep tracks with the pin, regenerate the rest, or save it. */}
+      {/* The radio playlist, not saved yet: keep tracks with their checkbox, regenerate the rest, or save it. */}
       {playlist && radio && !order && (
         <div className="mx-4 mb-4 flex flex-col gap-3 rounded-[18px] bg-surface-2 p-4 md:mx-6 md:flex-row md:items-center md:gap-5">
           <div className="flex min-w-0 flex-1 gap-3">
@@ -226,7 +226,15 @@ export default function Collection({ kind }: Props) {
             tracks={tracks}
             playlistId={playlist?.id}
             showAlbum
-            keep={playlist && radio ? { kept: new Set(radio.kept), toggle: (x) => void lib.toggleKeep(playlist.id, x.id) } : undefined}
+            keep={
+              playlist && radio
+                ? {
+                    kept: new Set(radio.kept),
+                    toggle: (x) => void lib.toggleKeep(playlist.id, x.id),
+                    setAll: (on) => void lib.setKept(playlist.id, on ? playlist.tracks.map((x) => x.id) : []),
+                  }
+                : undefined
+            }
             selection={{
               noFavorite: kind === "favorites",
               extra:

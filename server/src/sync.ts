@@ -67,6 +67,8 @@ export interface PlayState {
   autoRadio: boolean;
   /** Position of the current track in the device's whole queue. */
   index: number;
+  /** Its browser waits for a click on it before it plays (after a reload, a page may play sound only after one). */
+  blocked: boolean;
 }
 
 /** A device's queue (up to MAX_QUEUE tracks around the current one); `offset`: where it starts in the whole queue. */
@@ -194,6 +196,7 @@ function playState(v: unknown): PlayState | null {
     showingVideo: s.showingVideo === true,
     autoRadio: s.autoRadio !== false,
     index: count(s.index),
+    blocked: s.blocked === true,
   };
 }
 
