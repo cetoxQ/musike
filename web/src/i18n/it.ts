@@ -156,6 +156,7 @@ export const it: Messages = {
     quality: "Qualità video",
     qualityAuto: "Auto",
     qualityAutoHint: "Parte subito in SD, poi passa alla qualità adatta allo schermo",
+    qualityFailed: "Non è stato possibile preparare questa qualità: riproduco in SD.",
     qualityDownloads: "Scaricato prima di riprodurre",
     nothingPlaying: "Nessuna riproduzione in corso. Cerca qualcosa per iniziare.",
     showNowPlaying: "Mostra In riproduzione",

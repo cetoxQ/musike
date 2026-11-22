@@ -322,7 +322,7 @@ const COMMON_QUALITIES = [1080, 720, 480, 360];
  * The video quality: Auto (SD at once, then what fits the screen) or one of the qualities YouTube has for this video,
  * under the server's limit. Compact: a badge on the switch's corner, so the phone's row doesn't widen.
  */
-function QualityButton({ compact }: { compact: boolean }) {
+export function QualityButton({ compact }: { compact: boolean }) {
   const t = useT();
   const remote = usePlayer((s) => !!s.remote);
   const chosen = usePlayer((s) => s.remote?.quality ?? s.quality);

@@ -388,16 +388,32 @@ export const usePlayer = create<PlayerState>((set, get) => {
       lastProgress = Date.now();
       if (autoplay) play(media);
     };
-    // The server's proxy URL is known right away; on Android the stream is first resolved on the phone.
-    const source = streamSource(mediaIdFor(track, kind), kind, height);
-    if (typeof source === "string") start(source);
-    else {
-      const mine = token;
-      source.then(
-        (src) => mine === token && start(src),
-        (err: ApiError) => mine === token && report(err.message, err.code),
+    const mine = token;
+    const begin = (h: number) => {
+      // The server's proxy URL is known right away; on Android the stream is first resolved on the phone.
+      const source = streamSource(mediaIdFor(track, kind), kind, h);
+      if (typeof source === "string") start(source);
+      else
+        source.then(
+          (src) => mine === token && start(src),
+          (err: ApiError) => mine === token && report(err.message, err.code),
+        );
+    };
+    if (kind === "video" && height !== SD) {
+      // A quality the server downloads first (it can take a minute): asked ahead, so the player doesn't sit on a
+      // request with no data and take it for a stall. If it can't be had, SD plays instead of skipping the track.
+      api.prepareVideo(mediaIdFor(track, kind), height).then(
+        () => mine === token && begin(height),
+        (err: ApiError) => {
+          if (mine !== token) return;
+          if (err.code === "bot_check") return report(err.message, err.code);
+          toast(getT().player.qualityFailed);
+          if (loaded) loaded.height = SD;
+          set({ videoQuality: SD, statusText: "loadingVideo" });
+          begin(SD);
+        },
       );
-    }
+    } else begin(height);
     setMetadata(track);
     if (kind === "video") fitToScreen();
   }

@@ -8,7 +8,7 @@ import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import { selectCurrent, usePlayer, useStatusText, videoEl } from "../player/player";
 import { useUi } from "../stores/ui";
-import { FavoriteButton, Scrubber, Transport, Volume } from "./Controls";
+import { FavoriteButton, QualityButton, Scrubber, Transport, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
 
 /**
@@ -261,7 +261,8 @@ export function Theater() {
                   <FavoriteButton track={track} />
                 </div>
                 <Transport />
-                <div className="flex justify-end">
+                <div className="flex items-center justify-end gap-2">
+                  <QualityButton compact={false} />
                   <Volume className="max-md:hidden" />
                 </div>
               </div>
