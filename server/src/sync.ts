@@ -88,6 +88,8 @@ export type Command =
   | { action: "preferVideo" | "autoRadio"; on: boolean }
   | { action: "quality"; quality: Quality }
   | { action: "jumpTo" | "removeAt"; index: number; id: string }
+  /** A track of up next moved from one position of the queue to another (dragged on the controlling device). */
+  | { action: "moveTo"; from: number; to: number; id: string }
   | { action: "clearUpcoming" };
 
 /** What every device of an account is told about each device. `age`: milliseconds since its last report. */
@@ -249,6 +251,10 @@ function commandOf(v: unknown): Command | null {
     case "removeAt": {
       const id = text(c.id, 64);
       return TRACK_ID.test(id) ? { action: c.action, index: count(c.index), id } : null;
+    }
+    case "moveTo": {
+      const id = text(c.id, 64);
+      return TRACK_ID.test(id) ? { action: "moveTo", from: count(c.from), to: count(c.to), id } : null;
     }
     case "clearUpcoming":
       return { action: "clearUpcoming" };

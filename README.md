@@ -72,7 +72,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 
 **Library**
 - Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search, or by pasting or sharing its link, and save a copy as your own playlist
-- **Put things in order:** drag up next in the queue, and the tracks of your playlists, made here or saved as a copy (the arrows beside Shuffle, or the playlist's menu > Change the order), by the handle at the start of a row; on a phone you can also hold a row for a moment and then move it
+- **Put things in order:** drag up next in the queue (also the queue of a device you control from Devices: the move happens there), and the tracks of your playlists, made here or saved as a copy (the arrows beside Shuffle, or the playlist's menu > Change the order), by the handle at the start of a row; on a phone you can also hold a row for a moment and then move it
 - Recent searches remember what you opened (song, video, artist, album, playlist), each removable
 - **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled

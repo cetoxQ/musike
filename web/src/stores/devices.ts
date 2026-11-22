@@ -75,6 +75,7 @@ export type Command =
   | { action: "preferVideo" | "autoRadio"; on: boolean }
   | { action: "quality"; quality: Quality }
   | { action: "jumpTo" | "removeAt"; index: number; id: string }
+  | { action: "moveTo"; from: number; to: number; id: string }
   | { action: "clearUpcoming" };
 
 /** Closing codes from the server (sync.ts CLOSE). */
@@ -350,6 +351,18 @@ export const useDevices = create<DevicesState>((set, get) => {
         show();
       }
     },
+    moveTo: (from, to) => {
+      const known = target && queues.get(target.id);
+      const track = known?.tracks[from];
+      if (!known || !track || !target || from === to) return;
+      toTarget({ action: "moveTo", from: known.offset + from, to: known.offset + to, id: track.id });
+      // Moved at once here; the device's new queue follows.
+      const tracks = known.tracks.slice();
+      tracks.splice(from, 1);
+      tracks.splice(to, 0, track);
+      queues.set(target.id, { ...known, tracks });
+      show();
+    },
     clearUpcoming: () => toTarget({ action: "clearUpcoming" }),
     setAutoRadio: (on) => {
       assume({ autoRadio: on });
@@ -442,6 +455,12 @@ export const useDevices = create<DevicesState>((set, get) => {
           // By position, unless the queue changed meanwhile: then by id.
           const i = p.queue[c.index]?.id === c.id ? c.index : p.queue.findIndex((t) => t.id === c.id);
           if (i >= 0) (c.action === "jumpTo" ? p.jumpTo : p.removeAt)(i);
+          break;
+        }
+        case "moveTo": {
+          // By position, unless the queue changed meanwhile: then by id, with the target shifted as much.
+          const i = p.queue[c.from]?.id === c.id ? c.from : p.queue.findIndex((t) => t.id === c.id);
+          if (i >= 0) p.moveInQueue(i, c.to + (i - c.from));
           break;
         }
         case "clearUpcoming":

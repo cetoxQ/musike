@@ -1,5 +1,5 @@
 import { QueueIcon, XIcon } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
 import { selectShownIndex, selectShownQueue, usePlayer } from "../player/player";
@@ -17,6 +17,16 @@ const upcomingKey = (track: Track) => {
   return key;
 };
 
+/** The one track a drag moved: its position in `before` and in `after` (the same tracks, one of them elsewhere). */
+function moved<T>(before: T[], after: T[]): { from: number; to: number } | null {
+  let i = 0;
+  while (i < before.length && before[i] === after[i]) i++;
+  if (i === before.length) return null;
+  let j = before.length - 1;
+  while (j > i && before[j] === after[j]) j--;
+  return after[i] === before[j] ? { from: j, to: i } : { from: i, to: j };
+}
+
 export function QueueList({ compact = false }: { compact?: boolean }) {
   const t = useT();
   // This device's queue, or the one of the device it controls (the actions go there too).
@@ -27,12 +37,21 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
   const removeAt = usePlayer((s) => s.removeAt);
   const clearUpcoming = usePlayer((s) => s.clearUpcoming);
   const reorderUpcoming = usePlayer((s) => s.reorderUpcoming);
+  const moveInQueue = usePlayer((s) => s.moveInQueue);
   const remote = usePlayer((s) => !!s.remote);
   const autoRadio = usePlayer((s) => s.remote?.autoRadio ?? s.autoRadio);
   const setAutoRadio = usePlayer((s) => s.setAutoRadio);
 
   const current = queue[index];
   const upcoming = queue.slice(index + 1);
+  /**
+   * Controlling another device: up next as it's being dragged here, and as it was when the drag began. Letting go
+   * sends that device the one move (its queue keeps playing on and can change meanwhile).
+   */
+  const [dragged, setDragged] = useState<Track[] | null>(null);
+  const dragStart = useRef<{ index: number; upcoming: Track[] } | null>(null);
+  /** The same as `dragged`, for the drop (which can come before a render). */
+  const lastOrder = useRef<Track[] | null>(null);
 
   if (!current) {
     return (
@@ -46,9 +65,22 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
     );
   }
 
-  // Up next can be dragged into a new order on this device (not on one being controlled), when no track object is
-  // in it twice (the rows are told apart by them).
-  const reorderable = !remote && new Set(upcoming).size === upcoming.length;
+  // Up next can be dragged into a new order, here or on the device being controlled, when no track object is in it
+  // twice (the rows are told apart by them).
+  const reorderable = new Set(upcoming).size === upcoming.length;
+  const dragRemote = (tracks: Track[]) => {
+    dragStart.current ??= { index, upcoming };
+    lastOrder.current = tracks;
+    setDragged(tracks);
+  };
+  const dropRemote = () => {
+    const start = dragStart.current;
+    const m = start && lastOrder.current ? moved(start.upcoming, lastOrder.current) : null;
+    if (start && m) moveInQueue(start.index + 1 + m.from, start.index + 1 + m.to);
+    dragStart.current = null;
+    lastOrder.current = null;
+    setDragged(null);
+  };
 
   const row = (i: number, isCurrent: boolean, handle?: ReactNode) => {
     const track = queue[i];
@@ -110,8 +142,14 @@ export function QueueList({ compact = false }: { compact?: boolean }) {
         </div>
         {upcoming.length ? (
           reorderable ? (
-            <ReorderList items={upcoming} keyOf={(track) => upcomingKey(track)} onReorder={reorderUpcoming}>
-              {(track, handle) => row(index + 1 + upcoming.indexOf(track), false, handle)}
+            <ReorderList
+              items={remote ? (dragged ?? upcoming) : upcoming}
+              keyOf={(track) => upcomingKey(track)}
+              onReorder={remote ? dragRemote : reorderUpcoming}
+              onDragEnd={remote ? dropRemote : undefined}
+            >
+              {/* While dragging another device's queue, a row's actions still go to where its track is there. */}
+              {(track, handle) => row(index + 1 + (dragStart.current?.upcoming ?? upcoming).indexOf(track), false, handle)}
             </ReorderList>
           ) : (
             <ul>{upcoming.map((_, k) => row(index + 1 + k, false))}</ul>

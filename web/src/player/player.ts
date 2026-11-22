@@ -74,6 +74,8 @@ export interface RemoteControl {
   /** Positions in RemoteView.queue. */
   jumpTo(index: number): void;
   removeAt(index: number): void;
+  /** A track of up next to another place in it. */
+  moveTo(from: number, to: number): void;
   clearUpcoming(): void;
   setAutoRadio(on: boolean): void;
 }
@@ -134,6 +136,11 @@ interface PlayerState {
   clearUpcoming: () => void;
   /** The tracks after the current one, in a new order (dragged in the queue). This device only. */
   reorderUpcoming: (tracks: Track[]) => void;
+  /**
+   * One track of up next to another place in it (positions in the queue shown: this device's, or the one of the
+   * device it controls, where the move is sent).
+   */
+  moveInQueue: (from: number, to: number) => void;
   startRadio: (track: Track) => Promise<void>;
   toggle: () => void;
   /** Stops, without toggling: another device of the account took over. A track still loading won't start. */
@@ -789,6 +796,19 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const next = s.queue[s.index + 1];
       set({ queue: [...s.queue.slice(0, s.index + 1), ...tracks] });
       if (tracks[0] !== next) warmUpcoming();
+    },
+
+    moveInQueue: (from, to) => {
+      const r = elsewhere();
+      if (r) return r.moveTo(from, to);
+      const s = get();
+      if (from <= s.index || from >= s.queue.length) return;
+      const at = Math.min(Math.max(to, s.index + 1), s.queue.length - 1);
+      if (at === from) return;
+      const upcoming = s.queue.slice(s.index + 1);
+      const [track] = upcoming.splice(from - s.index - 1, 1);
+      upcoming.splice(at - s.index - 1, 0, track!);
+      get().reorderUpcoming(upcoming);
     },
 
     removeAt: (i) => {
