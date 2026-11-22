@@ -71,6 +71,8 @@ export function RadioReplaceDialog() {
     if (track) void usePlayer.getState().startRadio(track);
     close();
   };
+  // Saving keeps the ticked tracks only: with none ticked there is nothing to save.
+  const keptN = radio ? radio.tracks.filter((x) => radio.radio?.kept.includes(x.id)).length : 0;
   return (
     <Modal open={!!track && !!radio} onClose={close} title={t.radio.replaceTitle}>
       <div className="flex flex-col gap-4">
@@ -85,13 +87,14 @@ export function RadioReplaceDialog() {
           </button>
           <button
             type="button"
+            disabled={!keptN}
             onClick={async () => {
-              if (radio) await useLibrary.getState().saveRadioPlaylist(radio.id);
-              start();
+              // Not saved (no answer, or nothing kept any more on another device): the radio playlist stays as it is.
+              if (radio && (await useLibrary.getState().saveRadioPlaylist(radio.id))) start();
             }}
-            className="flex h-11 items-center justify-center rounded-full bg-surface-3 text-[15px] font-medium hover:bg-surface-4"
+            className="flex h-11 items-center justify-center rounded-full bg-surface-3 px-4 text-center text-[15px] font-medium hover:bg-surface-4 disabled:opacity-50 disabled:hover:bg-surface-3"
           >
-            {t.radio.replaceSave}
+            {keptN ? t.radio.replaceSave(keptN) : t.radio.replaceSaveNone}
           </button>
           <button
             type="button"

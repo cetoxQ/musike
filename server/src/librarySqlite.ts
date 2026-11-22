@@ -5,6 +5,7 @@ import {
   HISTORY_LIMIT,
   importLists,
   inOrder,
+  keepOnlyKept,
   type LibraryStore,
   PLAY_LOG_LIMIT,
   playedAt,
@@ -493,8 +494,11 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
 
         saveRadioPlaylist: (pid) =>
           tx(() => {
-            playlist(uid, pid);
-            plRadio(null, Date.now(), uid, pid);
+            const p = playlist(uid, pid);
+            if (!keepOnlyKept(p)) return p;
+            ptClear(uid, pid);
+            p.tracks.forEach((t, i) => ptInsert(uid, pid, t.id, i));
+            plRadio(null, p.updatedAt, uid, pid);
             return playlist(uid, pid);
           }),
 

@@ -724,7 +724,7 @@ export const en = {
   radio: {
     playlistName: (title: string) => `Radio from ${title}`,
     badge: "Radio, not saved",
-    hint: "The tracks this radio queued. Tick the ones you like to keep them, then Regenerate: the others give way to new ones from the radio of the kept ones. Save it to keep it as a playlist; starting another radio replaces it.",
+    hint: "The tracks this radio queued. Tick the ones you like to keep them. Regenerate: the ones not ticked give way to new ones, from the radio of the ticked ones. Save: it becomes a playlist with only the ticked tracks, the others are dropped. Starting another radio replaces it.",
     keep: (title: string) => `Keep ${title}`,
     unkeep: (title: string) => `Don't keep ${title}`,
     keptCount: (n: number) => count(n, "kept", "kept"),
@@ -735,13 +735,17 @@ export const en = {
     regenerating: "Regenerating...",
     regenerated: (n: number) => count(n, "new track", "new tracks"),
     nothingNew: "No new tracks found",
-    save: "Save playlist",
-    saved: (name: string) => `"${name}" saved as a playlist`,
+    save: (n: number) => (n ? `Save ${count(n, "track", "tracks")}` : "Save playlist"),
+    saveHint: "It becomes a playlist with only the ticked tracks; the others are dropped",
+    saveNeedsKept: "Tick at least one track to save the playlist",
+    saved: (name: string, n: number) => `"${name}" saved with ${count(n, "track", "tracks")}`,
     replaceTitle: "Replace the radio playlist?",
     replaceBody: (name: string) =>
       `"${name}" isn't saved and has changes (tracks kept, regenerated, renamed or edited). A new radio replaces it. The track playing now goes on.`,
     replaceDelete: "Delete it and start the radio",
-    replaceSave: "Save it, then start the radio",
+    replaceSave: (n: number) =>
+      n === 1 ? "Save the ticked track, then start the radio" : `Save the ${n} ticked tracks, then start the radio`,
+    replaceSaveNone: "No ticked tracks to save",
   },
 
   toasts: {

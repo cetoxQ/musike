@@ -100,7 +100,10 @@ export interface LibraryStore {
   createRadioPlaylist(name: string, seed: string, tracks: Track[]): Promise<Playlist>;
   /** Kept tracks, or regenerated ones (with the ones taken out): only on a radio playlist, which is then changed. */
   updateRadioPlaylist(pid: string, patch: RadioPatch): Promise<Playlist>;
-  /** A radio playlist saved: a playlist like the others from now on. */
+  /**
+   * A radio playlist saved: only its kept tracks stay (in its order), the others go, and it is a playlist like the
+   * others from now on. One with nothing kept can't be saved; one saved already is left as it is.
+   */
   saveRadioPlaylist(pid: string): Promise<Playlist>;
   /**
    * "merge" adds what is missing and never deletes (playlists match by id, then by name).
@@ -267,6 +270,21 @@ export function patchRadio(p: Playlist, patch: RadioPatch): void {
   p.radio.kept = (patch.kept ?? p.radio.kept).filter((id) => inside.has(id));
   p.radio.edited = true;
   p.updatedAt = Date.now();
+}
+
+/**
+ * A radio playlist being saved (in place): the kept tracks only, and no radio information any more. False for one that
+ * isn't a radio playlist (saved already, on another device or by a change sent twice): nothing to do.
+ */
+export function keepOnlyKept(p: Playlist): boolean {
+  if (!p.radio) return false;
+  const kept = new Set(p.radio.kept);
+  const tracks = p.tracks.filter((t) => kept.has(t.id));
+  if (!tracks.length) throw new HttpError(409, msg("radioNothingKept"));
+  p.tracks = tracks;
+  delete p.radio;
+  p.updatedAt = Date.now();
+  return true;
 }
 
 /** A playlist name as kept: trimmed, at most 80 characters, not empty. */
@@ -694,9 +712,7 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
     async saveRadioPlaylist(pid) {
       const lib = await load();
       const p = findPlaylist(lib, pid);
-      delete p.radio;
-      p.updatedAt = Date.now();
-      await persist();
+      if (keepOnlyKept(p)) await persist();
       return p;
     },
 

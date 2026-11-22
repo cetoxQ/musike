@@ -717,7 +717,7 @@ export const it: Messages = {
   radio: {
     playlistName: (title: string) => `Radio da ${title}`,
     badge: "Radio, non salvata",
-    hint: "I brani messi in coda da questa radio. Spunta quelli che ti piacciono per tenerli, poi Rigenera: gli altri lasciano il posto a brani nuovi dalla radio di quelli tenuti. Salvala per tenerla come playlist; avviare un'altra radio la sostituisce.",
+    hint: "I brani messi in coda da questa radio. Spunta quelli che ti piacciono per tenerli. Rigenera: quelli non spuntati lasciano il posto a brani nuovi, dalla radio di quelli spuntati. Salva: diventa una playlist con solo i brani spuntati, gli altri vengono scartati. Avviare un'altra radio la sostituisce.",
     keep: (title: string) => `Tieni ${title}`,
     unkeep: (title: string) => `Non tenere ${title}`,
     keptCount: (n: number) => count(n, "tenuto", "tenuti"),
@@ -728,13 +728,17 @@ export const it: Messages = {
     regenerating: "Rigenero...",
     regenerated: (n: number) => count(n, "brano nuovo", "brani nuovi"),
     nothingNew: "Nessun brano nuovo trovato",
-    save: "Salva playlist",
-    saved: (name: string) => `"${name}" salvata come playlist`,
+    save: (n: number) => (n ? `Salva ${count(n, "brano", "brani")}` : "Salva playlist"),
+    saveHint: "Diventa una playlist con solo i brani spuntati; gli altri vengono scartati",
+    saveNeedsKept: "Spunta almeno un brano per salvare la playlist",
+    saved: (name: string, n: number) => `"${name}" salvata con ${count(n, "brano", "brani")}`,
     replaceTitle: "Sostituire la playlist radio?",
     replaceBody: (name: string) =>
       `"${name}" non è salvata e ha delle modifiche (brani tenuti, rigenerata, rinominata o modificata). Una nuova radio la sostituisce. Il brano in riproduzione continua.`,
     replaceDelete: "Eliminala e avvia la radio",
-    replaceSave: "Salvala, poi avvia la radio",
+    replaceSave: (n: number) =>
+      n === 1 ? "Salva il brano spuntato, poi avvia la radio" : `Salva i ${n} brani spuntati, poi avvia la radio`,
+    replaceSaveNone: "Nessun brano spuntato da salvare",
   },
 
   toasts: {

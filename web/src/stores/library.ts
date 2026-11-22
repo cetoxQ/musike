@@ -46,7 +46,8 @@ interface LibraryState extends Library {
    */
   regenerateRadio: (id: string) => Promise<void>;
   /** The radio playlist as a playlist like the others. */
-  saveRadioPlaylist: (id: string) => Promise<void>;
+  /** Saved with its ticked tracks only (the others go): false when it couldn't be. */
+  saveRadioPlaylist: (id: string) => Promise<boolean>;
 }
 
 /** Radios asked for at once while regenerating. */
@@ -313,9 +314,11 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     try {
       const p = await api.saveRadioPlaylist(id);
       set((s) => ({ playlists: replacePlaylist(s.playlists, p) }));
-      toast(getT().radio.saved(p.name));
+      toast(getT().radio.saved(p.name, p.tracks.length));
+      return true;
     } catch (e) {
       toast((e as Error).message, "error");
+      return false;
     }
   },
 

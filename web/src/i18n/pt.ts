@@ -715,7 +715,7 @@ export const pt: Messages = {
   radio: {
     playlistName: (title: string) => `Rádio de ${title}`,
     badge: "Rádio, não salva",
-    hint: "As músicas que esta rádio colocou na fila. Marque as que você gosta para guardá-las e depois Regenerar: as outras dão lugar a novas, da rádio das guardadas. Salve para mantê-la como playlist; iniciar outra rádio a substitui.",
+    hint: "As músicas que esta rádio colocou na fila. Marque as que você gosta para guardá-las. Regenerar: as não marcadas dão lugar a novas, da rádio das marcadas. Salvar: vira uma playlist só com as músicas marcadas, as outras são descartadas. Iniciar outra rádio a substitui.",
     keep: (title: string) => `Guardar ${title}`,
     unkeep: (title: string) => `Não guardar ${title}`,
     keptCount: (n: number) => count(n, "guardada", "guardadas"),
@@ -726,13 +726,17 @@ export const pt: Messages = {
     regenerating: "Regenerando...",
     regenerated: (n: number) => count(n, "música nova", "músicas novas"),
     nothingNew: "Nenhuma música nova encontrada",
-    save: "Salvar playlist",
-    saved: (name: string) => `"${name}" salva como playlist`,
+    save: (n: number) => (n ? `Salvar ${count(n, "música", "músicas")}` : "Salvar playlist"),
+    saveHint: "Vira uma playlist só com as músicas marcadas; as outras são descartadas",
+    saveNeedsKept: "Marque pelo menos uma música para salvar a playlist",
+    saved: (name: string, n: number) => `"${name}" salva com ${count(n, "música", "músicas")}`,
     replaceTitle: "Substituir a playlist de rádio?",
     replaceBody: (name: string) =>
       `"${name}" não está salva e tem alterações (músicas guardadas, regenerada, renomeada ou editada). Uma nova rádio a substitui. A música tocando agora continua.`,
     replaceDelete: "Apagar e iniciar a rádio",
-    replaceSave: "Salvar e depois iniciar a rádio",
+    replaceSave: (n: number) =>
+      n === 1 ? "Salvar a música marcada e iniciar a rádio" : `Salvar as ${n} músicas marcadas e iniciar a rádio`,
+    replaceSaveNone: "Nenhuma música marcada para salvar",
   },
 
   toasts: {

@@ -53,6 +53,8 @@ export default function Collection({ kind }: Props) {
 
   const playlist = kind === "playlist" ? lib.playlists.find((p) => p.id === id) : undefined;
   const radio = playlist?.radio;
+  // What saving keeps: the ticked tracks still in it (the others are dropped).
+  const keptN = radio && playlist ? playlist.tracks.filter((x) => radio.kept.includes(x.id)).length : 0;
   const newRadio = lib.playlists.find((p) => p.radio);
   // Showing the radio playlist when a new radio replaced it (here or on another device): on to the new one.
   const wasRadio = useRef(false);
@@ -119,7 +121,7 @@ export default function Collection({ kind }: Props) {
             <p className="font-mono text-[13px] text-fg-2">
               {t.common.tracks(tracks.length)}
               {total > 0 && <> · {t.time.total(total)}</>}
-              {radio && radio.kept.length > 0 && <> · {t.radio.keptCount(radio.kept.length)}</>}
+              {keptN > 0 && <> · {t.radio.keptCount(keptN)}</>}
             </p>
           </div>
         </div>
@@ -186,9 +188,11 @@ export default function Collection({ kind }: Props) {
             <button
               type="button"
               onClick={() => void lib.saveRadioPlaylist(playlist.id)}
-              className="h-10 flex-1 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink md:flex-none"
+              disabled={!keptN}
+              title={keptN ? t.radio.saveHint : t.radio.saveNeedsKept}
+              className="h-10 flex-1 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50 md:flex-none"
             >
-              {t.radio.save}
+              {t.radio.save(keptN)}
             </button>
           </div>
         </div>
