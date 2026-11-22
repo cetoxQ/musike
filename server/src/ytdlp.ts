@@ -59,12 +59,50 @@ export function holdDuring<T>(job: Promise<T>): Promise<T> {
   return p;
 }
 
-async function run(args: string[], timeoutMs: number): Promise<string> {
+/**
+ * How many yt-dlp processes run at once. Each is Python plus Deno for YouTube's challenges, a couple of hundred MB:
+ * past these, requests wait their turn instead of filling the server's memory. HD downloads (minutes each) have
+ * their own lane, so they never hold up a track that's about to start.
+ */
+const LANES = { quick: 4, download: 2 } as const;
+type Lane = keyof typeof LANES;
+const running: Record<Lane, number> = { quick: 0, download: 0 };
+const waiting: Record<Lane, (() => void)[]> = { quick: [], download: [] };
+
+/** Waits for a free place in the lane; the function it returns gives the place to the next in line. */
+function turn(lane: Lane): Promise<() => void> {
+  const release = () => {
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      const next = waiting[lane].shift();
+      if (next) next();
+      else running[lane]--;
+    };
+  };
+  if (running[lane] < LANES[lane]) {
+    running[lane]++;
+    return Promise.resolve(release());
+  }
+  return new Promise((resolve) => waiting[lane].push(() => resolve(release())));
+}
+
+async function run(args: string[], timeoutMs: number, lane: Lane = "quick"): Promise<string> {
   if (maintenance) await maintenance.catch(() => {});
   const { ytdlp, env } = tools();
   if (!ytdlp) {
     throw new HttpError(503, msg("ytdlpMissing"), "tool_missing");
   }
+  const done = await turn(lane);
+  try {
+    return await spawnYtdlp(ytdlp, env, args, timeoutMs);
+  } finally {
+    done();
+  }
+}
+
+function spawnYtdlp(ytdlp: string, env: NodeJS.ProcessEnv, args: string[], timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(ytdlp, [...config.ytdlpExtraArgs, ...args], { windowsHide: true, env });
     let stdout = "";
@@ -147,6 +185,13 @@ function expiryOf(url: string): number {
 
 const cache = new Map<string, Promise<Resolved>>();
 const resolvedAt = new Map<string, Resolved>();
+
+/** Resolutions are kept while their URLs work: the expired ones are dropped every hour, not kept forever. */
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, r] of resolvedAt) if (r.expiresAt <= now) resolvedAt.delete(id);
+  for (const [id, f] of directResolved) if (f.expiresAt <= now) directResolved.delete(id);
+}, 3600_000).unref();
 
 // When yt-dlp fails, the clients to ask YouTube directly (see directAudio.ts), refreshed from the repository.
 // Read lazily: directAudio.ts and this module import each other through search.ts.
@@ -319,6 +364,7 @@ export function downloadHd(id: string): Promise<string> {
           `https://www.youtube.com/watch?v=${id}`,
         ],
         DOWNLOAD_TIMEOUT_MS,
+        "download",
       ),
     )
     .then(async () => {

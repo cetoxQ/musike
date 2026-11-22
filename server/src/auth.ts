@@ -335,7 +335,16 @@ export function loginThrottle(now = () => Date.now()) {
         if (s.fails >= FREE) s.until = now() + Math.min(MAX_MS, BASE_MS * 2 ** (s.fails - FREE));
         state.set(k, s);
       }
-      if (state.size > 10_000) state.clear(); // someone spraying names: start over rather than grow
+      // Someone spraying names: forget the keys no longer held back first, then the oldest, rather than everything
+      // (which would also let the sprayer's own address start over).
+      if (state.size > 10_000) {
+        const t = now();
+        for (const [k, s] of state) if (s.until <= t) state.delete(k);
+        for (const k of state.keys()) {
+          if (state.size <= 9_000) break;
+          state.delete(k);
+        }
+      }
     },
     succeed(keys: string[]) {
       for (const k of keys) state.delete(k);
