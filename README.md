@@ -37,6 +37,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 - [Installation](#installation)
 - [Radio playlist](#radio-playlist)
 - [Moving your library (backup)](#moving-your-library-backup)
+- [Importing from Spotify](#importing-from-spotify)
 - [Accounts](#accounts)
 - [Backups](#backups)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -75,6 +76,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search, or by pasting or sharing its link, and save a copy as your own playlist
 - **Put things in order:** drag up next in the queue (also the queue of a device you control from Devices: the move happens there), and the tracks of your playlists, made here or saved as a copy (the arrows beside Shuffle, or the playlist's menu > Change the order), by the handle at the start of a row; on a phone you can also hold a row for a moment and then move it
 - **Radio playlist:** starting a radio also makes a playlist of what it queued. Tick the tracks you like, regenerate the others from the radio of the kept ones, and save it with only the ticked tracks when it's right ([how](#radio-playlist))
+- **Import from Spotify:** your Spotify playlists and Liked Songs, exported with Exportify, become Musike playlists and Favorites, each song found on YouTube Music ([how](#importing-from-spotify)). From the [upstream pull request #50](https://github.com/Ernani1234/musike/pull/50), tried here first
 - Recent searches remember what you opened (song, video, artist, album, playlist), each removable
 - **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
@@ -164,6 +166,7 @@ Setting up `https://`:
 - Playlists, Favorites and recently played history
 - Select many tracks at once to play, favorite or add to a playlist
 - **Backup to a file** to move everything to another Musike: merge or replace, with a preview before importing
+- **Import from Spotify:** export your playlists with [Exportify](https://exportify.net) ("Export All"), pick the zip in **Settings > Import from Spotify**, and Musike finds every song on YouTube Music (title, artist and length must match). Each playlist comes over as a Musike playlist and "Liked Songs" become Favorites; songs it can't find are listed, and the import merges without deleting anything
 
 **Make it yours**
 - **English**, **Brazilian Portuguese**, **Italian** and **Vietnamese**, switchable in Settings (per device). Server messages and the genre names and bios that come from YouTube Music follow the same language
@@ -541,6 +544,22 @@ The file is readable, versioned JSON:
 ```
 
 On import the server validates every track (YouTube ID, sizes, `https://` images only), skips invalid entries instead of rejecting the whole file, and refuses backups from newer versions with a clear message.
+
+## Importing from Spotify
+
+Spotify doesn't let other apps read your library directly, so the import goes through [Exportify](https://exportify.net), a free site that saves your Spotify playlists as CSV files.
+
+1. **Settings > Import from Spotify > Open Exportify**, sign in with Spotify and click **Export All**. It saves a zip with one CSV per playlist (Liked Songs included). On the phone the site opens in the browser and the zip goes to Downloads.
+2. Back in Musike, **Choose file** and pick the zip (or one or more of its CSV files).
+3. Musike looks for every song on YouTube Music, a few at a time: the title, the main artist and the length must match, and covers, karaoke, remixes, live and sped-up versions lose out unless the Spotify title says so. A song with nothing close enough counts as **not found** rather than risk a wrong one. A big library takes a few minutes: Settings can be closed meanwhile, **Stop** keeps what was found and **Continue** searches the rest, **Retry** searches again the ones whose search failed.
+4. **Songs not found** lists the ones left out. **Import N songs** adds the rest to your library.
+
+What comes over:
+- each CSV becomes a playlist with its name, and **Liked Songs** goes into your Favorites. A list longer than 5000 tracks is split into parts (`(2)`, `(3)`);
+- the import is a [merge](#moving-your-library-backup): nothing is deleted, a playlist with the same name as one you have gets the new tracks, and importing the same zip twice duplicates nothing;
+- it goes into the library of the device or the server you're connected to, with your account, so on a server it shows on your other devices like any other change.
+
+The searches run where your searches run: through the server when connected to one, on the device otherwise. Thousands of songs in a row can make YouTube ask for its bot check: then stop, wait a while and **Continue**. Exportify uses Spotify's API: if Spotify stops it working, there's nothing to import from until it's back.
 
 ## Accounts
 

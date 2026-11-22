@@ -27,6 +27,7 @@ import { useUi } from "../stores/ui";
 import { AccountSection } from "./AccountSection";
 import { ServerSection } from "./ServerSection";
 import { BackupSection } from "./BackupSection";
+import { SpotifyImport } from "./SpotifyImport";
 import { AccentPicker, LayoutSection } from "./CustomizeSection";
 import { Modal } from "./Modal";
 
@@ -200,6 +201,8 @@ export function SettingsDialog() {
         <LayoutSection />
 
         <BackupSection />
+
+        <SpotifyImport />
 
         {capabilities.engineSettings && (
         <section className="flex flex-col gap-3">
