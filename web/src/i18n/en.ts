@@ -718,6 +718,27 @@ export const en = {
     note: "Musike open with your account on another device shows up here. One device plays at a time, and the others control it. Tap a device to play there.",
   },
 
+  radio: {
+    playlistName: (title: string) => `Radio from ${title}`,
+    badge: "Radio, not saved",
+    hint: "The tracks this radio queued. Keep the ones you like with the pin, then Regenerate: the others give way to new ones from the radio of the kept ones. Save it to keep it as a playlist; starting another radio replaces it.",
+    keep: (title: string) => `Keep ${title}`,
+    unkeep: (title: string) => `Don't keep ${title}`,
+    keptCount: (n: number) => count(n, "kept", "kept"),
+    regenerate: "Regenerate",
+    regenerateHint: "The tracks not kept give way to new ones, from the radio of the kept ones",
+    regenerating: "Regenerating...",
+    regenerated: (n: number) => count(n, "new track", "new tracks"),
+    nothingNew: "No new tracks found",
+    save: "Save playlist",
+    saved: (name: string) => `"${name}" saved as a playlist`,
+    replaceTitle: "Replace the radio playlist?",
+    replaceBody: (name: string) =>
+      `"${name}" isn't saved and has changes (tracks kept, regenerated, renamed or edited). A new radio replaces it. The track playing now goes on.`,
+    replaceDelete: "Delete it and start the radio",
+    replaceSave: "Save it, then start the radio",
+  },
+
   toasts: {
     dismiss: (message: string) => `${message}. Close notice`,
     addedFavorite: "Added to Favorites",

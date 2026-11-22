@@ -9,6 +9,7 @@ import {
   VideoCameraSlashIcon,
   XIcon,
 } from "@phosphor-icons/react";
+import { startRadio } from "../lib/radio";
 import { share } from "../lib/share";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
@@ -162,7 +163,6 @@ function usePanelTab(): { tab: PanelTab; showLyrics: boolean } {
 
 function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
   const track = usePlayer(selectShown);
-  const startRadio = usePlayer((s) => s.startRadio);
   const queue = usePlayer(selectShownQueue);
   const index = usePlayer(selectShownIndex);
   const t = useT();
@@ -180,7 +180,7 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
       <ModeSwitch />
       <button
         type="button"
-        onClick={() => void startRadio(track)}
+        onClick={() => startRadio(track)}
         className="flex h-11 items-center justify-center gap-2 rounded-full bg-surface-1 text-sm font-medium ring-1 ring-line transition-colors hover:bg-surface-3 active:scale-[0.98]"
       >
         <RadioIcon size={18} /> {t.nowPlaying.startRadio}
@@ -324,11 +324,10 @@ function SheetViewButton({ target, view, setView }: { target: "queue" | "lyrics"
  */
 function SheetRow({ track, view, setView }: { track: Track; view: SheetView; setView: (v: SheetView) => void }) {
   const t = useT();
-  const startRadio = usePlayer((s) => s.startRadio);
   const hasDevices = useDevices((s) => s.status !== "off");
   const hasVideo = useVideoAvailable();
   const left = [
-    <IconButton key="radio" label={t.trackMenu.startRadio} onClick={() => void startRadio(track)}>
+    <IconButton key="radio" label={t.trackMenu.startRadio} onClick={() => startRadio(track)}>
       <RadioIcon size={22} />
     </IconButton>,
     <SheetViewButton key="lyrics" target="lyrics" view={view} setView={setView} />,

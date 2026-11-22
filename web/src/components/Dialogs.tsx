@@ -2,6 +2,8 @@ import { CheckIcon, PlusIcon } from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useT, type Messages } from "../i18n";
 import { cn } from "../lib/format";
+import { usePlayer } from "../player/player";
+import { useRadioAsk } from "../lib/radio";
 import { useLibrary } from "../stores/library";
 import { send, useShare, type ShareSite } from "../lib/share";
 import { useUi } from "../stores/ui";
@@ -45,6 +47,58 @@ export function ForgetDialog() {
           >
             <span className="text-[15px] font-bold tracking-wide">Damnatio Memoriae</span>
             <span className="text-xs text-white/85">{t.forget.damnatioHint}</span>
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Starting a radio while the radio playlist not saved yet has changes: it would replace it. Delete it (in red), save
+ * it first, or leave things as they are. Nothing plays differently until an answer: the track on goes on.
+ */
+export function RadioReplaceDialog() {
+  const track = useRadioAsk((s) => s.track);
+  const radio = useLibrary((s) => s.playlists.find((p) => p.radio));
+  const t = useT();
+  const close = () => useRadioAsk.setState({ track: null });
+  // Saved or deleted meanwhile on another device: nothing left to ask about (the radio isn't started behind your back).
+  useEffect(() => {
+    if (track && !radio) close();
+  }, [track, radio]);
+  const start = () => {
+    if (track) void usePlayer.getState().startRadio(track);
+    close();
+  };
+  return (
+    <Modal open={!!track && !!radio} onClose={close} title={t.radio.replaceTitle}>
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-fg-2">{radio ? t.radio.replaceBody(radio.name) : ""}</p>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={start}
+            className="flex h-11 items-center justify-center rounded-full bg-danger text-[15px] font-semibold text-white transition-transform active:scale-[0.98]"
+          >
+            {t.radio.replaceDelete}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              if (radio) await useLibrary.getState().saveRadioPlaylist(radio.id);
+              start();
+            }}
+            className="flex h-11 items-center justify-center rounded-full bg-surface-3 text-[15px] font-medium hover:bg-surface-4"
+          >
+            {t.radio.replaceSave}
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="flex h-11 items-center justify-center rounded-full text-[15px] font-medium text-fg-2 hover:bg-surface-3 hover:text-fg"
+          >
+            {t.common.cancel}
           </button>
         </div>
       </div>

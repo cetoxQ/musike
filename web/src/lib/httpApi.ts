@@ -30,6 +30,7 @@ import type {
   PlayEntry,
   Playlist,
   PlaylistCard,
+  RadioPatch,
   RecentInput,
   RecentItem,
   RecentKind,
@@ -195,6 +196,10 @@ export function httpBackend(opts: HttpBackendOptions) {
     removeFromPlaylist: (id: string, trackId: string) =>
       request<Playlist>(`/api/playlists/${id}/tracks/${trackId}`, { method: "DELETE" }),
     reorderPlaylist: (id: string, ids: string[]) => request<Playlist>(`/api/playlists/${id}/order`, { method: "PUT", json: { ids } }),
+    createRadioPlaylist: (name: string, seed: string, tracks: Track[]) =>
+      request<Playlist>("/api/playlists/radio", { method: "POST", json: { name, seed, tracks } }),
+    updateRadioPlaylist: (id: string, patch: RadioPatch) => request<Playlist>(`/api/playlists/${id}/radio`, { method: "PATCH", json: patch }),
+    saveRadioPlaylist: (id: string) => request<Playlist>(`/api/playlists/${id}/save`, { method: "POST" }),
 
     recent: (signal?: AbortSignal) => request<{ recent: RecentItem[] }>("/api/recent", { signal }).then((r) => r.recent),
     pushRecent: (item: RecentInput) => request<{ recent: RecentItem[] }>("/api/recent", { method: "POST", json: item }).then((r) => r.recent),

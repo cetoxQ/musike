@@ -21,6 +21,23 @@ export interface Playlist {
   createdAt: number;
   updatedAt: number;
   tracks: Track[];
+  /** A radio playlist not saved yet (server/src/types.ts RadioInfo); absent on a playlist of yours. */
+  radio?: RadioInfo;
+}
+
+/** The radio playlist's state: what it started from, the tracks kept and taken out, changed since it was made. */
+export interface RadioInfo {
+  seed: string;
+  kept: string[];
+  discarded: string[];
+  edited: boolean;
+}
+
+/** A change to a radio playlist: any of these. */
+export interface RadioPatch {
+  tracks?: Track[];
+  kept?: string[];
+  discarded?: string[];
 }
 
 /** An artist kept in the library. */

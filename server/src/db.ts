@@ -170,6 +170,10 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX recent_user_at ON recent (user_id, at);
   `,
+  `
+  -- A radio playlist not saved yet: its RadioInfo (types.ts) as JSON; NULL on a playlist of yours.
+  ALTER TABLE playlists ADD COLUMN radio TEXT;
+  `,
 ];
 
 /** node:sqlite, loaded only when used. Its one-time "experimental feature" warning stays out of the logs. */

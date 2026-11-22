@@ -35,6 +35,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Installation](#installation)
+- [Radio playlist](#radio-playlist)
 - [Moving your library (backup)](#moving-your-library-backup)
 - [Accounts](#accounts)
 - [Backups](#backups)
@@ -73,6 +74,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 **Library**
 - Follow artists, save albums and YouTube playlists to your library; open a YouTube playlist from search, or by pasting or sharing its link, and save a copy as your own playlist
 - **Put things in order:** drag up next in the queue (also the queue of a device you control from Devices: the move happens there), and the tracks of your playlists, made here or saved as a copy (the arrows beside Shuffle, or the playlist's menu > Change the order), by the handle at the start of a row; on a phone you can also hold a row for a moment and then move it
+- **Radio playlist:** starting a radio also makes a playlist of what it queued. Keep the tracks you like, regenerate the others from the radio of the kept ones, and save it when it's right ([how](#radio-playlist))
 - Recent searches remember what you opened (song, video, artist, album, playlist), each removable
 - **Share** a track, an album, an artist or a playlist as a YouTube or YouTube Music link (asked once, then in Settings)
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
@@ -493,6 +495,21 @@ pnpm desktop    # opens the Electron app in development mode
 pnpm typecheck  # checks every package
 ```
 
+## Radio playlist
+
+**Start radio** (on a track, in Now Playing, or in a track's menu) queues tracks like the one you started from, and also makes a playlist of them: **Radio from** and the track's title. It's a playlist you shape before keeping it:
+
+1. **It's always at hand:** in the side column it's the third entry of Your collection, under Recently played (on the phone, the same place in the Library). Its line says **Radio, not saved**.
+2. **Keep what you like:** every track has a pin. Pinned tracks are kept; the count shows under the title.
+3. **Regenerate:** the tracks not kept give way to new ones, taken from the radio of the kept ones (up to five of them, spread over the list; with none kept, from the track the radio started from). The playlist stays as long as it was, the kept tracks come first, and tracks taken out once don't come back. The queue playing isn't touched: play the playlist when you want to hear it.
+4. **Save playlist:** it becomes a playlist like the others, renamed if you like, and stays when another radio starts.
+
+There is one radio playlist at a time. Starting another radio replaces it:
+- as it was made, without asking;
+- changed (tracks kept, regenerated, renamed, tracks added, taken out or moved), only after asking. **Delete it and start the radio** (in red) replaces it, **Save it, then start the radio** keeps it as a playlist first, **Cancel** leaves everything as it is. While asking, the track playing goes on.
+
+It lives in your library like your playlists, so it works the same in the browser, the Android app and the Windows app, and everything shows on your other devices within seconds over [HTTPS](#http-or-https): the pins, a regeneration, a new name, the save, and a new radio replacing it (a device showing the old one moves to the new one). On a phone that can't reach the server the changes wait in its queue like the others. Controlling another device, that device makes the playlist, with exactly the tracks it queued; the question is asked where you pressed the button.
+
 ## Moving your library (backup)
 
 Until cloud sync exists, Musike exports everything to a file that **any instance** can read: web, desktop, Android, Docker, another computer.
@@ -648,6 +665,9 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `PATCH` / `DELETE` | `/api/playlists/:pid` | Renames / deletes |
 | `POST` / `DELETE` | `/api/playlists/:pid/tracks[/:id]` | Adds (one track or `{ tracks }`) / removes a track |
 | `PUT` | `/api/playlists/:pid/order` | The tracks in a new order (`{ ids }`; ones left out follow in their order) |
+| `POST` | `/api/playlists/radio` | The radio playlist for a radio just started (`{ name, seed, tracks }`, the tracks as queued); the unsaved one there was goes |
+| `PATCH` | `/api/playlists/:pid/radio` | A radio playlist's kept tracks or regenerated tracks (`{ tracks?, kept?, discarded? }`); marks it changed |
+| `POST` | `/api/playlists/:pid/save` | A radio playlist saved as a playlist like the others |
 | `PUT` / `DELETE` | `/api/library/artists/:aid` | Saves / removes an artist in the library |
 | `PUT` / `DELETE` | `/api/library/albums/:alid` | Saves / removes an album in the library |
 | `PUT` / `DELETE` | `/api/library/yt-playlists/:pid` | Saves / removes a YouTube Music playlist (a link) in the library |
@@ -755,6 +775,7 @@ iOS limits background playback for PWAs; Audio mode works better than Video.
 - [x] Import YouTube playlists from a link: share or paste it, then save a copy
 - [x] Video quality to choose, changing without a gap; the next tracks ready before their turn
 - [x] Sleep timer, the same volume for every track, a copy of the library every day
+- [x] A playlist from every radio: keep tracks, regenerate the rest, save it
 
 **Open ideas, no promises**
 - [ ] Video on Android on its own

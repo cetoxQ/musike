@@ -1,14 +1,16 @@
 import {
+  ArrowsClockwiseIcon,
   ArrowsDownUpIcon,
   DotsThreeIcon,
   MagnifyingGlassIcon,
   PauseIcon,
   PencilSimpleIcon,
   PlayIcon,
+  RadioIcon,
   ShuffleIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
@@ -20,7 +22,7 @@ import { EmptyState, PageHeader } from "../components/Page";
 import { Action } from "../components/Selection";
 import { TrackList } from "../components/TrackList";
 import { useT } from "../i18n";
-import { shuffled } from "../lib/format";
+import { cn, shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { Track } from "../lib/types";
 import { selectShownQueue, selectShownStatus, usePlayer } from "../player/player";
@@ -50,10 +52,24 @@ export default function Collection({ kind }: Props) {
   useEffect(() => setOrder(null), [id]);
 
   const playlist = kind === "playlist" ? lib.playlists.find((p) => p.id === id) : undefined;
+  const radio = playlist?.radio;
+  const newRadio = lib.playlists.find((p) => p.radio);
+  // Showing the radio playlist when a new radio replaced it (here or on another device): on to the new one.
+  const wasRadio = useRef(false);
+  useEffect(() => {
+    if (playlist) wasRadio.current = !!playlist.radio;
+    else if (wasRadio.current && newRadio && lib.status === "ready") navigate(paths.playlist(newRadio.id), { replace: true });
+  }, [playlist, newRadio, lib.status, navigate]);
   const tracks: Track[] = kind === "favorites" ? lib.favorites : kind === "history" ? lib.history : playlist?.tracks ?? [];
   const name = kind === "favorites" ? t.nav.favorites : kind === "history" ? t.nav.recentlyPlayed : playlist?.name ?? "";
   const label =
-    kind === "playlist" ? t.collection.labelPlaylist : kind === "favorites" ? t.collection.labelFavorites : t.collection.labelHistory;
+    kind === "playlist"
+      ? radio
+        ? t.radio.badge
+        : t.collection.labelPlaylist
+      : kind === "favorites"
+        ? t.collection.labelFavorites
+        : t.collection.labelHistory;
 
   if (kind === "playlist" && !playlist) {
     if (lib.status !== "ready") return <PageHeader />;
@@ -103,6 +119,7 @@ export default function Collection({ kind }: Props) {
             <p className="font-mono text-[13px] text-fg-2">
               {t.common.tracks(tracks.length)}
               {total > 0 && <> · {t.time.total(total)}</>}
+              {radio && radio.kept.length > 0 && <> · {t.radio.keptCount(radio.kept.length)}</>}
             </p>
           </div>
         </div>
@@ -146,6 +163,37 @@ export default function Collection({ kind }: Props) {
         )}
       </div>
 
+      {/* The radio playlist, not saved yet: keep tracks with the pin, regenerate the rest, or save it. */}
+      {playlist && radio && !order && (
+        <div className="mx-4 mb-4 flex flex-col gap-3 rounded-[18px] bg-surface-2 p-4 md:mx-6 md:flex-row md:items-center md:gap-5">
+          <div className="flex min-w-0 flex-1 gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-text">
+              <RadioIcon size={18} weight="bold" />
+            </span>
+            <p className="text-sm text-fg-2">{t.radio.hint}</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => void lib.regenerateRadio(playlist.id)}
+              disabled={lib.regenerating === playlist.id}
+              title={t.radio.regenerateHint}
+              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-surface-3 px-4 text-sm font-medium hover:bg-surface-4 disabled:opacity-60 md:flex-none"
+            >
+              <ArrowsClockwiseIcon size={17} className={cn(lib.regenerating === playlist.id && "animate-spin")} />
+              {lib.regenerating === playlist.id ? t.radio.regenerating : t.radio.regenerate}
+            </button>
+            <button
+              type="button"
+              onClick={() => void lib.saveRadioPlaylist(playlist.id)}
+              className="h-10 flex-1 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink md:flex-none"
+            >
+              {t.radio.save}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="px-2 md:px-3">
         {order && playlist ? (
           <div className="px-2 md:px-3">
@@ -178,6 +226,7 @@ export default function Collection({ kind }: Props) {
             tracks={tracks}
             playlistId={playlist?.id}
             showAlbum
+            keep={playlist && radio ? { kept: new Set(radio.kept), toggle: (x) => void lib.toggleKeep(playlist.id, x.id) } : undefined}
             selection={{
               noFavorite: kind === "favorites",
               extra:

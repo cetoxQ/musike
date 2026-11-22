@@ -755,6 +755,26 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return libOf(req).addToPlaylist((req.params as { pid: string }).pid, tracks);
   });
 
+  /**
+   * The radio playlist for a radio just started (`{ name, seed, tracks }`, the tracks as queued): the one there was,
+   * not saved, goes. The app asks first when that one had been changed.
+   */
+  app.post("/api/playlists/radio", async (req) => {
+    const body = (req.body ?? {}) as { name?: unknown; seed?: unknown; tracks?: unknown };
+    const seed = typeof body.seed === "string" && VIDEO_ID.test(body.seed) ? body.seed : "";
+    if (!seed) throw new HttpError(400, msg("invalidTrack"));
+    const tracks = Array.isArray(body.tracks) ? body.tracks.slice(0, 500).map(library.sanitizeTrack) : [];
+    return libOf(req).createRadioPlaylist(typeof body.name === "string" ? body.name : "", seed, tracks);
+  });
+
+  /** A radio playlist's kept tracks, or its regenerated tracks: `{ tracks?, kept?, discarded? }`. */
+  app.patch("/api/playlists/:pid/radio", async (req) =>
+    libOf(req).updateRadioPlaylist((req.params as { pid: string }).pid, library.sanitizeRadioPatch(req.body)),
+  );
+
+  /** A radio playlist saved as a playlist like the others. */
+  app.post("/api/playlists/:pid/save", async (req) => libOf(req).saveRadioPlaylist((req.params as { pid: string }).pid));
+
   /** The playlist's tracks in a new order: `{ ids: [...] }`. */
   app.put("/api/playlists/:pid/order", async (req) => {
     const { ids } = (req.body ?? {}) as { ids?: unknown };

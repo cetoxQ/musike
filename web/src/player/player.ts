@@ -1124,6 +1124,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
         const related = (await api.radio(track.id)).filter((t) => t.id !== track.id);
         const s = get();
         const current = s.queue[s.index];
+        // The radio playlist: the tracks as queued, in the radio's order (made here, by the device that plays the
+        // radio, so it holds just what this queue holds; the other devices get it with the library).
+        const seed = current?.id === track.id ? current : track;
+        void useLibrary.getState().makeRadioPlaylist(seed, [seed, ...related]);
         // Radio from the track that is on: it keeps going, uninterrupted, and the radio follows it.
         if (current?.id === track.id && s.status !== "idle" && s.status !== "error") {
           set({

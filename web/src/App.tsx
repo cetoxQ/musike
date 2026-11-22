@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from "react-router";
 import { DevicesDialog } from "./components/Devices";
-import { AddToPlaylistDialog, ForgetDialog, ShareDialog, ShortcutsDialog } from "./components/Dialogs";
+import { AddToPlaylistDialog, ForgetDialog, RadioReplaceDialog, ShareDialog, ShortcutsDialog } from "./components/Dialogs";
 import { MiniPlayer, TabBar } from "./components/MobileChrome";
 import { NowPlayingSheet, PanelDrawer, SidePanel } from "./components/NowPlaying";
 import { LyricsPage } from "./components/Lyrics";
@@ -234,6 +234,7 @@ export default function App() {
       <AddToPlaylistDialog />
       <ShareDialog />
       <ForgetDialog />
+      <RadioReplaceDialog />
       <ShortcutsDialog />
       <DevicesDialog />
       <SettingsDialog />

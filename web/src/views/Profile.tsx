@@ -45,7 +45,9 @@ export default function Profile() {
   const t = useT();
   const lang = useI18n((s) => s.lang);
   const user = useAuth((s) => s.user);
-  const { favorites, artists, albums, playlists, ytPlaylists, history, playsVersion } = useLibrary();
+  const { favorites, artists, albums, playlists: allPlaylists, ytPlaylists, history, playsVersion } = useLibrary();
+  // Your playlists: not the radio playlist, which isn't saved yet.
+  const playlists = allPlaylists.filter((p) => !p.radio);
   const playList = usePlayer((s) => s.playList);
 
   // Most played: the period from Settings (1 month unless changed), all time if it has too little, or one you

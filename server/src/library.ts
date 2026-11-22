@@ -7,6 +7,7 @@ import {
   type Library,
   type PlayEntry,
   type Playlist,
+  type RadioInfo,
   type RecentItem,
   type RecentKind,
   type SavedAlbum,
@@ -92,6 +93,15 @@ export interface LibraryStore {
   removeFromPlaylist(pid: string, trackId: string): Promise<Playlist>;
   /** The playlist's tracks in this order (ids); ones left out keep their order after them, unknown ids are ignored. */
   reorderPlaylist(pid: string, ids: string[]): Promise<Playlist>;
+  /**
+   * The radio playlist for a radio just started: `tracks` as queued, from `seed`. The radio playlist there was, not
+   * saved, goes (the app asked first if it had been changed).
+   */
+  createRadioPlaylist(name: string, seed: string, tracks: Track[]): Promise<Playlist>;
+  /** Kept tracks, or regenerated ones (with the ones taken out): only on a radio playlist, which is then changed. */
+  updateRadioPlaylist(pid: string, patch: RadioPatch): Promise<Playlist>;
+  /** A radio playlist saved: a playlist like the others from now on. */
+  saveRadioPlaylist(pid: string): Promise<Playlist>;
   /**
    * "merge" adds what is missing and never deletes (playlists match by id, then by name).
    * "replace" swaps the whole library for the backup's.
@@ -218,6 +228,47 @@ export function withRecent(list: RecentItem[], item: RecentItem): RecentItem[] {
   return [item, ...list.filter((x) => x.kind !== item.kind || x.id !== item.id)].slice(0, RECENT_LIMIT);
 }
 
+/** What updateRadioPlaylist changes: any of them. */
+export interface RadioPatch {
+  tracks?: Track[];
+  kept?: string[];
+  discarded?: string[];
+}
+
+const RADIO_IDS = 500;
+const idList = (input: unknown, limit = RADIO_IDS): string[] =>
+  Array.isArray(input) ? [...new Set(input.filter((id): id is string => typeof id === "string" && VIDEO_ID.test(id)))].slice(-limit) : [];
+
+/** A radio playlist's information as kept, or undefined for anything that isn't one. */
+export function sanitizeRadio(input: unknown): RadioInfo | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const r = input as Record<string, unknown>;
+  const seed = typeof r.seed === "string" && VIDEO_ID.test(r.seed) ? r.seed : "";
+  if (!seed) return undefined;
+  return { seed, kept: idList(r.kept), discarded: idList(r.discarded), edited: r.edited === true };
+}
+
+/** A patch from the app, checked. */
+export function sanitizeRadioPatch(input: unknown): RadioPatch {
+  const b = (input ?? {}) as Record<string, unknown>;
+  const patch: RadioPatch = {};
+  if (Array.isArray(b.tracks)) patch.tracks = cleanTracks(b.tracks.slice(0, 500));
+  if (Array.isArray(b.kept)) patch.kept = idList(b.kept);
+  if (Array.isArray(b.discarded)) patch.discarded = idList(b.discarded);
+  return patch;
+}
+
+/** The patch on a radio playlist (in place): kept tracks that are still in it, and changed from now on. */
+export function patchRadio(p: Playlist, patch: RadioPatch): void {
+  if (!p.radio) throw new HttpError(409, msg("notRadioPlaylist"));
+  if (patch.tracks) p.tracks = patch.tracks;
+  if (patch.discarded) p.radio.discarded = patch.discarded;
+  const inside = new Set(p.tracks.map((t) => t.id));
+  p.radio.kept = (patch.kept ?? p.radio.kept).filter((id) => inside.has(id));
+  p.radio.edited = true;
+  p.updatedAt = Date.now();
+}
+
 /** A playlist name as kept: trimmed, at most 80 characters, not empty. */
 export function playlistName(name: string): string {
   const clean = name.trim().slice(0, 80);
@@ -296,7 +347,8 @@ export function cleanLibrary(input: unknown): Library {
     // A missing, malformed or repeated id gets a new one: each playlist keeps its own.
     const id = /^[\w-]{8,64}$/.test(given) && !ids.has(given) ? given : randomUUID();
     ids.add(id);
-    return [{ id, name, createdAt: num(p.createdAt), updatedAt: num(p.updatedAt), tracks: cleanTracks(p.tracks) }];
+    const radio = sanitizeRadio(p.radio);
+    return [{ id, name, createdAt: num(p.createdAt), updatedAt: num(p.updatedAt), tracks: cleanTracks(p.tracks), ...(radio ? { radio } : {}) }];
   });
   return {
     favorites: cleanTracks(lib.favorites),
@@ -568,6 +620,7 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
       const p = findPlaylist(lib, pid);
       p.name = playlistName(name);
       p.updatedAt = Date.now();
+      if (p.radio) p.radio.edited = true;
       await persist();
       return p;
     },
@@ -586,6 +639,7 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
         if (!p.tracks.some((t) => t.id === track.id)) p.tracks.push(track);
       }
       p.updatedAt = Date.now();
+      if (p.radio) p.radio.edited = true;
       await persist();
       return p;
     },
@@ -595,6 +649,10 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
       const p = findPlaylist(lib, pid);
       p.tracks = p.tracks.filter((t) => t.id !== trackId);
       p.updatedAt = Date.now();
+      if (p.radio) {
+        p.radio.edited = true;
+        p.radio.kept = p.radio.kept.filter((id) => id !== trackId);
+      }
       await persist();
       return p;
     },
@@ -603,6 +661,40 @@ export function jsonLibrary(storage: LibraryStorage): LibraryStore {
       const lib = await load();
       const p = findPlaylist(lib, pid);
       p.tracks = inOrder(p.tracks, ids);
+      p.updatedAt = Date.now();
+      if (p.radio) p.radio.edited = true;
+      await persist();
+      return p;
+    },
+
+    async createRadioPlaylist(name, seed, tracks) {
+      const lib = await load();
+      const now = Date.now();
+      const playlist: Playlist = {
+        id: randomUUID(),
+        name: playlistName(name),
+        createdAt: now,
+        updatedAt: now,
+        tracks,
+        radio: { seed, kept: [], discarded: [], edited: false },
+      };
+      lib.playlists = [playlist, ...lib.playlists.filter((p) => !p.radio)];
+      await persist();
+      return playlist;
+    },
+
+    async updateRadioPlaylist(pid, patch) {
+      const lib = await load();
+      const p = findPlaylist(lib, pid);
+      patchRadio(p, patch);
+      await persist();
+      return p;
+    },
+
+    async saveRadioPlaylist(pid) {
+      const lib = await load();
+      const p = findPlaylist(lib, pid);
+      delete p.radio;
       p.updatedAt = Date.now();
       await persist();
       return p;

@@ -1,4 +1,4 @@
-import { ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
+import { ClockIcon, DotsThreeIcon, HeartIcon, PushPinIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { memo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
@@ -28,6 +28,9 @@ interface RowProps {
   onToggle?: () => void;
   /** A touch screen rather than a mouse (see TrackList). */
   touch?: boolean;
+  /** In the radio playlist: the track is kept (see TrackList's keep). */
+  kept?: boolean;
+  onKeep?: () => void;
 }
 
 const TrackRow = memo(function TrackRow({
@@ -41,6 +44,8 @@ const TrackRow = memo(function TrackRow({
   selecting,
   onToggle,
   touch,
+  kept,
+  onKeep,
 }: RowProps) {
   // Also a track playing on the device this one controls.
   const isCurrent = usePlayer((s) => selectShown(s)?.id === track.id);
@@ -158,15 +163,32 @@ const TrackRow = memo(function TrackRow({
         </span>
       </div>
 
-      <button
-        type="button"
-        onClick={menuAt}
-        aria-label={t.trackList.moreFor(track.title)}
-        title={t.trackList.more}
-        className="relative z-10 grid size-9 place-items-center rounded-full text-fg-2 transition-[opacity,background-color] hover:bg-surface-3 hover:text-fg md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-      >
-        <DotsThreeIcon size={22} weight="bold" />
-      </button>
+      <div className="relative z-10 flex items-center">
+        {onKeep && (
+          <button
+            type="button"
+            onClick={onKeep}
+            aria-pressed={!!kept}
+            aria-label={kept ? t.radio.unkeep(track.title) : t.radio.keep(track.title)}
+            title={kept ? t.radio.unkeep(track.title) : t.radio.keep(track.title)}
+            className={cn(
+              "grid size-9 place-items-center rounded-full transition-[color,background-color,transform] hover:bg-surface-3 active:scale-90",
+              kept ? "text-accent-text" : "text-fg-3 hover:text-fg",
+            )}
+          >
+            <PushPinIcon size={18} weight={kept ? "fill" : "regular"} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={menuAt}
+          aria-label={t.trackList.moreFor(track.title)}
+          title={t.trackList.more}
+          className="grid size-9 place-items-center rounded-full text-fg-2 transition-[opacity,background-color] hover:bg-surface-3 hover:text-fg md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+        >
+          <DotsThreeIcon size={22} weight="bold" />
+        </button>
+      </div>
     </li>
   );
 });
@@ -192,9 +214,11 @@ interface ListProps {
    * artwork picks a track, and so does "Select" in the row's menu. A selection bar plays, favorites or adds them.
    */
   selection?: ListSelection;
+  /** The radio playlist: each row has a pin to keep the track (regenerating replaces the others). */
+  keep?: { kept: ReadonlySet<string>; toggle: (track: Track) => void };
 }
 
-export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true, selection }: ListProps) {
+export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true, selection, keep }: ListProps) {
   const playList = usePlayer((s) => s.playList);
   const pushRecent = useRecent((s) => s.push);
   const t = useT();
@@ -246,7 +270,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
           <span className="flex w-[84px] justify-end pr-0.5">
             <ClockIcon size={15} aria-label={t.trackList.duration} />
           </span>
-          <span className="w-9" />
+          <span className={keep ? "w-[72px]" : "w-9"} />
         </div>
       )}
       <ul className="flex flex-col">
@@ -266,6 +290,8 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
             selecting={chosen.length > 0}
             onToggle={selection ? () => toggle(t.id) : undefined}
             touch={touch}
+            kept={keep?.kept.has(t.id)}
+            onKeep={keep ? () => keep.toggle(t) : undefined}
           />
         ))}
       </ul>

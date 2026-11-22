@@ -56,6 +56,9 @@ const WRITES = [
   "addToPlaylist",
   "removeFromPlaylist",
   "reorderPlaylist",
+  "createRadioPlaylist",
+  "updateRadioPlaylist",
+  "saveRadioPlaylist",
   "pushRecent",
   "removeRecent",
   "clearRecent",
@@ -88,7 +91,17 @@ const CATALOG = [
 ] as const;
 
 /** Changes that name a playlist by its id (first argument): one created offline gets the server's id. */
-const ON_PLAYLIST = new Set<string>(["renamePlaylist", "deletePlaylist", "addToPlaylist", "removeFromPlaylist", "reorderPlaylist"]);
+const ON_PLAYLIST = new Set<string>([
+  "renamePlaylist",
+  "deletePlaylist",
+  "addToPlaylist",
+  "removeFromPlaylist",
+  "reorderPlaylist",
+  "updateRadioPlaylist",
+  "saveRadioPlaylist",
+]);
+/** Changes that make a playlist: offline it has the copy's id until the server gives its own. */
+const MAKES_PLAYLIST = new Set<string>(["createPlaylist", "createRadioPlaylist"]);
 
 /** The server didn't answer (as opposed to answering "no"): no network, refused, timed out, or a proxy's 502-504. */
 export function unreachable(e: unknown): boolean {
@@ -165,7 +178,7 @@ export function offlineCapable({ url, server, phone }: Options) {
       try {
         const send = server[next.method] as (...a: unknown[]) => Promise<unknown>;
         const result = await within(send(...next.args), TIMEOUT_MS);
-        if (next.method === "createPlaylist") created = (result as { id: string }).id;
+        if (MAKES_PLAYLIST.has(next.method)) created = (result as { id: string }).id;
         sent++;
       } catch (e) {
         // Still gone: the rest waits.
@@ -377,7 +390,7 @@ export function offlineCapable({ url, server, phone }: Options) {
       // A play keeps the time it was made: the server logs it then, not when it's sent.
       const args = k === "pushHistory" && asked[1] === undefined ? [asked[0], Date.now()] : asked;
       const result = await viaCopy(...args);
-      enqueue({ method: k, args, localId: k === "createPlaylist" ? (result as { id: string }).id : undefined });
+      enqueue({ method: k, args, localId: MAKES_PLAYLIST.has(k) ? (result as { id: string }).id : undefined });
       return result;
     });
   }

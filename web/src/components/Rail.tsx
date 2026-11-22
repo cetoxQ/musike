@@ -7,6 +7,7 @@ import {
   HouseIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  RadioIcon,
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router";
@@ -97,7 +98,10 @@ function RailLink({ to, label, sub, end, children }: { to: string; label: string
 export function Rail() {
   const t = useT();
   const sidebarPlaylists = useAppearance((s) => s.sidebarPlaylists);
-  const playlists = useLibrary((s) => s.playlists);
+  const allPlaylists = useLibrary((s) => s.playlists);
+  // The radio playlist not saved yet: always third, after Recently played, whether playlists show here or not.
+  const radio = allPlaylists.find((p) => p.radio);
+  const playlists = allPlaylists.filter((p) => !p.radio);
   const favorites = useLibrary((s) => s.favorites);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const navigate = useNavigate();
@@ -163,6 +167,16 @@ export function Rail() {
               <ClockCounterClockwiseIcon size={20} />
             </span>
           </RailLink>
+          {radio && (
+            <RailLink to={paths.playlist(radio.id)} label={radio.name} sub={t.radio.badge}>
+              <span className="relative block size-full">
+                <Artwork src={radio.tracks[0]?.thumb} className="size-full" iconSize={18} />
+                <span className="absolute right-0.5 bottom-0.5 grid size-4 place-items-center rounded-full bg-accent text-accent-ink">
+                  <RadioIcon size={10} weight="bold" />
+                </span>
+              </span>
+            </RailLink>
+          )}
           {sidebarPlaylists && playlists.map((p) => (
             <RailLink key={p.id} to={paths.playlist(p.id)} label={p.name} sub={t.common.tracks(p.tracks.length)}>
               <Artwork src={p.tracks[0]?.thumb} className="size-full" iconSize={18} />

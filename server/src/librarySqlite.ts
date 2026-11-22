@@ -9,7 +9,9 @@ import {
   PLAY_LOG_LIMIT,
   playedAt,
   type PlayRow,
+  patchRadio,
   playlistName,
+  sanitizeRadio,
   randomUUID,
   rankPlays,
   RECENT_LIMIT,
@@ -28,6 +30,15 @@ import {
 } from "./types.js";
 
 // The library in SQLite (see db.ts for the tables). Behaves like jsonLibrary in library.ts, one user at a time.
+
+/** JSON kept in a column, or null if it doesn't read. */
+const safeJson = (s: string): unknown => {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+};
 
 const TRACK_COLS = "t.id, t.title, t.artist, t.album, t.artist_id, t.album_id, t.duration, t.thumb, t.art, t.kind";
 
@@ -166,10 +177,13 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
 
   // Playlists
 
-  const plAll = rows(`SELECT id, name, created_at, updated_at FROM playlists WHERE user_id = ? ORDER BY pos`);
-  const plOne = one(`SELECT id, name, created_at, updated_at FROM playlists WHERE user_id = ? AND id = ?`);
+  const plAll = rows(`SELECT id, name, created_at, updated_at, radio FROM playlists WHERE user_id = ? ORDER BY pos`);
+  const plOne = one(`SELECT id, name, created_at, updated_at, radio FROM playlists WHERE user_id = ? AND id = ?`);
   const plTop = one(`SELECT COALESCE(MIN(pos), 0) AS v FROM playlists WHERE user_id = ?`);
-  const plInsert = run(`INSERT INTO playlists (user_id, id, name, created_at, updated_at, pos) VALUES (?, ?, ?, ?, ?, ?)`);
+  const plInsert = run(`INSERT INTO playlists (user_id, id, name, created_at, updated_at, pos, radio) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const plRadio = run(`UPDATE playlists SET radio = ?, updated_at = ? WHERE user_id = ? AND id = ?`);
+  const plRadioIds = rows(`SELECT id FROM playlists WHERE user_id = ? AND radio IS NOT NULL`);
+  const ptClear = run(`DELETE FROM playlist_tracks WHERE user_id = ? AND playlist_id = ?`);
   const plRename = run(`UPDATE playlists SET name = ?, updated_at = ? WHERE user_id = ? AND id = ?`);
   const plTouch = run(`UPDATE playlists SET updated_at = ? WHERE user_id = ? AND id = ?`);
   const plDelete = run(`DELETE FROM playlists WHERE user_id = ? AND id = ?`);
@@ -185,13 +199,24 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
   const ptRemove = run(`DELETE FROM playlist_tracks WHERE user_id = ? AND playlist_id = ? AND track_id = ?`);
   const ptMove = run(`UPDATE playlist_tracks SET pos = ? WHERE user_id = ? AND playlist_id = ? AND track_id = ?`);
 
-  const toPlaylist = (r: Row, tracks: Track[]): Playlist => ({
-    id: String(r.id),
-    name: String(r.name),
-    createdAt: Number(r.created_at),
-    updatedAt: Number(r.updated_at),
-    tracks,
-  });
+  const toPlaylist = (r: Row, tracks: Track[]): Playlist => {
+    const radio = r.radio == null ? undefined : sanitizeRadio(safeJson(String(r.radio)));
+    return {
+      id: String(r.id),
+      name: String(r.name),
+      createdAt: Number(r.created_at),
+      updatedAt: Number(r.updated_at),
+      tracks,
+      ...(radio ? { radio } : {}),
+    };
+  };
+
+  /** A change to a radio playlist marks it changed (starting another radio asks before deleting it). */
+  function touched(uid: number, pid: string) {
+    const p = playlist(uid, pid);
+    if (p.radio) plRadio(JSON.stringify({ ...p.radio, edited: true }), Date.now(), uid, pid);
+    else plTouch(Date.now(), uid, pid);
+  }
 
   function playlist(uid: number, pid: string): Playlist {
     const r = plOne(uid, pid);
@@ -210,7 +235,7 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
   }
 
   function insertPlaylist(uid: number, p: Playlist, pos: number) {
-    plInsert(uid, p.id, p.name, p.createdAt, p.updatedAt, pos);
+    plInsert(uid, p.id, p.name, p.createdAt, p.updatedAt, pos, p.radio ? JSON.stringify(p.radio) : null);
     p.tracks.forEach((t, i) => {
       upsertTrack(t);
       ptInsert(uid, p.id, t.id, i);
@@ -395,6 +420,7 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
           tx(() => {
             playlist(uid, pid);
             plRename(playlistName(name), Date.now(), uid, pid);
+            touched(uid, pid);
             return playlist(uid, pid);
           }),
 
@@ -412,15 +438,16 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
               upsertTrack(t);
               ptInsert(uid, pid, t.id, ++pos); // already there: ignored
             }
-            plTouch(Date.now(), uid, pid);
+            touched(uid, pid);
             return playlist(uid, pid);
           }),
 
         removeFromPlaylist: (pid, trackId) =>
           tx(() => {
-            playlist(uid, pid);
+            const p = playlist(uid, pid);
             ptRemove(uid, pid, trackId);
-            plTouch(Date.now(), uid, pid);
+            if (p.radio) plRadio(JSON.stringify({ ...p.radio, kept: p.radio.kept.filter((id) => id !== trackId), edited: true }), Date.now(), uid, pid);
+            else plTouch(Date.now(), uid, pid);
             return playlist(uid, pid);
           }),
 
@@ -428,7 +455,46 @@ export function sqliteLibraries(db: Db): { forUser(userId: number): LibraryStore
           tx(() => {
             const current = playlist(uid, pid);
             inOrder(current.tracks, ids).forEach((t, pos) => ptMove(pos, uid, pid, t.id));
-            plTouch(Date.now(), uid, pid);
+            touched(uid, pid);
+            return playlist(uid, pid);
+          }),
+
+        createRadioPlaylist: (name, seed, tracks) =>
+          tx(() => {
+            // One radio playlist at a time: the one there was, not saved, goes.
+            for (const r of plRadioIds(uid)) plDelete(uid, String(r.id));
+            const now = Date.now();
+            const p: Playlist = {
+              id: randomUUID(),
+              name: playlistName(name),
+              createdAt: now,
+              updatedAt: now,
+              tracks,
+              radio: { seed, kept: [], discarded: [], edited: false },
+            };
+            insertPlaylist(uid, p, Number(plTop(uid)!.v) - 1);
+            return playlist(uid, p.id);
+          }),
+
+        updateRadioPlaylist: (pid, patch) =>
+          tx(() => {
+            const p = playlist(uid, pid);
+            patchRadio(p, patch);
+            if (patch.tracks) {
+              ptClear(uid, pid);
+              p.tracks.forEach((t, i) => {
+                upsertTrack(t);
+                ptInsert(uid, pid, t.id, i);
+              });
+            }
+            plRadio(JSON.stringify(p.radio), p.updatedAt, uid, pid);
+            return playlist(uid, pid);
+          }),
+
+        saveRadioPlaylist: (pid) =>
+          tx(() => {
+            playlist(uid, pid);
+            plRadio(null, Date.now(), uid, pid);
             return playlist(uid, pid);
           }),
 

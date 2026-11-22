@@ -709,6 +709,27 @@ export const pt: Messages = {
     note: "O Musike aberto com a sua conta em outro dispositivo aparece aqui. Um dispositivo toca por vez, e os outros o controlam. Toque em um dispositivo para tocar nele.",
   },
 
+  radio: {
+    playlistName: (title: string) => `Rádio de ${title}`,
+    badge: "Rádio, não salva",
+    hint: "As músicas que esta rádio colocou na fila. Guarde as que você gosta com o alfinete e depois Regenerar: as outras dão lugar a novas, da rádio das guardadas. Salve para mantê-la como playlist; iniciar outra rádio a substitui.",
+    keep: (title: string) => `Guardar ${title}`,
+    unkeep: (title: string) => `Não guardar ${title}`,
+    keptCount: (n: number) => count(n, "guardada", "guardadas"),
+    regenerate: "Regenerar",
+    regenerateHint: "As músicas não guardadas dão lugar a novas, da rádio das guardadas",
+    regenerating: "Regenerando...",
+    regenerated: (n: number) => count(n, "música nova", "músicas novas"),
+    nothingNew: "Nenhuma música nova encontrada",
+    save: "Salvar playlist",
+    saved: (name: string) => `"${name}" salva como playlist`,
+    replaceTitle: "Substituir a playlist de rádio?",
+    replaceBody: (name: string) =>
+      `"${name}" não está salva e tem alterações (músicas guardadas, regenerada, renomeada ou editada). Uma nova rádio a substitui. A música tocando agora continua.`,
+    replaceDelete: "Apagar e iniciar a rádio",
+    replaceSave: "Salvar e depois iniciar a rádio",
+  },
+
   toasts: {
     dismiss: (message) => `${message}. Fechar aviso`,
     addedFavorite: "Adicionada às Favoritas",

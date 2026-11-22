@@ -11,6 +11,7 @@ import type {
   PlayEntry,
   Playlist,
   PlaylistCard,
+  RadioPatch,
   RecentInput,
   RecentItem,
   RecentKind,
@@ -262,6 +263,12 @@ export interface MusikeApi {
   removeFromPlaylist(id: string, trackId: string): Promise<Playlist>;
   /** The playlist's tracks in this order (their ids). */
   reorderPlaylist(id: string, ids: string[]): Promise<Playlist>;
+  /** The radio playlist for a radio just started (the tracks as queued): the unsaved one there was goes. */
+  createRadioPlaylist(name: string, seed: string, tracks: Track[]): Promise<Playlist>;
+  /** A radio playlist's kept tracks, or its regenerated ones. */
+  updateRadioPlaylist(id: string, patch: RadioPatch): Promise<Playlist>;
+  /** A radio playlist saved as a playlist like the others. */
+  saveRadioPlaylist(id: string): Promise<Playlist>;
   importLibrary(backup: unknown, mode: "merge" | "replace"): Promise<ImportResult>;
   /** The Search page's "Recent" list, newest first. */
   recent(signal?: AbortSignal): Promise<RecentItem[]>;

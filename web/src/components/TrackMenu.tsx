@@ -13,6 +13,7 @@ import {
   ShareNetworkIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
+import { startRadio } from "../lib/radio";
 import { share } from "../lib/share";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -105,7 +106,7 @@ export function TrackMenu() {
         {t.trackMenu.addToQueue}
       </Item>
       {!menu.noRadio && (
-        <Item icon={<RadioIcon size={18} />} onClick={run(() => void usePlayer.getState().startRadio(menu.track))}>
+        <Item icon={<RadioIcon size={18} />} onClick={run(() => startRadio(menu.track))}>
           {t.trackMenu.startRadio}
         </Item>
       )}

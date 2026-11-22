@@ -21,6 +21,25 @@ export interface Playlist {
   createdAt: number;
   updatedAt: number;
   tracks: Track[];
+  /** A radio playlist not saved yet (see RadioInfo); absent on a playlist of yours. */
+  radio?: RadioInfo;
+}
+
+/**
+ * The radio playlist: made with the tracks a radio queued, one at a time (starting another radio replaces it). Tracks
+ * can be kept; regenerating swaps the others for new ones from the radio of the kept ones. Saved, it becomes a
+ * playlist like the others.
+ */
+export interface RadioInfo {
+  /** The track the radio started from. */
+  seed: string;
+  /** Tracks marked to keep (ids). */
+  kept: string[];
+  /** Tracks regenerating took out: not brought back. */
+  discarded: string[];
+  /** Changed since it was made (kept tracks, regenerated, renamed, tracks added, taken out or moved): starting another
+   * radio asks before deleting it. */
+  edited: boolean;
 }
 
 /** An artist kept in the library. */

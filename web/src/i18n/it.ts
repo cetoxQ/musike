@@ -711,6 +711,27 @@ export const it: Messages = {
     note: "Musike aperto con il tuo account su un altro dispositivo compare qui. Riproduce un dispositivo alla volta e gli altri lo controllano. Tocca un dispositivo per riprodurre lì.",
   },
 
+  radio: {
+    playlistName: (title: string) => `Radio da ${title}`,
+    badge: "Radio, non salvata",
+    hint: "I brani messi in coda da questa radio. Tieni quelli che ti piacciono con la puntina, poi Rigenera: gli altri lasciano il posto a brani nuovi dalla radio di quelli tenuti. Salvala per tenerla come playlist; avviare un'altra radio la sostituisce.",
+    keep: (title: string) => `Tieni ${title}`,
+    unkeep: (title: string) => `Non tenere ${title}`,
+    keptCount: (n: number) => count(n, "tenuto", "tenuti"),
+    regenerate: "Rigenera",
+    regenerateHint: "I brani non tenuti lasciano il posto a brani nuovi, dalla radio di quelli tenuti",
+    regenerating: "Rigenero...",
+    regenerated: (n: number) => count(n, "brano nuovo", "brani nuovi"),
+    nothingNew: "Nessun brano nuovo trovato",
+    save: "Salva playlist",
+    saved: (name: string) => `"${name}" salvata come playlist`,
+    replaceTitle: "Sostituire la playlist radio?",
+    replaceBody: (name: string) =>
+      `"${name}" non è salvata e ha delle modifiche (brani tenuti, rigenerata, rinominata o modificata). Una nuova radio la sostituisce. Il brano in riproduzione continua.`,
+    replaceDelete: "Eliminala e avvia la radio",
+    replaceSave: "Salvala, poi avvia la radio",
+  },
+
   toasts: {
     dismiss: (message) => `${message}. Chiudi avviso`,
     addedFavorite: "Aggiunto ai Preferiti",

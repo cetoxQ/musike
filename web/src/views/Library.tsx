@@ -67,7 +67,13 @@ export default function Library() {
       <ul className="grid grid-cols-1 gap-1 px-2 pt-2 md:grid-cols-3 md:gap-2 md:px-4 lg:grid-cols-4 2xl:grid-cols-6">
         <Entry to={paths.favorites} name={t.nav.favorites} kind="favorites" tracks={favorites} sub={t.common.tracks(favorites.length)} />
         <Entry to={paths.history} name={t.nav.recentlyPlayed} kind="history" tracks={history} sub={t.common.tracks(history.length)} />
-        {playlists.map((p) => (
+        {/* The radio playlist not saved yet: third, after Recently played, as in the side column. */}
+        {playlists
+          .filter((p) => p.radio)
+          .map((p) => (
+            <Entry key={p.id} to={paths.playlist(p.id)} name={p.name} kind="playlist" tracks={p.tracks} sub={t.radio.badge} />
+          ))}
+        {playlists.filter((p) => !p.radio).map((p) => (
           <Entry
             key={p.id}
             to={paths.playlist(p.id)}
