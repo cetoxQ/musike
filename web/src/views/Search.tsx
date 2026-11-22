@@ -10,7 +10,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { AlbumGrid } from "../components/AlbumTiles";
 import { ArtistGrid } from "../components/ArtistTiles";
 import { PlaylistGrid } from "../components/PlaylistTiles";
@@ -25,7 +25,7 @@ import { api } from "../lib/api";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
-import { trackFromLink, videoIdFromUrl } from "../lib/youtubeLink";
+import { playlistIdFromUrl, trackFromLink, videoIdFromUrl } from "../lib/youtubeLink";
 import type { AlbumCard, ArtistCard, PlaylistCard, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { parseList } from "./BatchSearch";
@@ -67,6 +67,13 @@ export default function Search() {
   const playTrack = usePlayer((s) => s.playTrack);
 
   const linkId = videoIdFromUrl(text);
+  // A playlist link: on its own it opens the playlist; with a video in it, the video shows with a way to the list.
+  const linkList = playlistIdFromUrl(text);
+  const navigate = useNavigate();
+  useEffect(() => {
+    // Only when just pasted or typed: back here from the playlist, the page stays (with the way to it).
+    if (linkList && !linkId && text.trim() !== q.trim()) navigate(paths.ytPlaylist(linkList));
+  }, [linkList, linkId, text, q, navigate]);
   // "a, b, c" probably means three songs; offer to search each one (titles can have commas, so only offer).
   const listTerms = linkId || !text.includes(",") ? [] : parseList(text);
 
@@ -88,7 +95,7 @@ export default function Search() {
 
   // Search as you type, debounced.
   useEffect(() => {
-    if (linkId || text.trim() === q) return;
+    if (linkId || linkList || text.trim() === q) return;
     const timer = setTimeout(() => setQuery(text), 380);
     return () => clearTimeout(timer);
   }, [text]);
@@ -322,6 +329,16 @@ export default function Search() {
             {linkTrack === "error" && (
               <p className="px-1 py-6 text-sm text-fg-2">{t.search.linkError}</p>
             )}
+          </div>
+        )}
+        {linkList && (
+          <div className="px-2 md:px-3">
+            <Link
+              to={paths.ytPlaylist(linkList)}
+              className="mt-3 inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-fg-2 ring-1 ring-line hover:text-fg"
+            >
+              <LinkIcon size={16} /> {t.search.openPlaylist}
+            </Link>
           </div>
         )}
 

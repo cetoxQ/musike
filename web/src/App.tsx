@@ -92,7 +92,7 @@ export default function App() {
   useEffect(() => startCar?.(), []);
 
   // A YouTube link opened with the Android app, or shared to it, plays right away.
-  useEffect(() => openedLinks?.((url) => void playLink(url)), []);
+  useEffect(() => openedLinks?.((url) => void playLink(url, (path) => navigate(path))), [navigate]);
 
   // Settings that follow the account (the accent colour...): for whoever is signed in.
   const userId = useAuth((s) => s.user?.id);
