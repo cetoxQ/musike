@@ -157,7 +157,7 @@ export const pt: Messages = {
     qualityAuto: "Auto",
     qualityAutoHint: "Começa na hora em SD, depois na qualidade que cabe na tela",
     qualityFailed: "Não deu para preparar essa qualidade: tocando em SD.",
-    qualityDownloads: "Baixado antes de tocar",
+    qualityDownloads: "SD enquanto baixa",
     nothingPlaying: "Nada tocando. Busque algo para começar.",
     showNowPlaying: "Mostrar Tocando agora",
     queue: "Fila",

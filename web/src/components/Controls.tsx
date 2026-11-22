@@ -234,8 +234,8 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
 }
 
 /**
- * Where a small menu opens, fixed to the window so no panel's edge cuts it: above its button when the button is low,
- * under it otherwise; lined up with the button's right edge (or in the middle of the window, `centred`), and always
+ * Where a small menu opens, fixed to the window so no panel's edge cuts it: above or under its button, on the side
+ * with more room (a phone held sideways is short: a fixed threshold sent the cinema view's menu under the screen); lined up with the button's right edge (or in the middle of the window, `centred`), and always
  * inside the window (on a phone the button can sit in the middle of the row, where a menu lined up with it would run
  * off the screen). `width`: the menu's, in px.
  */
@@ -243,9 +243,12 @@ function menuPlace(button: DOMRect, width: number, centred = false): CSSProperti
   const w = Math.min(width, window.innerWidth - 16);
   const at = centred ? (window.innerWidth - w) / 2 : button.right - w;
   const left = Math.round(Math.min(Math.max(8, at), window.innerWidth - w - 8));
-  return button.top > 360
-    ? { left, width: w, bottom: window.innerHeight - button.top + 10, maxHeight: button.top - 18 }
-    : { left, width: w, top: button.bottom + 10, maxHeight: window.innerHeight - button.bottom - 18 };
+  const above = button.top;
+  const below = window.innerHeight - button.bottom;
+  // Taller than the room, it scrolls (the menus are scroll areas).
+  return above > below
+    ? { left, width: w, bottom: window.innerHeight - button.top + 10, maxHeight: above - 18 }
+    : { left, width: w, top: button.bottom + 10, maxHeight: below - 18 };
 }
 
 const SLEEP_MINUTES = [15, 30, 45, 60, 90];

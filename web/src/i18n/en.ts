@@ -163,7 +163,7 @@ export const en = {
     qualityAuto: "Auto",
     qualityAutoHint: "Starts at once in SD, then the quality that fits the screen",
     qualityFailed: "That quality couldn't be prepared: playing in SD.",
-    qualityDownloads: "Downloads before playing",
+    qualityDownloads: "SD while it downloads",
     nothingPlaying: "Nothing playing. Search for something to start.",
     showNowPlaying: "Show Now playing",
     queue: "Queue",
