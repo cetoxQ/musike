@@ -366,10 +366,14 @@ services:
       YTDLP_EXTRA_ARGS: "--extractor-args youtubepot-bgutilhttp:base_url=http://pot:4416"
     depends_on: [pot]
     restart: unless-stopped
+    cap_drop: [ALL]                        # no root powers, none to gain
+    security_opt: ["no-new-privileges:true"]
   pot: # proof-of-origin tokens for yt-dlp, so YouTube asks less often to confirm you're not a bot
     image: brainicism/bgutil-ytdlp-pot-provider:2.0.2
     init: true
     restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
 volumes:
   musike-data:
   musike-cache:

@@ -27,6 +27,9 @@ services:
       # MUSIKE_TRUST_PROXY: "true" # behind a reverse proxy
     depends_on: [pot]
     restart: unless-stopped
+    # Nothing in Musike needs root's powers: none are given, and none can be gained later.
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
 
   # Proof-of-origin tokens for yt-dlp, so YouTube asks less often to "confirm you're not a bot" (VPNs, shared
   # networks). Optional: without it Musike works the same, only bot-checked more often. Keep the version in step with
@@ -36,6 +39,8 @@ services:
     container_name: musike-pot
     init: true
     restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
 
 volumes:
   musike-data:
