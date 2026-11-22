@@ -13,13 +13,22 @@ import {
   SpeakerXIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useT } from "../i18n";
-import { capabilities, link } from "../lib/api";
+import { api, capabilities, link } from "../lib/api";
 import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
-import { selectHasShown, selectShownDuration, selectShownPosition, selectShownStatus, usePlayer } from "../player/player";
+import {
+  playingVideoId,
+  type Quality,
+  selectCurrent,
+  selectHasShown,
+  selectShownDuration,
+  selectShownPosition,
+  selectShownStatus,
+  usePlayer,
+} from "../player/player";
 import { useLibrary } from "../stores/library";
 import { IconButton, PlayDisc } from "./IconButton";
 import { Slider } from "./Slider";
@@ -223,6 +232,128 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
   );
 }
 
+/** A quality line as people know it: 4K, 1440p (2K when short), 720p. */
+export const qualityLabel = (h: number, short = false) =>
+  h >= 2160 ? "4K" : h >= 1440 && short ? "2K" : short ? String(h) : `${h}p`;
+
+/** Offered when the device being controlled can't say which qualities its video has. */
+const COMMON_QUALITIES = [1080, 720, 480, 360];
+
+/**
+ * The video quality: Auto (SD at once, then what fits the screen) or one of the qualities YouTube has for this video,
+ * under the server's limit. Compact: a badge on the switch's corner, so the phone's row doesn't widen.
+ */
+function QualityButton({ compact }: { compact: boolean }) {
+  const t = useT();
+  const remote = usePlayer((s) => !!s.remote);
+  const chosen = usePlayer((s) => s.remote?.quality ?? s.quality);
+  const playing = usePlayer((s) => s.videoQuality);
+  const setQuality = usePlayer((s) => s.setQuality);
+  const track = usePlayer(selectCurrent);
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState<number[] | null>(null);
+  /** Where the menu shows: fixed to the window, above the button or under it, so no panel's edge cuts it. */
+  const [at, setAt] = useState<CSSProperties>({});
+  const box = useRef<HTMLDivElement>(null);
+  const toggle = () => {
+    const r = box.current?.getBoundingClientRect();
+    if (r && !open) {
+      const right = Math.max(8, window.innerWidth - r.right);
+      setAt(r.top > 360 ? { right, bottom: window.innerHeight - r.top + 10 } : { right, top: r.bottom + 10 });
+    }
+    setOpen((o) => !o);
+  };
+  const shown = remote ? (chosen === "auto" ? null : chosen) : playing;
+
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+
+  // The qualities of the video playing here, asked when the menu opens (the server already resolved it).
+  useEffect(() => {
+    if (!open) return;
+    const id = remote ? null : playingVideoId();
+    if (!id) return setList(COMMON_QUALITIES);
+    let live = true;
+    setList(null);
+    api.videoQualities(id).then(
+      (r) => live && setList([...r.qualities].sort((a, b) => b - a)),
+      () => live && setList(COMMON_QUALITIES),
+    );
+    return () => {
+      live = false;
+    };
+  }, [open, remote, track?.id]);
+
+  const pick = (q: Quality) => {
+    setQuality(q);
+    setOpen(false);
+  };
+  const high = (shown ?? 0) >= 720;
+  const label = chosen === "auto" ? (shown ? `${t.player.qualityAuto} · ${qualityLabel(shown)}` : t.player.qualityAuto) : qualityLabel(chosen);
+  const item = (on: boolean) =>
+    cn(
+      "flex w-full items-center justify-between gap-6 rounded-lg px-3 py-2 text-left text-[13px]",
+      on ? "bg-accent-soft text-accent-text" : "text-fg hover:bg-surface-4",
+    );
+
+  return (
+    <div ref={box} className={cn(compact ? "absolute -top-2.5 -right-2.5" : "relative")}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title={t.player.quality}
+        className={cn(
+          "rounded-full font-mono font-semibold ring-1 transition-colors",
+          compact
+            ? cn("h-5 px-1.5 text-[10px] leading-none", high ? "bg-accent text-accent-ink ring-accent" : "bg-surface-2 text-fg-2 ring-line")
+            : cn("h-9 px-3 text-[12px]", high ? "bg-accent-soft text-accent-text ring-accent/40" : "text-fg-2 ring-line hover:text-fg"),
+        )}
+      >
+        {compact ? (shown ? qualityLabel(shown, true) : "A") : label}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label={t.player.quality}
+          style={at}
+          className="fixed z-50 w-64 rounded-2xl bg-surface-3 p-1.5 shadow-lg ring-1 ring-line"
+        >
+          <button type="button" role="menuitemradio" aria-checked={chosen === "auto"} className={item(chosen === "auto")} onClick={() => pick("auto")}>
+            <span className="flex flex-col">
+              <span className="font-medium">{t.player.qualityAuto}</span>
+              <span className="text-[11px] text-fg-3">{t.player.qualityAutoHint}</span>
+            </span>
+            {chosen === "auto" && shown ? <span className="font-mono text-[11px]">{qualityLabel(shown)}</span> : null}
+          </button>
+          {list === null ? (
+            <div className="px-3 py-2 text-[12px] text-fg-3">…</div>
+          ) : (
+            list.map((h) => (
+              <button key={h} type="button" role="menuitemradio" aria-checked={chosen === h} className={item(chosen === h)} onClick={() => pick(h)}>
+                <span className="font-mono">{qualityLabel(h)}</span>
+                {h !== 360 && <span className="text-[11px] text-fg-3">{t.player.qualityDownloads}</span>}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Audio / Video segmented switch. For songs, Video plays the song's music video when YouTube has one. */
 const noLink = () => () => {};
 
@@ -241,9 +372,6 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
   // This device's mode, or the one of the device it controls (which may not play videos: the phone's own library).
   const preferVideo = usePlayer((s) => s.remote?.preferVideo ?? s.preferVideo);
   const setPreferVideo = usePlayer((s) => s.setPreferVideo);
-  // What the video plays in (HD fetched for the big screen counts), or the controlled device's choice.
-  const quality = usePlayer((s) => s.remote?.quality ?? (s.mediaKind === "video" ? s.videoQuality : s.quality));
-  const setQuality = usePlayer((s) => s.setQuality);
   const showingVideo = usePlayer((s) => s.remote?.showingVideo ?? s.mediaKind === "video");
   const canVideo = useVideoAvailable();
   if (!canVideo) return null;
@@ -256,7 +384,7 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
     );
 
   return (
-    // Compact, HD/SD is a badge on the switch's corner, so it doesn't widen the row it sits in.
+    // Compact, the quality is a badge on the switch's corner, so it doesn't widen the row it sits in.
     <div className={cn("flex items-center", compact ? "relative" : "gap-2", className)}>
       <div role="radiogroup" aria-label={t.player.mode} className="flex rounded-full bg-surface-1 p-1 ring-1 ring-line">
         <button
@@ -282,27 +410,7 @@ export function ModeSwitch({ className, compact = false }: { className?: string;
           <VideoCameraIcon size={compact ? 17 : 15} /> {!compact && t.player.video}
         </button>
       </div>
-      {showingVideo && (
-        <button
-          type="button"
-          onClick={() => setQuality(quality === "sd" ? "hd" : "sd")}
-          title={quality === "sd" ? t.player.toHd : t.player.toSd}
-          className={cn(
-            "rounded-full font-mono font-semibold ring-1 transition-colors",
-            compact
-              ? cn(
-                  "absolute -top-2.5 -right-2.5 h-5 px-1.5 text-[10px] leading-none",
-                  quality === "hd" ? "bg-accent text-accent-ink ring-accent" : "bg-surface-2 text-fg-2 ring-line",
-                )
-              : cn(
-                  "h-9 px-3 text-[12px]",
-                  quality === "hd" ? "bg-accent-soft text-accent-text ring-accent/40" : "text-fg-2 ring-line hover:text-fg",
-                ),
-          )}
-        >
-          {quality === "hd" ? "HD" : "SD"}
-        </button>
-      )}
+      {showingVideo && <QualityButton compact={compact} />}
     </div>
   );
 }

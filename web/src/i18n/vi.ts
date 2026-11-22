@@ -141,8 +141,6 @@ export const vi: Translation = {
     audio: "Âm thanh",
     video: "Video",
     watchClip: "Xem video âm nhạc",
-    toHd: "Chuyển sang HD (720p, tải trước khi phát)",
-    toSd: "Chuyển sang SD (360p, bắt đầu nhanh hơn khi có)",
     nothingPlaying: "Không có gì đang phát. Tìm bài hát để bắt đầu.",
     showNowPlaying: "Hiện Đang phát",
     queue: "Hàng chờ",

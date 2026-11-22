@@ -46,7 +46,8 @@ export type DeviceForm = "computer" | "phone";
 
 export type Repeat = "off" | "all" | "one";
 
-export type Quality = "sd" | "hd";
+/** A device's video quality: "auto", or a quality line (e.g. 720). */
+export type Quality = "auto" | number;
 
 export interface PlayState {
   track: Track | null;
@@ -162,8 +163,12 @@ function tracksOf(v: unknown): Track[] {
 const indexIn = (v: unknown, length: number) => (Number.isInteger(v) ? Math.min(Math.max(v as number, 0), length - 1) : 0);
 /** A position in a whole queue (which may be longer than what travels). */
 const count = (v: unknown) => (Number.isInteger(v) ? Math.min(Math.max(v as number, 0), 1_000_000) : 0);
-const QUALITIES = new Set<unknown>(["sd", "hd"]);
-const qualityOf = (v: unknown): Quality => (QUALITIES.has(v) ? (v as Quality) : "sd");
+/** A quality as a device sent it: "auto", a quality line, or the older "sd" (Auto) and "hd" (720). */
+const qualityOf = (v: unknown): Quality => {
+  if (v === "hd") return 720;
+  if (typeof v === "number" && Number.isInteger(v) && v >= 144 && v <= 4320) return v;
+  return "auto";
+};
 const TRACK_ID = /^[\w-]{1,64}$/;
 const level = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 1);
 

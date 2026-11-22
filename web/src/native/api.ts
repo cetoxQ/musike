@@ -121,7 +121,8 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
       return { id, title: r.title, duration: r.duration, hasSdVideo: false };
     }, signal),
   // Video needs a server: the phone on its own never asks.
-  prepareHd: () => Promise.reject(fail(404, "noSdVideo")),
+  videoQualities: () => Promise.reject(fail(404, "noSdVideo")),
+  prepareVideo: () => Promise.reject(fail(404, "noSdVideo")),
 
   library: () => call(() => lib.getLibraryLite()),
   addFavorite: (t) => call(async () => ({ favorites: await lib.addFavorite(library.sanitizeTrack(t)) })),
@@ -259,9 +260,9 @@ const phoneStream = (id: string) =>
  * On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. Connected to a
  * server, it plays the server's stream proxy; with the server out of reach, the phone's again (audio only).
  */
-export const streamSource = (id: string, kind: "audio" | "video" = "audio", quality: "sd" | "hd" = "sd"): Promise<string> =>
+export const streamSource = (id: string, kind: "audio" | "video" = "audio", height = 360): Promise<string> =>
   server && offline
-    ? offline.streamSource(id, () => server.streamUrl(id, kind, quality), () => phoneStream(id))
+    ? offline.streamSource(id, () => server.streamUrl(id, kind, height), () => phoneStream(id))
     : phoneStream(id);
 
 export async function explainStreamError(url: string, error?: MediaError | null): Promise<{ message: string }> {

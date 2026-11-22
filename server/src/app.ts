@@ -43,7 +43,7 @@ import { lyricsFor } from "./lyrics.js";
 import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./system.js";
 import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
-import { downloadHd, pruneCache, resolveStreams } from "./ytdlp.js";
+import { downloadVideo, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -88,6 +88,14 @@ function videoId(params: unknown): string {
   const id = (params as { id?: string }).id ?? "";
   if (!VIDEO_ID.test(id)) throw new HttpError(400, msg("invalidVideoId"));
   return id;
+}
+
+/** The video quality asked for: ?h= (lines, e.g. 720), or the older ?q=hd (720); 0 for the ready-made SD stream. */
+function heightOf(q: unknown): number {
+  const { h, q: legacy } = (q ?? {}) as { h?: string; q?: string };
+  const height = Math.trunc(Number(h));
+  if (Number.isFinite(height) && height >= 144 && height <= 4320) return height;
+  return legacy === "hd" ? 720 : 0;
 }
 
 function query(q: unknown): string {
@@ -570,21 +578,32 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return { id: r.id, title: r.title, duration: r.duration, hasSdVideo: !!r.video };
   });
 
-  /** A video's HD downloaded ahead (shown big while SD plays): the player switches to it when this answers. */
-  app.post("/api/prepare/:id/hd", async (req) => {
-    await downloadHd(videoId(req.params));
+  /** The video qualities a track comes in here (lines, e.g. 720), under MUSIKE_VIDEO_MAX_HEIGHT. */
+  app.get("/api/video-qualities/:id", async (req) => videoQualities(videoId(req.params)));
+
+  /**
+   * A video downloaded ahead in a quality (?h=, e.g. 1080), so the player can switch to it without waiting: the
+   * Auto quality does this when the video is shown big. /hd is the older name for 720.
+   */
+  const prepareVideo = async (id: string, height: number) => {
+    if (height <= 360 && (await resolveStreams(id)).video) return { ready: true };
+    await downloadVideo(id, height);
     return { ready: true };
-  });
+  };
+  app.post("/api/prepare/:id/video", async (req) => prepareVideo(videoId(req.params), heightOf(req.query)));
+  app.post("/api/prepare/:id/hd", async (req) => prepareVideo(videoId(req.params), 720));
 
   app.get("/api/stream/:id/audio", (req, reply) => proxyStream(req, reply, videoId(req.params), "audio"));
 
+  /** ?h= a quality (e.g. 1080), downloaded first; none (or 360) the ready-made SD stream, when YouTube has one. */
   app.get("/api/stream/:id/video", async (req, reply) => {
     const id = videoId(req.params);
-    const { q } = req.query as { q?: string };
-    if (q === "hd") return serveFile(req, reply, await downloadHd(id), "video/mp4");
-    const resolved = await resolveStreams(id);
-    if (!resolved.video) return serveFile(req, reply, await downloadHd(id), "video/mp4");
-    return proxyStream(req, reply, id, "video");
+    const height = heightOf(req.query);
+    if (height <= 360) {
+      const resolved = await resolveStreams(id);
+      if (resolved.video) return proxyStream(req, reply, id, "video");
+    }
+    return serveFile(req, reply, await downloadVideo(id, height || 360), "video/mp4");
   });
 
   // Library

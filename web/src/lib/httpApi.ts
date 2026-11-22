@@ -141,7 +141,9 @@ export function httpBackend(opts: HttpBackendOptions) {
         method: "POST",
         signal,
       }),
-    prepareHd: (id: string) => request<{ ready: boolean }>(`/api/prepare/${id}/hd`, { method: "POST" }).then(() => undefined),
+    videoQualities: (id: string) => request<{ qualities: number[]; max: number }>(`/api/video-qualities/${id}`),
+    prepareVideo: (id: string, height: number) =>
+      request<{ ready: boolean }>(`/api/prepare/${id}/video?h=${height}`, { method: "POST" }).then(() => undefined),
 
     library: () => request<Library>("/api/library"),
     addFavorite: (t: Track) => request<{ favorites: Track[] }>(`/api/favorites/${t.id}`, { method: "PUT", json: t }),
@@ -233,8 +235,9 @@ export function httpBackend(opts: HttpBackendOptions) {
   };
 
   /** The server's stream proxy for a track. */
-  const streamPath = (id: string, kind: "audio" | "video", quality: "sd" | "hd") =>
-    kind === "audio" ? `/api/stream/${id}/audio` : `/api/stream/${id}/video?q=${quality}`;
+  /** `height`: the video's quality line (360 is the ready-made SD stream). */
+  const streamPath = (id: string, kind: "audio" | "video", height: number) =>
+    kind === "audio" ? `/api/stream/${id}/audio` : `/api/stream/${id}/video?h=${height}`;
 
   /** Media elements hide the HTTP error body; fetch it to show the real reason. */
   async function explain(url: string): Promise<{ message: string; code?: ErrorCode }> {

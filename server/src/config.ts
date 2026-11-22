@@ -42,6 +42,11 @@ export const config = {
   cacheDir: process.env.MUSIKE_CACHE_DIR ?? path.join(root, "cache"),
   /** HD video cache limit; least recently played videos are evicted first. */
   cacheMaxBytes: Number(process.env.MUSIKE_CACHE_MAX_MB ?? 2048) * 1024 * 1024,
+  /**
+   * The highest video quality offered (lines: 1080 is Full HD, 2160 is 4K). Higher ones are left out: they take long
+   * to download and fill the cache, and 1440/2160 exist only as VP9/AV1, which older devices decode slowly.
+   */
+  videoMaxHeight: Math.max(144, Math.min(Math.trunc(Number(process.env.MUSIKE_VIDEO_MAX_HEIGHT)) || 1080, 4320)),
   webDist: process.env.MUSIKE_WEB_DIST ?? path.resolve(root, "..", "web", "dist"),
   /**
    * Private folder for yt-dlp, Deno and FFmpeg downloaded by Musike itself (the desktop app sets it).

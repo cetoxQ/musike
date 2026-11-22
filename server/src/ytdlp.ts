@@ -27,8 +27,18 @@ export interface Resolved {
   title: string;
   duration: number;
   audio: StreamFormat;
+  /** The ready-made SD stream (video and audio together, 360p), when YouTube has one. */
   video?: StreamFormat;
+  /** The video qualities YouTube offers (lines, e.g. 720), each with the format to download. Unknown: empty. */
+  qualities?: VideoChoice[];
+  /** The audio to download with a video: AAC where there is one, so the MP4 plays everywhere. */
+  audioFormatId?: string;
   expiresAt: number;
+}
+
+export interface VideoChoice {
+  height: number;
+  formatId: string;
 }
 
 interface RawFormat {
@@ -38,6 +48,11 @@ interface RawFormat {
   acodec?: string;
   vcodec?: string;
   height?: number;
+  width?: number;
+  /** YouTube's own label for the quality, e.g. "720p60". */
+  format_note?: string;
+  fps?: number;
+  tbr?: number;
   abr?: number;
   protocol?: string;
   http_headers?: Record<string, string>;
@@ -176,6 +191,41 @@ function pickVideo(formats: RawFormat[]): RawFormat | undefined {
   return muxed.find((f) => f.format_id === "18") ?? muxed.sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0];
 }
 
+/** H.264 plays everywhere; VP9 widely; AV1 is slow to decode on older devices. */
+const codecRank = (v = "") => (v.startsWith("avc1") ? 3 : v.startsWith("vp09") || v.startsWith("vp9") ? 2 : v.startsWith("av01") ? 1 : 0);
+
+/** The qualities a video comes in, by YouTube's label (a vertical 1080p clip is 1080, not 1920), best format each. */
+function videoChoices(formats: RawFormat[]): VideoChoice[] {
+  const best = new Map<number, RawFormat>();
+  for (const f of formats) {
+    if (!f.vcodec || f.vcodec === "none" || (f.acodec && f.acodec !== "none") || !isHttps(f)) continue;
+    const label = Number(/^(\d{3,4})p/.exec(f.format_note ?? "")?.[1]) || Math.min(f.width ?? 0, f.height ?? 0);
+    if (!label) continue;
+    const prev = best.get(label);
+    const better =
+      !prev ||
+      codecRank(f.vcodec) > codecRank(prev.vcodec) ||
+      (codecRank(f.vcodec) === codecRank(prev.vcodec) && ((f.fps ?? 0) > (prev.fps ?? 0) || ((f.fps ?? 0) === (prev.fps ?? 0) && (f.tbr ?? 0) > (prev.tbr ?? 0))));
+    if (better) best.set(label, f);
+  }
+  return [...best].map(([height, f]) => ({ height, formatId: f.format_id })).sort((a, b) => a.height - b.height);
+}
+
+/** The quality to download for a wish: the highest at or under it (and under the server's limit), else the lowest. */
+function choiceFor(choices: VideoChoice[], wanted: number): VideoChoice | undefined {
+  const cap = Math.min(wanted, config.videoMaxHeight);
+  const under = choices.filter((c) => c.height <= cap);
+  return under[under.length - 1] ?? choices[0];
+}
+
+/** The qualities a video can be played in here (under MUSIKE_VIDEO_MAX_HEIGHT), and that limit. */
+export async function videoQualities(id: string): Promise<{ qualities: number[]; max: number }> {
+  const r = await resolveStreams(id);
+  const heights = new Set((r.qualities ?? []).map((c) => c.height).filter((h) => h <= config.videoMaxHeight));
+  if (r.video) heights.add(360);
+  return { qualities: [...heights].sort((a, b) => a - b), max: config.videoMaxHeight };
+}
+
 function expiryOf(url: string): number {
   const expire = Number(new URL(url).searchParams.get("expire"));
   const fallback = Date.now() + 4 * 3600_000;
@@ -270,6 +320,8 @@ export function resolveStreams(id: string): Promise<Resolved> {
         duration: info.duration ?? 0,
         audio: toStream(audio, "audio"),
         video: video ? toStream(video, "video") : undefined,
+        qualities: videoChoices(info.formats),
+        audioFormatId: audio.format_id,
         expiresAt: expiryOf(audio.url!),
       };
     })
@@ -319,7 +371,7 @@ const downloads = new Map<string, Promise<string>>();
 /** Keeps the video cache under `config.cacheMaxBytes`, evicting least recently played files first. */
 export async function pruneCache(): Promise<void> {
   if (!existsSync(config.cacheDir)) return;
-  const names = (await readdir(config.cacheDir)).filter((n) => n.endsWith(".720.mp4"));
+  const names = (await readdir(config.cacheDir)).filter((n) => /\.\d+\.mp4$/.test(n));
   const files = await Promise.all(
     names.map(async (n) => {
       const p = path.join(config.cacheDir, n);
@@ -335,19 +387,37 @@ export async function pruneCache(): Promise<void> {
   }
 }
 
-/** Downloads and merges a 720p H.264 + AAC MP4 into the cache, for HD video playback with seeking. */
-export function downloadHd(id: string): Promise<string> {
-  const file = path.join(config.cacheDir, `${id}.720.mp4`);
+/**
+ * Downloads a video in the quality asked for (or the nearest under it) with its audio, merged into an MP4 in the
+ * cache, for playback with seeking. The file is named after the quality it really has, so asking for 1080 on a video
+ * that stops at 720 reuses the 720 file.
+ */
+export async function downloadVideo(id: string, wanted: number): Promise<string> {
+  let resolved: Resolved | null = null;
+  try {
+    resolved = await resolveStreams(id);
+  } catch {
+    // yt-dlp below says why, if it fails too
+  }
+  const choice = choiceFor(resolved?.qualities ?? [], wanted);
+  const height = choice?.height ?? Math.min(wanted, config.videoMaxHeight);
+  const file = path.join(config.cacheDir, `${id}.${height}.mp4`);
   if (existsSync(file)) {
     // Mark as recently used for cache eviction.
     const now = new Date();
     utimes(file, now, now).catch(() => {});
-    return Promise.resolve(file);
+    return file;
   }
-  const inflight = downloads.get(id);
+  const key = `${id}.${height}`;
+  const inflight = downloads.get(key);
   if (inflight) return inflight;
 
-  const tmp = path.join(config.cacheDir, `${id}.720.part.mp4`);
+  // The format picked from the formats YouTube listed, then yt-dlp's own pick for that height as a fallback.
+  const exact = choice && resolved?.audioFormatId ? `${choice.formatId}+${resolved.audioFormatId}/` : "";
+  const formats =
+    `${exact}bv*[height<=${height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${height}]+ba[ext=m4a]/` +
+    `bv*[height<=${height}]+ba/b[height<=${height}]/b`;
+  const tmp = path.join(config.cacheDir, `${id}.${height}.part.mp4`);
   // Merging video + audio needs FFmpeg; the desktop app fetches it on first use if it isn't there yet.
   const job = (tools().ffmpeg || !config.binDir ? Promise.resolve() : ensureComponent("ffmpeg"))
     .then(() => mkdir(config.cacheDir, { recursive: true }))
@@ -358,7 +428,7 @@ export function downloadHd(id: string): Promise<string> {
           "--no-warnings",
           "--no-part",
           "-N", "4",
-          "-f", "bv*[height<=720][vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4][height<=720]/bv*[height<=720]+ba",
+          "-f", formats,
           "--merge-output-format", "mp4",
           "-o", tmp,
           `https://www.youtube.com/watch?v=${id}`,
@@ -376,9 +446,9 @@ export function downloadHd(id: string): Promise<string> {
       await rm(tmp, { force: true });
       throw err;
     })
-    .finally(() => downloads.delete(id));
+    .finally(() => downloads.delete(key));
 
-  downloads.set(id, job);
+  downloads.set(key, job);
   return job;
 }
 

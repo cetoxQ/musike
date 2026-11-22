@@ -12,8 +12,8 @@ const http = httpBackend({ base: "", fetch: (input, init) => fetch(input, init) 
 export const api: MusikeApi = http.api;
 
 /** What a media element plays for a track: here, the server's stream proxy. The Android backend resolves it on the phone. */
-export const streamSource = (id: string, kind: "audio" | "video", quality: "sd" | "hd"): string | Promise<string> =>
-  http.streamPath(id, kind, quality);
+export const streamSource = (id: string, kind: "audio" | "video", height: number): string | Promise<string> =>
+  http.streamPath(id, kind, height);
 
 /** Saves a text file the way this platform does it: a browser download (the desktop app shows "Save as"). */
 export async function saveFile(name: string, text: string) {
