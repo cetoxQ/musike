@@ -105,7 +105,29 @@ function turn(lane: Lane): Promise<() => void> {
   return new Promise((resolve) => waiting[lane].push(() => resolve(release())));
 }
 
-async function run(args: string[], timeoutMs: number, lane: Lane = "quick"): Promise<string> {
+/**
+ * yt-dlp keeps one set of arguments per extractor: a second `--extractor-args youtube:...` would replace the one in
+ * YTDLP_EXTRA_ARGS instead of adding to it. So `arg` (key=value) joins the youtube arguments already there, or comes on
+ * its own when there are none; a key the admin set there stays as they set it.
+ */
+export function withYoutubeArg(extra: string[], arg: string): string[] {
+  const out = [...extra];
+  const key = arg.split("=")[0];
+  for (let i = 0; i < out.length; i++) {
+    const inline = out[i]!.startsWith("--extractor-args=");
+    const value = inline ? out[i]!.slice("--extractor-args=".length) : out[i] === "--extractor-args" ? out[i + 1] : undefined;
+    if (value === undefined || !/^youtube:/i.test(value)) continue;
+    const pairs = value.slice(value.indexOf(":") + 1).split(";");
+    if (pairs.some((p) => p.split("=")[0] === key)) return out;
+    const merged = `${value};${arg}`;
+    if (inline) out[i] = `--extractor-args=${merged}`;
+    else out[i + 1] = merged;
+    return out;
+  }
+  return [...out, "--extractor-args", `youtube:${arg}`];
+}
+
+async function run(args: string[], timeoutMs: number, lane: Lane = "quick", youtubeArg?: string): Promise<string> {
   if (maintenance) await maintenance.catch(() => {});
   const { ytdlp, env } = tools();
   if (!ytdlp) {
@@ -113,7 +135,8 @@ async function run(args: string[], timeoutMs: number, lane: Lane = "quick"): Pro
   }
   const done = await turn(lane);
   try {
-    return await spawnYtdlp(ytdlp, env, args, timeoutMs);
+    const extra = youtubeArg ? withYoutubeArg(config.ytdlpExtraArgs, youtubeArg) : config.ytdlpExtraArgs;
+    return await spawnYtdlp(ytdlp, env, [...extra, ...args], timeoutMs);
   } finally {
     done();
   }
@@ -121,7 +144,7 @@ async function run(args: string[], timeoutMs: number, lane: Lane = "quick"): Pro
 
 function spawnYtdlp(ytdlp: string, env: NodeJS.ProcessEnv, args: string[], timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(ytdlp, [...config.ytdlpExtraArgs, ...args], { windowsHide: true, env });
+    const child = spawn(ytdlp, args, { windowsHide: true, env });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
@@ -391,10 +414,16 @@ export async function loudnessOf(id: string): Promise<number | null> {
 
 const downloads = new Map<string, Promise<string>>();
 
-/** Keeps the video cache under `config.cacheMaxBytes`, evicting least recently played files first. */
+/** Pieces of a video downloaded at the same time (10 MB each: a 1080p music video is about ten). */
+const FRAGMENTS_AT_ONCE = 6;
+
+/** What the cache keeps: videos (`<id>.<height>.mp4`) and audio fetched ahead (`<id>.audio.m4a`, see audioCache.ts). */
+export const CACHED = /\.(\d+\.mp4|audio\.(m4a|webm))$/;
+
+/** Keeps the cache under `config.cacheMaxBytes`, evicting least recently played files first. */
 export async function pruneCache(): Promise<void> {
   if (!existsSync(config.cacheDir)) return;
-  const names = (await readdir(config.cacheDir)).filter((n) => /\.\d+\.mp4$/.test(n));
+  const names = (await readdir(config.cacheDir)).filter((n) => CACHED.test(n));
   const files = await Promise.all(
     names.map(async (n) => {
       const p = path.join(config.cacheDir, n);
@@ -416,6 +445,14 @@ export async function pruneCache(): Promise<void> {
  * that stops at 720 reuses the 720 file.
  */
 export async function downloadVideo(id: string, wanted: number): Promise<string> {
+  // Already downloaded in the very quality asked for: no need to ask YouTube which qualities there are first (a
+  // yt-dlp run of a few seconds once the resolution has expired, or after a restart).
+  const exact = path.join(config.cacheDir, `${id}.${Math.min(wanted, config.videoMaxHeight)}.mp4`);
+  if (existsSync(exact)) {
+    const now = new Date();
+    utimes(exact, now, now).catch(() => {});
+    return exact;
+  }
   let resolved: Resolved | null = null;
   try {
     resolved = await resolveStreams(id);
@@ -436,9 +473,9 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
   if (inflight) return inflight;
 
   // The format picked from the formats YouTube listed, then yt-dlp's own pick for that height as a fallback.
-  const exact = choice && resolved?.audioFormatId ? `${choice.formatId}+${resolved.audioFormatId}/` : "";
+  const picked = choice && resolved?.audioFormatId ? `${choice.formatId}+${resolved.audioFormatId}/` : "";
   const formats =
-    `${exact}bv*[height<=${height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${height}]+ba[ext=m4a]/` +
+    `${picked}bv*[height<=${height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${height}]+ba[ext=m4a]/` +
     `bv*[height<=${height}]+ba/b[height<=${height}]/b`;
   const tmp = path.join(config.cacheDir, `${id}.${height}.part.mp4`);
   // Merging video + audio needs FFmpeg; the desktop app fetches it on first use if it isn't there yet.
@@ -450,7 +487,7 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
           "--no-playlist",
           "--no-warnings",
           "--no-part",
-          "-N", "4",
+          "-N", String(FRAGMENTS_AT_ONCE),
           "-f", formats,
           "--merge-output-format", "mp4",
           "-o", tmp,
@@ -458,6 +495,9 @@ export async function downloadVideo(id: string, wanted: number): Promise<string>
         ],
         DOWNLOAD_TIMEOUT_MS,
         "download",
+        // YouTube's formats as pieces of 10 MB (DASH), so -N fetches several at once: a plain HTTPS format downloads
+        // as one sequence of requests, whatever -N says, and a 1080p video took minutes behind a slow connection.
+        "formats=dashy",
       ),
     )
     .then(async () => {

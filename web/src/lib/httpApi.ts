@@ -145,6 +145,7 @@ export function httpBackend(opts: HttpBackendOptions) {
     videoQualities: (id: string) => request<{ qualities: number[]; max: number }>(`/api/video-qualities/${id}`),
     prepareVideo: (id: string, height: number) =>
       request<{ ready: boolean }>(`/api/prepare/${id}/video?h=${height}`, { method: "POST" }).then(() => undefined),
+    prefetchAudio: (id: string) => request<{ queued: boolean }>(`/api/prefetch/${id}/audio`, { method: "POST" }).then(() => undefined),
 
     library: () => request<Library>("/api/library"),
     addFavorite: (t: Track) => request<{ favorites: Track[] }>(`/api/favorites/${t.id}`, { method: "PUT", json: t }),

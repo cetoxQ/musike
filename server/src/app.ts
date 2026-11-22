@@ -44,6 +44,7 @@ import { lyricsFor } from "./lyrics.js";
 import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./system.js";
 import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
+import { cacheAudio, cachedAudio } from "./audioCache.js";
 import { downloadVideo, loudnessOf, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
 
 declare module "fastify" {
@@ -597,7 +598,22 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   app.post("/api/prepare/:id/video", async (req) => prepareVideo(videoId(req.params), heightOf(req.query)));
   app.post("/api/prepare/:id/hd", async (req) => prepareVideo(videoId(req.params), 720));
 
-  app.get("/api/stream/:id/audio", (req, reply) => proxyStream(req, reply, videoId(req.params), "audio"));
+  /**
+   * The audio of a track coming up, fetched into the cache in the background (the answer doesn't wait for it): when
+   * it's its turn it plays from the server's disk, at once. The player asks for the next tracks of its queue.
+   */
+  app.post("/api/prefetch/:id/audio", async (req, reply) => {
+    const id = videoId(req.params);
+    cacheAudio(id).catch((err) => req.log.debug({ videoId: id, err: String(err) }, "Audio fetched ahead failed"));
+    return reply.code(202).send({ queued: true });
+  });
+
+  /** From the cache when it was fetched ahead, else from YouTube through this server. */
+  app.get("/api/stream/:id/audio", (req, reply) => {
+    const id = videoId(req.params);
+    const cached = cachedAudio(id);
+    return cached ? serveFile(req, reply, cached.file, cached.mime) : proxyStream(req, reply, id, "audio");
+  });
 
   /** ?h= a quality (e.g. 1080), downloaded first; none (or 360) the ready-made SD stream, when YouTube has one. */
   app.get("/api/stream/:id/video", async (req, reply) => {

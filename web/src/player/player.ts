@@ -194,6 +194,17 @@ const fetchedFor = new Map<string, number>();
 /** How tall the video shows on screen (CSS pixels), measured by the observer after the store. */
 let shownHeight = 0;
 let fetching: string | null = null;
+/**
+ * Whether each video has YouTube's ready-made SD stream, learnt when it's resolved ahead: without one, even SD is a
+ * download (and nothing can play meanwhile).
+ */
+const sdFor = new Map<string, boolean>();
+/** The playing track's own download of its quality, while it runs: the next track's waits for it to be done. */
+let hdPending: Promise<unknown> | null = null;
+/** How long a quality may take to be ready before SD plays meanwhile: a file already in the cache answers sooner. */
+const HD_GRACE_MS = 1200;
+/** How many tracks of the queue are got ready ahead. */
+const AHEAD = 2;
 /** Told by the video's size on screen. */
 let onShown: (height: number) => void = () => {};
 let sleepTimer: ReturnType<typeof setTimeout> | undefined;
@@ -335,7 +346,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     });
   }
 
-  function load(index: number, opts: { autoplay?: boolean; startAt?: number } = {}) {
+  /** `ready`: the quality is known to be downloaded already (it takes over from SD, see upgrade). */
+  function load(index: number, opts: { autoplay?: boolean; startAt?: number; ready?: boolean } = {}) {
     const s = get();
     const track = s.queue[index];
     if (!track) return;
@@ -369,7 +381,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
     token++;
     const height = heightOf(track, kind);
-    loaded = { id: track.id, kind, height, media: mediaIdFor(track, kind) };
+    const id = mediaIdFor(track, kind);
+    loaded = { id: track.id, kind, height, media: id };
+    // The server downloads the quality first (and SD too, for a video without YouTube's ready-made SD stream).
+    const download = kind === "video" && !opts.ready && (height !== SD || sdFor.get(id) === false);
     pendingSeek = opts.startAt ?? 0;
     // The same track again from where it was (a retry, Audio/Video switched): the same play. Anything else is a new one.
     const key = `${index}:${track.id}`;
@@ -380,7 +395,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       mediaKind: kind,
       status: autoplay ? "loading" : "paused",
       // Video may need a server-side download first (HD, or videos without a combined SD stream).
-      statusText: kind === "video" ? (height !== SD ? "preparingHd" : "loadingVideo") : null,
+      statusText: kind === "video" ? (download ? "preparingHd" : "loadingVideo") : null,
       videoQuality: height,
       videoNote: noteFor(track),
       position: pendingSeek,
@@ -406,23 +421,57 @@ export const usePlayer = create<PlayerState>((set, get) => {
           (err: ApiError) => mine === token && report(err.message, err.code),
         );
     };
-    if (kind === "video" && height !== SD) {
-      // A quality the server downloads first (it can take a minute): asked ahead, so the player doesn't sit on a
-      // request with no data and take it for a stall. If it can't be had, SD plays instead of skipping the track.
-      api.prepareVideo(mediaIdFor(track, kind), height).then(
-        () => mine === token && begin(height),
-        (err: ApiError) => {
-          if (mine !== token) return;
-          if (err.code === "bot_check") return report(err.message, err.code);
-          toast(getT().player.qualityFailed);
-          if (loaded) loaded.height = SD;
-          set({ videoQuality: SD, statusText: "loadingVideo" });
-          begin(SD);
-        },
-      );
+    const toSd = () => {
+      if (loaded) loaded.height = SD;
+      set({ videoQuality: SD, statusText: "loadingVideo" });
+      begin(SD);
+    };
+    if (download) {
+      // Asked ahead rather than streamed, so the player doesn't sit on a request with no data and take it for a
+      // stall. Already in the cache (fetched ahead while the last track played), the quality answers in a moment and
+      // plays straight away; otherwise SD, which starts at once, plays meanwhile and the quality takes over from where
+      // it is (see upgrade). If the quality can't be had, SD plays on instead of skipping the track.
+      const sdMeanwhile = height !== SD && sdFor.get(id) !== false;
+      let onSd = false;
+      const timer = sdMeanwhile
+        ? setTimeout(() => {
+            if (mine !== token) return;
+            onSd = true;
+            toSd();
+          }, HD_GRACE_MS)
+        : undefined;
+      const job = api.prepareVideo(id, height);
+      hdPending = job;
+      job
+        .then(
+          () => {
+            clearTimeout(timer);
+            if (mine !== token) return;
+            if (onSd) upgrade(track, height);
+            else begin(height);
+          },
+          (err: ApiError) => {
+            clearTimeout(timer);
+            if (mine !== token) return;
+            if (!onSd && (err.code === "bot_check" || height === SD)) return report(err.message, err.code);
+            toast(getT().player.qualityFailed);
+            if (!onSd) toSd();
+          },
+        )
+        .finally(() => {
+          if (hdPending === job) hdPending = null;
+        });
     } else begin(height);
     setMetadata(track);
     if (kind === "video") fitToScreen();
+  }
+
+  /** The quality downloaded while SD played: it takes over from where SD is, if that track is still on. */
+  function upgrade(track: Track, height: number) {
+    const now = get();
+    if (now.queue[now.index]?.id !== track.id || loaded?.id !== track.id || loaded.kind !== "video" || loaded.height >= height) return;
+    if (now.quality === "auto") fetchedFor.set(loaded.media, height);
+    load(now.index, { startAt: now.position, autoplay: now.status === "playing" || now.status === "loading", ready: true });
   }
 
   /**
@@ -443,12 +492,16 @@ export const usePlayer = create<PlayerState>((set, get) => {
       .then(async ({ qualities }) => {
         const fits = qualities.find((h) => h >= wanted) ?? qualities[qualities.length - 1];
         if (!fits || !loaded || fits <= loaded.height) return;
-        await api.prepareVideo(id, fits);
+        const job = api.prepareVideo(id, fits);
+        hdPending = job;
+        await job.finally(() => {
+          if (hdPending === job) hdPending = null;
+        });
         fetchedFor.set(id, fits);
         const now = get();
         if (now.quality !== "auto" || now.queue[now.index]?.id !== track.id || loaded?.id !== track.id || loaded.kind !== "video") return;
         if (loaded.height >= fits) return;
-        load(now.index, { startAt: now.position, autoplay: now.status === "playing" || now.status === "loading" });
+        load(now.index, { startAt: now.position, autoplay: now.status === "playing" || now.status === "loading", ready: true });
       })
       .catch(() => {}) // the better quality didn't come: the current one goes on
       .finally(() => {
@@ -502,16 +555,55 @@ export const usePlayer = create<PlayerState>((set, get) => {
     }
   }
 
-  /** Warms up the next track (and, in Video mode, finds and resolves its clip) so it starts quickly. */
+  /**
+   * Gets what comes next ready while this track plays, so it starts at once: the next tracks' audio fetched into the
+   * server's cache; in Video mode their music videos looked up, and the very next one resolved (is it there, can it
+   * play, has it a ready-made SD stream) and downloaded in the quality it will play in.
+   */
   function warmUpcoming() {
     const s = get();
-    const upcoming = s.queue[s.index + 1];
-    if (!upcoming) return;
-    if (s.preferVideo) void lookupClip(upcoming).then((id) => api.prepare(id ?? upcoming.id).catch(() => {}));
-    else {
-      api.prepare(upcoming.id).catch(() => {});
-      learnGain(upcoming.id);
-    }
+    const next = s.queue.slice(s.index + 1, s.index + 1 + AHEAD);
+    const video = s.preferVideo && capabilities.video && Date.now() > videoBlockedUntil;
+    next.forEach((track, k) => {
+      if (!video) return warmAudio(track);
+      void lookupClip(track).then((clip) => {
+        if (!clip) return warmAudio(track); // no music video: it will play as audio
+        if (k === 0) warmVideo(track, clip);
+      });
+    });
+  }
+
+  function warmAudio(track: Track) {
+    // An older server without the cache: the stream at least resolved ahead.
+    api.prefetchAudio(track.id).catch(() => api.prepare(track.id).catch(() => {}));
+    learnGain(track.id);
+  }
+
+  function warmVideo(track: Track, clip: string) {
+    api
+      .prepare(clip)
+      .then(
+        async (p) => {
+          sdFor.set(clip, p.hasSdVideo);
+          const q = get().quality;
+          // Auto plays the next video as big as this one got. SD needs nothing more, unless it's a download too.
+          const want = q !== "auto" ? q : loaded?.kind === "video" ? Math.max(SD, loaded.height) : SD;
+          const need = want !== SD ? want : p.hasSdVideo ? 0 : SD;
+          if (!need) return;
+          // After this track's own download: one at a time, each is done sooner.
+          await hdPending?.catch(() => {});
+          await api.prepareVideo(clip, need);
+          if (get().quality === "auto") fetchedFor.set(clip, need);
+        },
+        (err: ApiError) => {
+          // A clip that can't play (removed, private, age-restricted): its song plays as audio, instead of failing on it.
+          if (track.kind === "song" && (err.status === 403 || err.status === 404)) {
+            clipFor.set(track.id, null);
+            warmAudio(track);
+          }
+        },
+      )
+      .catch(() => {});
   }
 
   function onStarted() {

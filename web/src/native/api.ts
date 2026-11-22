@@ -124,6 +124,11 @@ function phoneApi(lib: library.LibraryStore): MusikeApi {
   // Video needs a server: the phone on its own never asks.
   videoQualities: () => Promise.reject(fail(404, "noSdVideo")),
   prepareVideo: () => Promise.reject(fail(404, "noSdVideo")),
+  // The phone keeps no files: the stream is resolved ahead, so it starts without that wait.
+  prefetchAudio: (id) =>
+    call(async () => {
+      if (VIDEO_ID.test(id)) await resolveAudio(id);
+    }),
 
   library: () => call(() => lib.getLibraryLite()),
   addFavorite: (t) => call(async () => ({ favorites: await lib.addFavorite(library.sanitizeTrack(t)) })),

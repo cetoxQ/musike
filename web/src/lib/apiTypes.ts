@@ -219,6 +219,8 @@ export interface MusikeApi {
   videoQualities(id: string): Promise<{ qualities: number[]; max: number }>;
   /** Downloads a video ahead on the server in a quality: resolves when it's ready to play. */
   prepareVideo(id: string, height: number): Promise<void>;
+  /** Fetches a track's audio ahead (into the server's cache; on the phone alone, its stream resolved): returns at once. */
+  prefetchAudio(id: string): Promise<void>;
 
   library(): Promise<Library>;
   addFavorite(t: Track): Promise<{ favorites: Track[] }>;

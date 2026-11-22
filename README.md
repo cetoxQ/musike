@@ -78,7 +78,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **Lyrics** from [LRCLIB](https://lrclib.net): timed ones follow the song, line by line, and a line plays from there. They also follow the device being controlled
 
 **Player**
-- **Video quality:** Auto, or any quality YouTube has for the video up to the server's limit (`MUSIKE_VIDEO_MAX_HEIGHT`, 1080 unless you raise it, up to 4K). Auto starts in SD, which plays at once, and when the video shows bigger (cinema view, full screen, a wide window) downloads the quality that fits the screen and switches to it from the same point
+- **Video quality:** Auto, or any quality YouTube has for the video up to the server's limit (`MUSIKE_VIDEO_MAX_HEIGHT`, 1080 unless you raise it, up to 4K). Auto starts in SD, which plays at once, and when the video shows bigger (cinema view, full screen, a wide window) downloads the quality that fits the screen and switches to it from the same point. A quality you chose works the same way: SD plays while it downloads (in pieces, several at once), unless it's already in the cache
 - **The same volume for every track:** loud tracks are turned down to YouTube's reference level (Settings > Playback). Needs the loudness YouTube gives with the direct audio: on the phone always, on a server with `MUSIKE_DIRECT_AUDIO=first`
 - **Sleep timer:** the moon button stops the music in 15 to 90 minutes or at the end of the track, fading out
 - When YouTube asks to confirm you're not a bot, the track stops and is tried again after 1 and 3 minutes, instead of skipping through the queue; video falls back to audio for a while
@@ -146,7 +146,7 @@ Setting up `https://`:
 - **Lyrics:** the mic button (or `Y`) shows the lyrics of the track being played as a page in the middle of the app, with the sections and the player still around it; the sung line is highlighted and followed as the song goes, and clicking a line plays from it. Timed lyrics come from [LRCLIB](https://lrclib.net)
 - Queue with play next, shuffle and repeat (queue or track)
 - **Autoplay radio:** when the queue ends, it keeps going with similar songs
-- Instant seeking (HTTP Range streaming) and the next track preloaded
+- Instant seeking (HTTP Range streaming) and what comes next got ready while a track plays: the next two tracks' audio fetched into the server's cache; in Video mode their music videos looked up, and the next one checked (a clip that can't play is skipped for its song's audio, without waiting on it) and downloaded in the quality it will play in, after the current track's own download
 
 **Video**
 - Video mode in the side panel, full screen on phones, or in a floating mini player
@@ -597,7 +597,7 @@ Server environment variables (all optional):
 | `MUSIKE_ALLOWED_ORIGINS` | | Other addresses Musike is opened from (`https://musike.example.com`), for proxies that rewrite `Host`: changes from any other origin are refused |
 | `MUSIKE_LIBRARY` | automatic | `sqlite`: require the database. `json`: keep `library.json` (what the desktop app does). Unset: SQLite when Node has it (22.13 or later), `library.json` otherwise |
 | `MUSIKE_CACHE_DIR` | `server/cache` (`/cache` in Docker) | Downloaded HD videos |
-| `MUSIKE_CACHE_MAX_MB` | `2048` | Video cache limit (least recently played go first) |
+| `MUSIKE_CACHE_MAX_MB` | `2048` | Cache limit: downloaded videos and the audio of the next tracks fetched ahead (least recently played go first) |
 | `MUSIKE_VIDEO_MAX_HEIGHT` | `1080` | The highest video quality offered (1440, 2160 for 4K). Higher qualities take long to download, fill the cache, and above 1080 come only as VP9 or AV1, which older devices decode slowly |
 | `MUSIKE_BACKUPS` | `7` | Daily copies of the library kept in `<data>/backups` (0: none). See [Backups](#backups) |
 | `MUSIKE_BIN_DIR` | | Private tools folder (the desktop app uses `%APPDATA%\Musike\bin`) |
@@ -629,7 +629,8 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `POST` | `/api/prepare/:id/video?h=` | Downloads a video in a quality ahead (`h`: a quality line, e.g. `1080`) and answers when it's ready |
 | `GET` | `/api/video-qualities/:id` | The video's qualities here (`{ qualities: [360, 720, …], max }`, under `MUSIKE_VIDEO_MAX_HEIGHT`) |
 | `GET` | `/api/loudness/:id` | How much louder than YouTube's reference the track is, in dB (`{ loudnessDb }`, `null` when unknown) |
-| `GET` | `/api/stream/:id/audio` | Audio with HTTP Range |
+| `POST` | `/api/prefetch/:id/audio` | Fetches a track's audio into the cache in the background (answers at once, 202) |
+| `GET` | `/api/stream/:id/audio` | Audio with HTTP Range: from the cache when it was fetched ahead, otherwise from YouTube through the server |
 | `GET` | `/api/stream/:id/video?h=` | Video with HTTP Range: without `h` (or `360`) YouTube's ready-made SD stream, otherwise that quality, downloaded first. The older `?q=hd` means 720 |
 | `GET` | `/api/library` | The whole library, without the play log |
 | `GET` | `/api/plays?artist=&name=` | Your plays of one artist's tracks, most played first (`artist` is the `UC…` ID, `name` matches tracks saved without one) |
