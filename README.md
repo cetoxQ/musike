@@ -81,6 +81,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **Video quality:** Auto, or any quality YouTube has for the video up to the server's limit (`MUSIKE_VIDEO_MAX_HEIGHT`, 1080 unless you raise it, up to 4K). Auto starts in SD, which plays at once, and when the video shows bigger (cinema view, full screen, a wide window) downloads the quality that fits the screen and switches to it. The quality you choose stays the one every video plays in (a video that doesn't go that high plays in the nearest under it, and the button says which); SD plays while it downloads (in pieces, several at once), unless it's already in the cache. A new quality takes over without a gap: it gets ready in a second, hidden player and the two trade places on the same frame. Skipping through tracks quickly in Video mode only loads the one you stop on, and the server stops the downloads nobody waits for anymore
 - **The same volume for every track:** loud tracks are turned down to YouTube's reference level (Settings > Playback). Needs the loudness YouTube gives with the direct audio: on the phone always, on a server with `MUSIKE_DIRECT_AUDIO=first`
 - **Sleep timer:** the moon button stops the music in 15 to 90 minutes or at the end of the track, fading out
+- **What comes next is ready before its turn:** while a track plays, the next two tracks' audio is fetched into the server's cache, and in Video mode the next video is checked (a clip that can't play gives way to its song's audio) and downloaded in the quality it will play in
 - When YouTube asks to confirm you're not a bot, the track stops and is tried again after 1 and 3 minutes, instead of skipping through the queue; video falls back to audio for a while
 - The loading spinner is a stop button: a track stuck loading can be let go
 - In a narrow window (half a screen) the volume stays reachable: the speaker opens the slider
@@ -89,11 +90,13 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - The Now Playing sheet has everything for the track in one row under the controls: Start radio, lyrics, devices, Audio/Video, share, the queue and the track's menu. A long title slides along
 - The sheets coming up from the bottom (the track's menu, Settings and the other dialogs) close when pulled down
 - Connected to a server it can't reach, the phone plays audio with the artwork instead of offering video
+- Out of the Now Playing sheet, a playing video goes on in a small window you can drag anywhere on the screen and close
 
 **Android**
 - **YouTube links:** **Share > Musike** from YouTube or YouTube Music plays the video in Musike, and Musike can open the YouTube links you tap ([how](#youtube-links))
 - **Android Auto:** your favorites, playlists, recently played and the queue in the car. With "Display over other apps" allowed, opening Musike in the car with the app closed starts it in the background and resumes the last track. A log of the car's requests (**Settings > Android Auto**) helps when something doesn't show
 - Connected to the server, the phone also plays video, streamed by the server
+- **Full screen** in the cinema view hides the system bars and turns a landscape video sideways, even with auto-rotate off; Back leaves it. In the cinema view a tap shows the controls, the next one pauses
 
 **Server**
 - A track YouTube holds back for a few seconds (it answers 403 until then) starts as soon as YouTube serves it, instead of failing
@@ -102,6 +105,7 @@ Musike started from the idea behind the old Discord music bots: a server that fe
 - **A copy of the library every day** in `<data>/backups`, the newest 7 kept (`MUSIKE_BACKUPS`, 0 for none): see [Backups](#backups)
 - **Setup code:** with accounts on, creating the admin asks for a code the server prints in its log, so whoever reaches Musike first can't take the account
 - At most 4 yt-dlp processes resolve tracks at once, and 2 download videos: the rest wait instead of filling the memory
+- Videos download in pieces, several at once (`youtube:formats=dashy`, `-N 6`); a download nobody waits for anymore (a track skipped) stops after a few seconds
 
 ## On its own or with a server
 
@@ -626,7 +630,7 @@ Every route answers JSON. Errors look like `{ "error": "message", "code"?: "tool
 | `GET` | `/api/video-for/:id?title=&artist=&duration=` | A song's official music video |
 | `GET` | `/api/lyrics/:id?title=&artist=&album=&duration=` | The track's lyrics (timed when available), or `null` |
 | `POST` | `/api/prepare/:id` | Resolves a stream before playing |
-| `POST` | `/api/prepare/:id/video?h=` | Downloads a video in a quality ahead (`h`: a quality line, e.g. `1080`) and answers when it's ready |
+| `POST` | `/api/prepare/:id/video?h=` | Downloads a video in a quality ahead (`h`: a quality line, e.g. `1080`) and answers when it's ready, with the quality it really has (`{ ready, height }`: the nearest under `h` when the video doesn't go that high). Closing the request gives the download up |
 | `GET` | `/api/video-qualities/:id` | The video's qualities here (`{ qualities: [360, 720, …], max }`, under `MUSIKE_VIDEO_MAX_HEIGHT`) |
 | `GET` | `/api/loudness/:id` | How much louder than YouTube's reference the track is, in dB (`{ loudnessDb }`, `null` when unknown) |
 | `POST` | `/api/prefetch/:id/audio` | Fetches a track's audio into the cache in the background (answers at once, 202) |
@@ -747,11 +751,13 @@ iOS limits background playback for PWAs; Audio mode works better than Video.
 - [x] Android Auto
 - [x] Timed lyrics
 - [x] Fewer bot checks in Docker (proof-of-origin tokens)
-- [x] Reorder the queue and playlists by dragging
+- [x] Reorder the queue and playlists by dragging, also the queue of a device you control
+- [x] Import YouTube playlists from a link: share or paste it, then save a copy
+- [x] Video quality to choose, changing without a gap; the next tracks ready before their turn
+- [x] Sleep timer, the same volume for every track, a copy of the library every day
 
 **Open ideas, no promises**
 - [ ] Video on Android on its own
-- [ ] Import YouTube playlists from a link (today: from search)
 - [ ] Download playlists to listen without a connection
 - [ ] Artists in Android Auto
 - [ ] Automatic updates for the Windows app
