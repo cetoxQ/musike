@@ -7,7 +7,7 @@
 **Your music, uninterrupted.**
 
 A personal music player for YouTube's catalog: any song or music video, as **audio** or **video**, with no ads, no account and no subscription.
-This fork runs as a **Windows** app, as an **Android** and **Android TV** app that needs no computer and plays in **Android Auto**, in any **browser** (installable PWA) and in **Docker**. For macOS, Linux and iPhone there are the [original Musike's builds](#option-2-macos-app).
+This fork runs as a **Windows** app, as an **Android** and **Android TV** app that needs no computer and plays in **Android Auto** and in **Docker**. For macOS, Linux and iPhone and NPM there are the [original Musike's builds](#option-2-macos-app).
 
 ![MIT license](https://img.shields.io/badge/license-MIT-c3ec52?style=flat-square&labelColor=121318)
 ![Windows](https://img.shields.io/badge/desktop-Windows-c3ec52?style=flat-square&labelColor=121318)
@@ -18,7 +18,7 @@ This fork runs as a **Windows** app, as an **Android** and **Android TV** app th
 
 <img src="docs/screenshots/fork-profile.jpg" alt="Profile page with the most played tracks of the last month, the playlists in the sidebar and the Now Playing panel" width="900" />
 
-**[Download for Android and Windows](https://github.com/yourboiava/musike/releases/latest)** · [Run with Docker](#option-6-docker) · [Run from source](#option-7-node-server--browser)
+**[Download for Android and Windows](https://github.com/yourboiava/musike/releases/latest)** · [Run with Docker](#option-6-docker)
 
 </div>
 
@@ -462,41 +462,7 @@ volumes:
 
 ### Option 7: Node server + browser
 
-Requirements:
-
-| Tool | Version | Windows |
-|---|---|---|
-| Node.js | 22.19+ | `winget install OpenJS.NodeJS.LTS` |
-| pnpm | 10+ | `corepack enable` |
-| yt-dlp | recent | `winget install yt-dlp.yt-dlp` (installs Deno and FFmpeg too) |
-
-```bash
-pnpm install
-pnpm build   # builds the web app
-pnpm start   # http://localhost:4180
-```
-
-The server prints its network addresses on start. Open the `Network:` address on a phone on the same Wi-Fi (allow Node through the firewall on private networks). On Windows the server finds yt-dlp even in terminals opened before it was installed, by reading the PATH from the registry.
-
-**Away from home:** reach the computer through a VPN to your home network (WireGuard, Tailscale, ZeroTier and the like), or put a reverse proxy with HTTPS in front. To install Musike as an app (PWA) on the phone the browser requires HTTPS: a reverse proxy with a certificate gives it, and so does a VPN that serves HTTPS (with Tailscale, `tailscale serve --bg 4180` and the `https://...ts.net` address).
-
-### Option 8: from the browser, as an app
-
-Any phone or computer can install Musike from your server's page, with nothing to download: it opens in its own window, with its own icon. The server must be on `https://` (see [HTTP or HTTPS](#http-or-https)).
-
-- **Android (Chrome, Edge):** the browser's menu > **Install app** (on some versions **Add to Home screen**).
-- **iPhone and iPad (Safari):** the Share button > **Add to Home Screen**. This fork builds no iPhone app, so this is the way to use it there.
-- **Computer (Chrome, Edge):** the install icon at the right of the address bar, or the browser's menu > **Install Musike**.
-
-It's the server's page in a window of its own: without the server it can't play or show your library, and it keeps no copy of the library like the Android app does.
-
-### Development
-
-```bash
-pnpm dev        # server (4180) + Vite with hot reload (5173)
-pnpm desktop    # opens the Electron app in development mode
-pnpm typecheck  # checks every package
-```
+Not built by this fork. The [original Musike](https://github.com/Ernani1234/musike#option-5-iphone-app) has a Node serve, without this fork's changes.
 
 ## Radio playlist
 
