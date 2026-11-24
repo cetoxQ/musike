@@ -295,8 +295,6 @@ This fork builds and uses the **Android** and **Windows** apps and the **Docker*
 
   Built from source, `git pull && docker compose up -d --build` updates it.
 
-Between releases, every push to `local` (and to `community`) builds the apps in GitHub Actions: Actions > **Android APK** or **Windows app** > the latest run > the `musike-…` artifact, kept for 14 days. To build by hand, **Run workflow** on the same pages.
-
 ### Option 1: Windows app
 
 Download `Musike-Setup-<version>-Windows.exe` from [this fork's latest release](https://github.com/yourboiava/musike/releases/latest) and run it. It replaces the original Musike if you have it, and keeps its library. The installer:
