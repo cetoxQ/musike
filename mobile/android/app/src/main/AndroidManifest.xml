@@ -6,6 +6,8 @@
     <!-- Android TV: no touchscreen, leanback UI, network only -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <!-- Android Auto, parked: the app itself on the car's screen (see appCategory below). Optional, so it installs on phones. -->
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -16,7 +18,10 @@
     <!-- Updates: the APK of a newer release, downloaded by the app, goes to Android's installer (MusikeDevicePlugin). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- usesCleartextTraffic: a Musike server on the home network is often plain http (the app warns about it).
+    <!-- appCategory/isGame: Android Auto (phone on Android 15 or newer) opens only games on the car's screen, and only
+         while parked: that's how videos can be watched in the car. Android Auto covers the app as soon as the car moves;
+         the sound plays on, through the car's media player (PlaybackService).
+         usesCleartextTraffic: a Musike server on the home network is often plain http (the app warns about it).
          Backups leave out the session token: res/xml/backup_rules.xml and data_extraction_rules.xml. -->
     <application
         android:allowBackup="true"
@@ -28,6 +33,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
+        android:appCategory="game"
+        android:isGame="true"
         android:theme="@style/AppTheme">
 
         <activity
@@ -43,6 +50,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <!-- Android TV launchers only show apps with this category -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <!-- Android Auto's parked apps (see appCategory) -->
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
             </intent-filter>
 
             <!-- Share > Musike, from YouTube, YouTube Music or anywhere else: MainActivity turns the text into a link. -->

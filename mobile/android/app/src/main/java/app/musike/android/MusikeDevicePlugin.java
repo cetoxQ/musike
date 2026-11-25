@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.view.Display;
 import android.net.Uri;
 import androidx.core.content.FileProvider;
 import androidx.core.view.WindowCompat;
@@ -65,9 +66,12 @@ public class MusikeDevicePlugin extends Plugin {
             } else {
                 bars.show(WindowInsetsCompat.Type.systemBars());
             }
-            activity.setRequestedOrientation(
-                on && landscape ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            );
+            // On the car's screen (Android Auto, parked) the screen is what it is: only the phone's own turns.
+            if (activity.getWindowManager().getDefaultDisplay().getDisplayId() == Display.DEFAULT_DISPLAY) {
+                activity.setRequestedOrientation(
+                    on && landscape ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                );
+            }
             call.resolve();
         });
     }
