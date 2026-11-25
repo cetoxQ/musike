@@ -15,7 +15,7 @@ on:
       app_id:
         description: "Android app ID (app.musike.android replaces the official app; any other installs next to it)"
         required: true
-        default: app.musike.android.fork
+        default: app.musike.android.cetox
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     env:
-      MUSIKE_APP_ID: ${{ inputs.app_id || 'app.musike.android.fork' }}
+      MUSIKE_APP_ID: ${{ inputs.app_id || 'app.musike.android.cetox' }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5

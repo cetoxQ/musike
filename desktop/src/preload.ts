@@ -16,4 +16,13 @@ contextBridge.exposeInMainWorld("musikeDesktop", {
   connect: (url: string | null) => ipcRenderer.invoke("musike:connect", url),
   /** This computer's own library, to copy into an account on the server. */
   localLibrary: () => ipcRenderer.invoke("musike:local-library"),
+  /** A newer release on GitHub, or null; installing it downloads it, runs it and closes the app. */
+  update: {
+    check: () => ipcRenderer.invoke("musike:update-check"),
+    install: (progress: (fraction: number) => void) => {
+      const listener = (_e: unknown, fraction: number) => progress(fraction);
+      ipcRenderer.on("musike:update-progress", listener);
+      return ipcRenderer.invoke("musike:update-install").finally(() => ipcRenderer.off("musike:update-progress", listener));
+    },
+  },
 });

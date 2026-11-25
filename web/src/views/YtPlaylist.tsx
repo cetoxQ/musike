@@ -14,6 +14,7 @@ import { share } from "../lib/share";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
+import { DownloadButton } from "../components/DownloadButton";
 import { IconButton, PlayDisc } from "../components/IconButton";
 import { BackButton, EmptyState, PageHeader } from "../components/Page";
 import { SelectableTrackList } from "../components/Selection";
@@ -117,6 +118,7 @@ export default function YtPlaylist() {
           <IconButton label={t.album.shuffle} size="lg" onClick={() => playList(shuffled(tracks), 0)}>
             <ShuffleIcon size={24} />
           </IconButton>
+          <DownloadButton tracks={tracks} />
           <IconButton
             label={inLibrary ? t.album.removeFromLibrary : t.album.saveToLibrary}
             active={inLibrary}

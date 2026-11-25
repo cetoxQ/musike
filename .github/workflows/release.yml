@@ -1,7 +1,6 @@
-# Builds every download for a release tag (v1.4.0) and attaches them to a draft GitHub release:
-# the Windows installer, the macOS apps (Apple Silicon and Intel), the Linux packages, the Android APK and the
-# unsigned iOS app.
-# The draft only goes public when it's published by hand, after checking it.
+# Builds the Windows installer and the Android APK for a release tag (v1.6.0) and publishes them as a GitHub release.
+# The apps update themselves from the latest release (web/src/lib/updates.ts): the files keep their names
+# (*-Windows.exe, *-Android.apk), and the version in the tag must be the one in the package.json files.
 #
 # The APK is signed with the key in these repository secrets (Settings → Secrets and variables → Actions):
 #   MUSIKE_KEYSTORE_BASE64    the .jks file, base64-encoded
@@ -41,58 +40,11 @@ jobs:
           path: release/*
           if-no-files-found: error
 
-  mac:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Ad-hoc signed (no Apple Developer ID): enough to run on Apple Silicon; Gatekeeper asks once.
-      - run: pnpm --filter musike-desktop dist:mac
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      - name: Check downloads
-        shell: bash
-        run: |
-          { echo "### macOS"; ls release | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
-          found=$(ls release/*-macOS-*.dmg 2>/dev/null | wc -l)
-          [ "$found" -eq 2 ] || { echo "::error::Expected 2 file(s) matching *-macOS-*.dmg, found $found"; ls -l release; exit 1; }
-      - uses: actions/upload-artifact@v7
-        with:
-          name: mac
-          path: release/*
-          if-no-files-found: error
-
-  linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # AppImage and .deb, for x64 and arm64 (the arm64 ones are packaged here too: nothing is compiled).
-      - run: pnpm --filter musike-desktop dist:linux
-      - name: Check downloads
-        shell: bash
-        run: |
-          { echo "### Linux"; ls release | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
-          found=$(ls release/*-Linux-* 2>/dev/null | wc -l)
-          [ "$found" -eq 4 ] || { echo "::error::Expected 4 file(s) matching *-Linux-*, found $found"; ls -l release; exit 1; }
-      - uses: actions/upload-artifact@v7
-        with:
-          name: linux
-          path: release/*
-          if-no-files-found: error
-
   android:
     runs-on: ubuntu-latest
+    env:
+      # Its own app ID: installs next to other builds of Musike, and updates only from this repository's releases.
+      MUSIKE_APP_ID: app.musike.android.cetox
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5
@@ -132,32 +84,8 @@ jobs:
           path: release/*
           if-no-files-found: error
 
-  ios:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Unsigned on purpose: AltStore, SideStore or Sideloadly sign it with the user's own Apple ID when installing.
-      - run: pnpm --filter @musike/mobile ipa
-      - name: Check downloads
-        shell: bash
-        run: |
-          { echo "### iOS"; ls release | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
-          found=$(ls release/*-iOS.ipa 2>/dev/null | wc -l)
-          [ "$found" -eq 1 ] || { echo "::error::Expected 1 file(s) matching *-iOS.ipa, found $found"; ls -l release; exit 1; }
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ios
-          path: release/*
-          if-no-files-found: error
-
   release:
-    needs: [windows, mac, linux, android, ios]
+    needs: [windows, android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -169,7 +97,7 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v3
         with:
-          draft: true
+          draft: false
           generate_release_notes: true
           files: downloads/*
           fail_on_unmatched_files: true

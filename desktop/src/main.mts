@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { createWriteStream, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from "electron";
@@ -341,6 +342,56 @@ ipcMain.handle("musike:local-library", (event) => {
   } catch {
     return null;
   }
+});
+
+// Updates from this fork's GitHub releases (public: no token). Windows only: the installer is downloaded, then run
+// silently over this version, and it opens Musike again when it's done.
+
+/** The same repository as web/src/lib/updates.ts. */
+const UPDATE_REPO = "cetoxQ/musike";
+let update: { version: string; page: string; url: string } | null = null;
+
+const isNewer = (candidate: string, current: string) => {
+  const parts = (v: string) => v.replace(/^v/, "").split("-")[0]!.split(".").map((n) => Number(n) || 0);
+  const a = parts(candidate);
+  const b = parts(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  return false;
+};
+
+ipcMain.handle("musike:update-check", async () => {
+  if (process.platform !== "win32" || !app.isPackaged) return null;
+  const res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+    headers: { accept: "application/vnd.github+json", "user-agent": "Musike" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return null;
+  const release = (await res.json()) as { tag_name?: string; html_url?: string; assets?: { name: string; browser_download_url: string }[] };
+  const version = release.tag_name?.replace(/^v/, "") ?? "";
+  const file = release.assets?.find((a) => /-Windows\.exe$/.test(a.name));
+  if (!version || !file || !isNewer(version, app.getVersion())) return null;
+  update = { version, page: release.html_url ?? "", url: file.browser_download_url };
+  return { version: update.version, page: update.page };
+});
+
+/** Downloads the release found by the last check (never a URL from the page) and runs it; the app then quits. */
+ipcMain.handle("musike:update-install", async (event) => {
+  if (!update) return;
+  const res = await fetch(update.url, { headers: { "user-agent": "Musike" } });
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+  const total = Number(res.headers.get("content-length")) || 0;
+  const file = path.join(app.getPath("temp"), `Musike-Setup-${update.version}.exe`);
+  const out = createWriteStream(file);
+  let done = 0;
+  for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+    if (!out.write(chunk)) await new Promise<void>((r) => out.once("drain", () => r()));
+    done += chunk.length;
+    if (total) event.sender.send("musike:update-progress", done / total);
+  }
+  await new Promise<void>((resolve, reject) => out.end((err?: Error | null) => (err ? reject(err) : resolve())));
+  // /S: silent, into the same folder; --updated --force-run: electron-builder's installer opens Musike afterwards.
+  spawn(file, ["/S", "--updated", "--force-run"], { detached: true, stdio: "ignore" }).unref();
+  app.quit();
 });
 
 app.on("second-instance", () => {

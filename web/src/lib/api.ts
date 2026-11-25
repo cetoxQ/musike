@@ -1,5 +1,5 @@
 import { getT } from "../i18n";
-import { ApiError, type CarSettings, type Connection, type MusikeApi, type ServerLink, type SystemMedia } from "./apiTypes";
+import { ApiError, type CarSettings, type Connection, type Downloads, type Updater, type MusikeApi, type ServerLink, type SystemMedia } from "./apiTypes";
 import { desktop } from "./desktop";
 import { httpBackend } from "./httpApi";
 
@@ -133,6 +133,12 @@ export const openedLinks: ((open: (url: string) => void) => () => void) | null =
 
 /** Settings > Android Auto: only the Android app (native/api.ts). */
 export const car: CarSettings | null = null;
+
+/** Updates from GitHub: the Windows app through its shell; the browser has none (the server updates on its own). */
+export const updater: Updater | null = desktop?.update ?? null;
+
+/** Tracks kept on the device to play without the network: only the Android app (native/downloads.ts). */
+export const downloads: Downloads | null = null;
 
 /**
  * The cinema view's full screen, done by the Android app itself (native/api.ts): its web view doesn't keep a page in

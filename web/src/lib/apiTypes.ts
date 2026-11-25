@@ -100,6 +100,49 @@ export interface CarSettings {
   shareLog(text: string): Promise<void>;
 }
 
+/** A track kept on the device, or on its way there. */
+export type DownloadState =
+  | { status: "queued" }
+  | { status: "downloading"; progress: number }
+  | { status: "done"; bytes: number }
+  | { status: "failed"; error: string };
+
+/** Tracks kept on the device, played from there instead of the network (the Android app). */
+export interface Downloads {
+  /** The track's state, or undefined when it's neither downloaded nor on its way. */
+  state(id: string): DownloadState | undefined;
+  /** Downloads the tracks not kept yet, a couple at a time. */
+  add(tracks: Track[]): void;
+  /** Deletes the tracks' files (and stops the ones still on their way). */
+  remove(ids: string[]): Promise<void>;
+  removeAll(): Promise<void>;
+  /** The tracks kept, newest first. */
+  tracks(): Track[];
+  /** What's kept and what's on its way. */
+  summary(): { count: number; bytes: number; pending: number };
+  /** Changes whenever anything above does (for useSyncExternalStore). */
+  version(): number;
+  subscribe(fn: () => void): () => void;
+}
+
+/** A newer version of the app, published on GitHub. */
+export interface Update {
+  version: string;
+  /** The release's page, with what changed. */
+  page: string;
+}
+
+/** Updates from this fork's GitHub releases (public: no account or token needed). The Windows and Android apps. */
+export interface Updater {
+  /** The newest release when it's newer than this app, or null. */
+  check(): Promise<Update | null>;
+  /**
+   * Downloads it and starts the installer: on Windows the app closes, updates and opens again; on Android the system
+   * asks to confirm the install. progress goes from 0 to 1.
+   */
+  install(progress: (fraction: number) => void): Promise<void>;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: ErrorCode) {
     super(message);

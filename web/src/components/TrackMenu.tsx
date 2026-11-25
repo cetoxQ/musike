@@ -1,6 +1,8 @@
 import {
   ArrowSquareOutIcon,
   CheckSquareIcon,
+  CircleNotchIcon,
+  DownloadSimpleIcon,
   HeartIcon,
   ListPlusIcon,
   MicrophoneStageIcon,
@@ -19,6 +21,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
+import { useDownloads } from "../hooks/useDownloads";
 import { MD, useMediaQuery } from "../hooks/useMediaQuery";
 import { useSwipeDown } from "../hooks/useSwipeDown";
 import { useT } from "../i18n";
@@ -53,6 +56,8 @@ export function TrackMenu() {
   const openAddToPlaylist = useUi((s) => s.openAddToPlaylist);
   const isFavorite = useLibrary((s) => (menu ? s.favorites.some((t) => t.id === menu.track.id) : false));
   const isMd = useMediaQuery(MD);
+  const downloads = useDownloads();
+  const download = menu ? downloads?.state(menu.track.id) : undefined;
   const box = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const t = useT();
@@ -120,6 +125,20 @@ export function TrackMenu() {
       <Item icon={<PlaylistIcon size={18} />} onClick={() => openAddToPlaylist([menu.track])}>
         {t.trackMenu.addToPlaylist}
       </Item>
+      {downloads &&
+        (download?.status === "done" ? (
+          <Item icon={<TrashIcon size={18} />} onClick={run(() => void downloads.remove([menu.track.id]))}>
+            {t.downloads.removeOne}
+          </Item>
+        ) : download?.status === "queued" || download?.status === "downloading" ? (
+          <Item icon={<CircleNotchIcon size={18} className="animate-spin" />} onClick={run(() => void downloads.remove([menu.track.id]))}>
+            {t.downloads.cancelOne(download.status === "downloading" ? download.progress : 0)}
+          </Item>
+        ) : (
+          <Item icon={<DownloadSimpleIcon size={18} />} onClick={run(() => downloads.add([menu.track]))}>
+            {download?.status === "failed" ? t.downloads.retryOne : t.downloads.downloadOne}
+          </Item>
+        ))}
       {menu.playlistId && (
         <Item
           danger

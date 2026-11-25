@@ -1,14 +1,48 @@
 import { App } from "@capacitor/app";
-import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle } from "@capacitor/core";
+import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle, type PluginListenerHandle } from "@capacitor/core";
+import type { Updater } from "../lib/apiTypes";
+import { latestRelease, type Release } from "../lib/updates";
 import { installTvMode } from "../tv/tvMode";
 
-/** MusikeDevicePlugin.java: what kind of device this is, and the cinema view's full screen. */
+/** MusikeDevicePlugin.java: what kind of device this is, the cinema view's full screen, and installing updates. */
 const Device = registerPlugin<{
   info(): Promise<{ tv: boolean }>;
   fullscreen(options: { on: boolean; landscape: boolean }): Promise<void>;
+  installUpdate(options: { url: string }): Promise<void>;
+  addListener(event: "updateProgress", fn: (e: { fraction: number }) => void): Promise<PluginListenerHandle>;
 }>("MusikeDevice", {
   web: () => ({ info: async () => ({ tv: false }), fullscreen: async () => {} }),
 });
+
+const APK = /-Android\.apk$/;
+
+/**
+ * Updates from GitHub: the APK is downloaded by the app itself and handed to Android's installer, which asks to
+ * confirm (and, the first time, to allow Musike to install apps). It installs over this one only when signed with
+ * the same key, as every release of this fork is.
+ */
+export const androidUpdater: Updater | null =
+  Capacitor.getPlatform() === "android"
+    ? (() => {
+        let found: Release | null = null;
+        return {
+          async check() {
+            found = await latestRelease(APK);
+            return found;
+          },
+          async install(progress) {
+            const release = found ?? (await latestRelease(APK));
+            if (!release) return;
+            const sub = await Device.addListener("updateProgress", (e) => progress(e.fraction));
+            try {
+              await Device.installUpdate({ url: release.url });
+            } finally {
+              void sub.remove();
+            }
+          },
+        };
+      })()
+    : null;
 
 /**
  * Full screen in the Android app: the system bars hide (a swipe from the edge shows them for a moment) and a landscape

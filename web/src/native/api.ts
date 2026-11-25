@@ -23,9 +23,10 @@ import { discover } from "../../../server/src/profile";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
-import { ApiError, type CarSettings, type Connection, type MusikeApi, type ServerLink, type SystemInfo } from "../lib/apiTypes";
-import { androidFullscreen } from "./android";
+import { ApiError, type CarSettings, type Connection, type Downloads, type MusikeApi, type ServerLink, type SystemInfo, type Updater } from "../lib/apiTypes";
+import { androidFullscreen, androidUpdater } from "./android";
 import { makeConnection, savedConnection, serverBackend } from "./connection";
+import { downloads as kept } from "./downloads";
 import { media, Playback } from "./media";
 import { offlineCapable } from "./offline";
 import { nativeStorage } from "./storage";
@@ -268,14 +269,20 @@ const phoneStream = (id: string) =>
 
 /**
  * On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. Connected to a
- * server, it plays the server's stream proxy; with the server out of reach, the phone's again (audio only).
+ * server, it plays the server's stream proxy; with the server out of reach, the phone's again (audio only). A track
+ * downloaded to the phone plays from its file, either way.
  */
-export const streamSource = (id: string, kind: "audio" | "video" = "audio", height = 360): Promise<string> =>
-  server && offline
+export const streamSource = async (id: string, kind: "audio" | "video" = "audio", height = 360): Promise<string> => {
+  const file = kind === "audio" ? await kept.source(id).catch(() => null) : null;
+  if (file) return file;
+  return server && offline
     ? offline.streamSource(id, () => server.streamUrl(id, kind, height), () => phoneStream(id))
     : phoneStream(id);
+};
 
 export async function explainStreamError(url: string, error?: MediaError | null): Promise<{ message: string }> {
+  // A downloaded file that won't play (deleted, or cut short): forgotten, so the retry streams the track.
+  if (kept.broken(url)) return { message: getT().downloads.broken };
   // The server's stream: the server says why, if it's still there.
   if (server && offline && (url.startsWith(saved.url) || url.includes("_capacitor_http_interceptor_"))) {
     if (!(await offline.check())) return { message: getT().offline.gone };
@@ -357,6 +364,12 @@ export const car: CarSettings | null = {
     await Share.share({ title: "Musike Android Auto", text, dialogTitle: "Musike Android Auto" }).catch(() => {});
   },
 };
+
+/** Updates from this fork's GitHub releases (native/android.ts). */
+export const updater: Updater | null = androidUpdater;
+
+/** Tracks kept on the phone, played from there (native/downloads.ts). */
+export const downloads: Downloads | null = kept;
 
 /** The cinema view's full screen: the app hides the system bars and turns the screen itself (native/android.ts). */
 export const appFullscreen: ((on: boolean, landscape: boolean) => Promise<void>) | null = androidFullscreen;

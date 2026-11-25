@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
+import { DownloadButton } from "../components/DownloadButton";
 import { IconButton, PlayDisc } from "../components/IconButton";
 import { Artwork } from "../components/Artwork";
 import { Modal } from "../components/Modal";
@@ -147,6 +148,7 @@ export default function Collection({ kind }: Props) {
         >
           <ShuffleIcon size={24} />
         </IconButton>
+        <DownloadButton tracks={tracks} />
         {/* Any playlist of yours, made here or saved as a copy: the order in plain sight, not only in the menu. */}
         {playlist && playlist.tracks.length > 1 && (
           <IconButton

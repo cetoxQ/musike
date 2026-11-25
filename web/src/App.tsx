@@ -18,6 +18,7 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { getT } from "./i18n";
 import { loadAccountSettings } from "./lib/accountSettings";
 import { capabilities, link, openedLinks, startCar, syncAddress } from "./lib/api";
+import { useAppUpdate } from "./stores/appUpdate";
 import { playLink } from "./lib/youtubeLink";
 import { cn } from "./lib/format";
 import { legacyRedirect, NOW_PLAYING_HASH, paths } from "./lib/routes";
@@ -90,6 +91,12 @@ export default function App() {
 
   // Android Auto's lists (the Android app only).
   useEffect(() => startCar?.(), []);
+
+  // A newer release on GitHub (the Windows and Android apps): looked for a little after starting, every few hours.
+  useEffect(() => {
+    const timer = setTimeout(() => void useAppUpdate.getState().check(), 8000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // A YouTube link opened with the Android app, or shared to it, plays right away.
   useEffect(() => openedLinks?.((url) => void playLink(url, (path) => navigate(path))), [navigate]);

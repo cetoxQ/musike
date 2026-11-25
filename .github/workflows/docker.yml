@@ -3,9 +3,8 @@
 # started on the "local" branch, it is :latest too (this fork publishes its image that way).
 name: Docker image
 
+# Only by hand here: a release tag builds the Windows and Android apps (release.yml), not a public image.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

@@ -19,7 +19,9 @@ import { cn } from "../lib/format";
 import { useShare } from "../lib/share";
 import { saveAccountSettings, useAccountSettings } from "../lib/accountSettings";
 import { DEFAULT_PERIODS, periodName, type PeriodId } from "../lib/periods";
-import { car } from "../lib/api";
+import { car, updater } from "../lib/api";
+import { useAppUpdate } from "../stores/appUpdate";
+import { useDownloads } from "../hooks/useDownloads";
 import { usePlayer } from "../player/player";
 import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
@@ -195,6 +197,10 @@ export function SettingsDialog() {
         <ShareSection />
 
         <ProfileSection />
+
+        {updater && <UpdateSection />}
+
+        <DownloadsSection />
 
         {car && <CarSection />}
 
@@ -407,6 +413,100 @@ function CarSection() {
           </button>
         )}
       </div>
+    </section>
+  );
+}
+
+/** This app's version, and a newer one from GitHub: checked on its own every few hours, or now. */
+function UpdateSection() {
+  const t = useT();
+  const { available, status, progress, check, install } = useAppUpdate();
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="flex items-center gap-1.5 text-xs font-medium text-fg-3">
+        <ArrowsClockwiseIcon size={14} /> {t.update.settings}
+      </h3>
+      <div className="flex items-center justify-between gap-3 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <span className="flex min-w-0 flex-col">
+          <span className="text-sm font-medium">
+            {status === "downloading"
+              ? t.update.downloading(Math.round(progress * 100))
+              : available
+                ? t.update.available(available.version)
+                : t.update.current(__APP_VERSION__)}
+          </span>
+          <span className="text-xs text-fg-2">{t.update.settingsBody}</span>
+        </span>
+        <button
+          type="button"
+          disabled={status === "checking" || status === "downloading"}
+          onClick={() => void (available ? install() : check(true))}
+          className={cn(
+            "flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium ring-1 ring-line disabled:opacity-60",
+            available ? "bg-accent text-accent-ink" : "bg-surface-2 hover:bg-surface-3",
+          )}
+        >
+          {available ? t.update.install : status === "checking" ? t.update.checking : t.update.check}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** The tracks downloaded to the phone: how much room they take, playing them all, deleting them (Android app). */
+function DownloadsSection() {
+  const t = useT();
+  const downloads = useDownloads();
+  const [confirm, setConfirm] = useState(false);
+  if (!downloads) return null;
+  const { count, bytes, pending } = downloads.summary();
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="flex items-center gap-1.5 text-xs font-medium text-fg-3">
+        <DownloadSimpleIcon size={14} /> {t.downloads.settings}
+      </h3>
+      <div className="flex flex-col gap-3 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{t.downloads.summary(count, Math.round(bytes / 1048576))}</span>
+          <span className="text-xs text-fg-2">{pending ? t.downloads.pending(pending) : t.downloads.settingsBody}</span>
+        </div>
+        {count > 0 && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => usePlayer.getState().playList(downloads.tracks(), 0)}
+              className="flex h-9 items-center rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3"
+            >
+              {t.downloads.playAll}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirm(true)}
+              className="flex h-9 items-center rounded-full bg-surface-2 px-4 text-sm font-medium text-danger ring-1 ring-line hover:bg-surface-3"
+            >
+              {t.downloads.removeAll}
+            </button>
+          </div>
+        )}
+      </div>
+      <Modal open={confirm} onClose={() => setConfirm(false)} title={t.downloads.removeAllTitle}>
+        <p className="text-sm text-fg-2">{t.downloads.removeBody(count)}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={() => setConfirm(false)} className="h-11 rounded-full px-5 text-sm font-medium text-fg-2 hover:text-fg">
+            {t.common.cancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirm(false);
+              void downloads.removeAll();
+            }}
+            className="h-11 rounded-full bg-danger px-6 text-sm font-semibold text-white"
+          >
+            {t.downloads.remove}
+          </button>
+        </div>
+      </Modal>
     </section>
   );
 }

@@ -1,5 +1,6 @@
-import { ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
+import { ArrowCircleDownIcon, ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { memo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useDownloads } from "../hooks/useDownloads";
 import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
@@ -51,6 +52,7 @@ const TrackRow = memo(function TrackRow({
   const isCurrent = usePlayer((s) => selectShown(s)?.id === track.id);
   const isPlaying = usePlayer((s) => s.remote?.playing ?? (s.status === "playing" || s.status === "loading"));
   const isFavorite = useLibrary((s) => s.favorites.some((t) => t.id === track.id));
+  const download = useDownloads()?.state(track.id);
   const toggleFavorite = useLibrary((s) => s.toggleFavorite);
   const openMenu = useUi((s) => s.openMenu);
   const art = useRef<HTMLDivElement>(null);
@@ -134,6 +136,12 @@ const TrackRow = memo(function TrackRow({
         </p>
         <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-fg-2">
           {track.kind === "video" && <VideoCameraIcon size={13} className="shrink-0 text-fg-3" aria-label={t.common.video} />}
+          {download?.status === "done" && (
+            <ArrowCircleDownIcon size={13} weight="fill" className="shrink-0 text-accent-text" aria-label={t.downloads.downloaded} />
+          )}
+          {download?.status === "downloading" && (
+            <span className="shrink-0 font-mono text-[11px] text-accent-text tabular-nums">{Math.round(download.progress * 100)}%</span>
+          )}
           {/* On phones the whole row plays; there the artist is one tap away in the row's menu. */}
           <ArtistLink track={track} className="relative z-10 truncate md:pointer-events-auto" />
           {track.plays && <span className="shrink-0 text-fg-3">· {track.plays}</span>}

@@ -11,6 +11,11 @@ interface DesktopBridge {
   connect?: (url: string | null) => Promise<{ ok: true } | { error: "invalid" | "unreachable" | "cancelled" }>;
   /** This computer's own library (null when there is none). */
   localLibrary?: () => Promise<unknown>;
+  /** Updates from GitHub (missing in builds before 1.6): only the Windows app finds any. */
+  update?: {
+    check(): Promise<{ version: string; page: string } | null>;
+    install(progress: (fraction: number) => void): Promise<void>;
+  };
 }
 
 export const desktop = (window as Window & { musikeDesktop?: DesktopBridge }).musikeDesktop;

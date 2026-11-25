@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Lets Android Auto open the app in the background (granted by the user in Settings > Android Auto). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Updates: the APK of a newer release, downloaded by the app, goes to Android's installer (MusikeDevicePlugin). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- usesCleartextTraffic: a Musike server on the home network is often plain http (the app warns about it).
          Backups leave out the session token: res/xml/backup_rules.xml and data_extraction_rules.xml. -->
