@@ -1,5 +1,6 @@
-import { CheckIcon, HeartIcon, PlayIcon, PlaylistIcon, VideoCameraIcon } from "@phosphor-icons/react";
+import { ArrowCircleDownIcon, CheckIcon, DownloadSimpleIcon, HeartIcon, PlayIcon, PlaylistIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useDownloads } from "../hooks/useDownloads";
 import { TOUCH, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
@@ -110,6 +111,7 @@ export function SelectionBar({
   const playList = usePlayer((s) => s.playList);
   const addFavorites = useLibrary((s) => s.addFavorites);
   const openAddToPlaylist = useUi((s) => s.openAddToPlaylist);
+  const downloads = useDownloads();
   const toPlay = chosen.length ? chosen : all;
   const t = useT();
 
@@ -145,6 +147,7 @@ export function SelectionBar({
           <>
             {!noFavorite && <Action icon={<HeartIcon size={16} />} label={t.common.favorite} onClick={() => void addFavorites(chosen)} />}
             <Action icon={<PlaylistIcon size={16} />} label={t.common.playlist} onClick={() => openAddToPlaylist(chosen)} />
+            {downloads && <Action icon={<DownloadSimpleIcon size={16} />} label={t.downloads.downloadOne} onClick={() => downloads.add(chosen)} />}
             {extra}
           </>
         )}
@@ -192,6 +195,7 @@ export function SelectableRow({
   const isCurrent = usePlayer((s) => selectShown(s)?.id === track.id);
   const isPlaying = usePlayer((s) => s.remote?.playing ?? (s.status === "playing" || s.status === "loading"));
   const isFavorite = useLibrary((s) => s.favorites.some((f) => f.id === track.id));
+  const download = useDownloads()?.state(track.id);
   const pushRecent = useRecent((s) => s.push);
   const openMenu = useUi((s) => s.openMenu);
   const art = useRef<HTMLButtonElement>(null);
@@ -262,6 +266,9 @@ export function SelectableRow({
         </span>
       </button>
 
+      {download?.status === "done" && (
+        <ArrowCircleDownIcon size={15} weight="fill" className="shrink-0 text-accent-text" aria-label={t.downloads.downloaded} />
+      )}
       {isFavorite && <HeartIcon size={15} weight="fill" className="shrink-0 text-accent-text" aria-label={t.common.inFavorites} />}
 
       <span className="hidden w-11 shrink-0 text-right font-mono text-[13px] text-fg-3 tabular-nums md:block">

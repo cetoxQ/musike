@@ -34,7 +34,11 @@ export function desktopDownloads(): Downloads {
     if (res.ok) apply((await res.json()) as Info);
   };
 
-  const refresh = () => call("").catch(() => {});
+  let asked = 0;
+  const refresh = () => {
+    asked = Date.now();
+    return call("").catch(() => {});
+  };
   void refresh();
 
   return {
@@ -48,6 +52,8 @@ export function desktopDownloads(): Downloads {
     summary: () => ({ count: kept.length, bytes: kept.reduce((sum, k) => sum + k.bytes, 0), pending }),
     version: () => version,
     subscribe(fn) {
+      // A page or Settings showing downloads: what the server has now (at most every few seconds).
+      if (Date.now() - asked > 3000) void refresh();
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
