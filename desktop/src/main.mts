@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { createWriteStream, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, shell, Tray } from "electron";
 import type { RunningServer } from "../../server/src/app.js";
 import { backupLibraryOnUpdate } from "./backup.js";
 
@@ -68,6 +68,8 @@ interface Settings {
   lang?: Lang;
   server?: string | null;
   lastServer?: string;
+  /** The tray's "still playing here" note was shown once already. */
+  trayHinted?: boolean;
 }
 
 function readSettings(): Settings {
@@ -77,6 +79,7 @@ function readSettings(): Settings {
       lang: isLang(s.lang) ? s.lang : undefined,
       server: typeof s.server === "string" ? serverAddress(s.server) : null,
       lastServer: typeof s.lastServer === "string" ? (serverAddress(s.lastServer) ?? undefined) : undefined,
+      trayHinted: s.trayHinted === true,
     };
   } catch {
     return {}; // first launch
@@ -130,6 +133,51 @@ const CONNECT: Record<Lang, { buttons: string[]; message: (url: string) => strin
   it: { buttons: ["Connetti", "Annulla"], message: (url) => `Connettere Musike a ${url}?` },
   vi: { buttons: ["Kết nối", "Hủy"], message: (url) => `Kết nối Musike với ${url}?` },
 };
+
+// Windows and Linux: closing the window sends Musike to the tray (next to the clock) and the music keeps playing;
+// it quits from the tray's menu.
+const TRAY: Record<Lang, { open: string; quit: string; hint: string }> = {
+  en: { open: "Open Musike", quit: "Quit Musike", hint: "Musike keeps playing here. Right-click the icon to quit." },
+  "pt-BR": { open: "Abrir o Musike", quit: "Sair do Musike", hint: "O Musike continua tocando aqui. Clique com o botão direito no ícone para sair." },
+  it: { open: "Apri Musike", quit: "Esci da Musike", hint: "Musike continua a suonare qui. Clic destro sull'icona per uscire." },
+  vi: { open: "Mở Musike", quit: "Thoát Musike", hint: "Musike vẫn phát nhạc ở đây. Nhấp chuột phải vào biểu tượng để thoát." },
+};
+
+let tray: Tray | null = null;
+/** Quitting for real (the tray's Quit, an update, the system shutting down): the window may close. */
+let quitting = false;
+
+function showMain() {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function trayMenu() {
+  tray?.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: TRAY[lang].open, click: showMain },
+      { type: "separator" },
+      { label: TRAY[lang].quit, click: () => app.quit() },
+    ]),
+  );
+}
+
+function createTray() {
+  if (isMac || tray) return;
+  tray = new Tray(nativeImage.createFromPath(path.join(here, "icon.png")).resize({ width: 16, height: 16 }));
+  tray.setToolTip("Musike");
+  tray.on("click", showMain);
+  trayMenu();
+}
+
+/** The first time the window goes to the tray: a note that Musike is still there. */
+function hintTray() {
+  if (!tray || readSettings().trayHinted) return;
+  writeSettings({ trayHinted: true });
+  if (process.platform === "win32") tray.displayBalloon({ title: "Musike", content: TRAY[lang].hint, iconType: "info" });
+}
 
 function readWindowState(): WindowState {
   try {
@@ -191,6 +239,8 @@ function createMainWindow(url: string): BrowserWindow {
       sandbox: true,
       spellcheck: false,
       autoplayPolicy: "no-user-gesture-required",
+      // In the tray the window is hidden: its timers keep their pace, so the player goes on as usual.
+      backgroundThrottling: false,
     },
   });
 
@@ -198,7 +248,16 @@ function createMainWindow(url: string): BrowserWindow {
     if (state.maximized) win.maximize();
     win.show();
   });
-  win.on("close", () => saveWindowState(win));
+  win.on("close", (event) => {
+    saveWindowState(win);
+    if (isMac || quitting || win !== mainWindow) return;
+    event.preventDefault();
+    win.hide();
+    hintTray();
+  });
+  // Windows shutting down or signing out: no tray to go to, the window really closes.
+  win.on("query-session-end", () => (quitting = true));
+  win.on("session-end", () => (quitting = true));
 
   // Links to YouTube etc. open in the user's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -280,6 +339,7 @@ ipcMain.on("musike:lang", (_event, next: unknown) => {
   if (!isLang(next) || next === lang) return;
   lang = next;
   writeSettings({ lang });
+  trayMenu();
 });
 
 /** Starts over with what settings.json says (this computer, or a server), in place of the window that asked. */
@@ -394,14 +454,14 @@ ipcMain.handle("musike:update-install", async (event) => {
   app.quit();
 });
 
-app.on("second-instance", () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.focus();
-});
+// Musike opened again (a shortcut, the Start menu) while it runs, maybe in the tray: its window comes back.
+app.on("second-instance", showMain);
 
 app.on("window-all-closed", () => app.quit());
-app.on("before-quit", () => void server?.close());
+app.on("before-quit", () => {
+  quitting = true;
+  void server?.close();
+});
 
 void app.whenReady().then(() => {
   // A server's pages get no more than the app's own: full screen for videos, copying links. Nothing else.
@@ -411,5 +471,6 @@ void app.whenReady().then(() => {
   Menu.setApplicationMenu(
     isMac ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null,
   );
+  createTray();
   return launch();
 });
