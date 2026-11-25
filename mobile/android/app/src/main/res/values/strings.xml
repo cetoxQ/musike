@@ -13,10 +13,10 @@
     <string name="car_open_app_hint">It opens by itself if allowed in Settings, Android Auto</string>
     <string name="car_video_label">Musike Video</string>
     <string name="car_video_none">Play a video in Musike: its picture shows here while the car is parked.</string>
-    <string name="car_video_failed">The video couldn't load here. The sound plays on.</string>
-    <string name="car_video_permission">Allow Musike to read the car's speed (asked on the phone): the video shows only while the car stands still.</string>
-    <string name="car_video_reading">Reading the car's speed…</string>
-    <string name="car_video_no_speed">This car doesn't report its speed, so the video can't show here. The sound plays on.</string>
+    <string name="car_video_failed">The video couldn\'t load here. The sound plays on.</string>
+    <string name="car_video_permission">Allow Musike to read the car\'s speed (asked on the phone): the video shows only while the car stands still.</string>
+    <string name="car_video_reading">Reading the car\'s speed…</string>
+    <string name="car_video_no_speed">This car doesn\'t report its speed, so the video can\'t show here. The sound plays on.</string>
     <string name="car_video_soon">Stopped: the video shows in a few seconds.</string>
     <string name="car_video_parked_only">The video shows only while the car is parked. The sound plays on.</string>
 </resources>

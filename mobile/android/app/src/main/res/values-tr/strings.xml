@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="car_video_label">Musike Video</string>
-    <string name="car_video_none">Musike'de bir video başlatın: araç park halindeyken görüntüsü burada çıkar.</string>
+    <string name="car_video_none">Musike\'de bir video başlatın: araç park halindeyken görüntüsü burada çıkar.</string>
     <string name="car_video_failed">Video burada yüklenemedi. Ses çalmaya devam ediyor.</string>
-    <string name="car_video_permission">Musike'nin aracın hızını okumasına izin verin (telefonda sorulur): video sadece araç dururken görünür.</string>
+    <string name="car_video_permission">Musike\'nin aracın hızını okumasına izin verin (telefonda sorulur): video sadece araç dururken görünür.</string>
     <string name="car_video_reading">Aracın hızı okunuyor…</string>
     <string name="car_video_no_speed">Bu araç hızını bildirmiyor, bu yüzden video burada gösterilemiyor. Ses çalmaya devam ediyor.</string>
     <string name="car_video_soon">Araç durdu: video birkaç saniye içinde görünecek.</string>
