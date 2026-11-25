@@ -730,6 +730,15 @@ export const en = {
     log: "Android Auto log",
     logBody: (n: number) => (n ? `${n} recent events. If something doesn't work in the car, send it along.` : "Nothing yet: it fills in once the car connects."),
     sendLog: "Send",
+    screen: "Videos on the car's screen",
+    screenBody:
+      "Parked, Android Auto can show Musike itself on the car's screen, videos included: look for it among the car's apps, next to the music player. It does so only on Android 15 or newer, and only for apps installed by Play Store, which Reinstall asks Android to record.",
+    screenReady: "Listed",
+    screenNotListed: "Not listed",
+    screenOld: "Needs Android 15",
+    reinstall: "Reinstall",
+    reinstalling: (pct: number) => `Downloading ${pct}%`,
+    reinstallFailed: "Couldn't download Musike again",
     songs: (n: number) => (n === 1 ? "1 song" : `${n} songs`),
   },
 

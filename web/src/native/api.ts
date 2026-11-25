@@ -367,6 +367,10 @@ export const openedLinks: ((open: (url: string) => void) => () => void) | null =
 export const car: CarSettings | null = {
   info: () => Playback.carInfo(),
   openBackgroundSettings: () => Playback.openBackgroundSettings(),
+  reinstall: async (progress) => {
+    if (!androidUpdater) throw new Error("not on Android");
+    await androidUpdater.reinstall(progress);
+  },
   shareLog: async (text) => {
     await Share.share({ title: "Musike Android Auto", text, dialogTitle: "Musike Android Auto" }).catch(() => {});
   },

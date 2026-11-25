@@ -35,6 +35,7 @@ public class MusikeDevicePlugin extends Plugin {
 
     /** Only this fork's own releases are installed (web/src/lib/updates.ts names the same repository). */
     private static final String RELEASES = "https://github.com/cetoxQ/musike/releases/download/";
+    static final String PLAY_STORE = "com.android.vending";
 
     @PluginMethod
     public void info(PluginCall call) {
@@ -117,9 +118,16 @@ public class MusikeDevicePlugin extends Plugin {
                         }
                     }
                     Uri uri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", apk);
-                    Intent install = new Intent(Intent.ACTION_VIEW)
+                    // Asked to be recorded as installed by Play Store: Android Auto lists an app on the car's screen
+                    // (parked, see appCategory in the manifest) only then. Android's installer may ignore it (some
+                    // phones' own installers do); the app installs all the same.
+                    Intent install = new Intent(Intent.ACTION_INSTALL_PACKAGE)
                         .setDataAndType(uri, "application/vnd.android.package-archive")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                        .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, PLAY_STORE)
+                        .putExtra(Intent.EXTRA_REFERRER, Uri.parse("android-app://" + PLAY_STORE))
+                        .putExtra(Intent.EXTRA_ORIGINATING_URI, Uri.parse("https://play.google.com/store/apps/details?id=" + context.getPackageName()));
                     context.startActivity(install);
                     call.resolve();
                 } catch (Exception e) {

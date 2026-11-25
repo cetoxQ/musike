@@ -721,6 +721,15 @@ export const pt: Messages = {
     log: "Registro do Android Auto",
     logBody: (n: number) => (n ? `${n} eventos recentes. Se algo não funcionar no carro, envie.` : "Nada ainda: preenche quando o carro conecta."),
     sendLog: "Enviar",
+    screen: "Vídeos na tela do carro",
+    screenBody:
+      "Com o carro parado, o Android Auto pode mostrar o próprio Musike na tela do carro, com vídeos: procure-o entre os apps do carro, ao lado do player de música. Só no Android 15 ou mais novo, e só para apps instalados pela Play Store, o que Reinstalar pede ao Android para registrar.",
+    screenReady: "Na lista",
+    screenNotListed: "Fora da lista",
+    screenOld: "Precisa do Android 15",
+    reinstall: "Reinstalar",
+    reinstalling: (pct: number) => `Baixando ${pct}%`,
+    reinstallFailed: "Não foi possível baixar o Musike de novo",
     songs: (n: number) => (n === 1 ? "1 música" : `${n} músicas`),
   },
 

@@ -92,8 +92,13 @@ export type TopRange = "3m" | "all" | { since: number };
 
 /** Settings > Android Auto (the Android app only). */
 export interface CarSettings {
-  /** Whether the app may open itself from the car, and what happened with the car lately. */
-  info(): Promise<{ background: boolean; xiaomi: boolean; log: string[] }>;
+  /**
+   * Whether the app may open itself from the car, whether it can show on the car's screen while parked (Android 15 or
+   * newer; listed only when recorded as installed by Play Store), and what happened with the car lately.
+   */
+  info(): Promise<{ background: boolean; xiaomi: boolean; screenSupported: boolean; screenListed: boolean; log: string[] }>;
+  /** Installs this version again, recorded as installed by Play Store, so the car's screen lists the app. */
+  reinstall(progress: (fraction: number) => void): Promise<void>;
   /** The system page where that's allowed. */
   openBackgroundSettings(): Promise<void>;
   /** Sends the car's log through the share sheet. */

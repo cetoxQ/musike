@@ -25,7 +25,7 @@ import { useDownloads } from "../hooks/useDownloads";
 import { usePlayer } from "../player/player";
 import { useAuth } from "../stores/auth";
 import { useSystem } from "../stores/system";
-import { useUi } from "../stores/ui";
+import { toast, useUi } from "../stores/ui";
 import { AccountSection } from "./AccountSection";
 import { ServerSection } from "./ServerSection";
 import { BackupSection } from "./BackupSection";
@@ -365,7 +365,16 @@ function ShareSection() {
 /** Android Auto: whether the app may open itself from the car, and the car's log to send along. */
 function CarSection() {
   const t = useT();
-  const [info, setInfo] = useState<{ background: boolean; xiaomi: boolean; log: string[] } | null>(null);
+  const [info, setInfo] = useState<Awaited<ReturnType<NonNullable<typeof car>["info"]>> | null>(null);
+  /** Reinstall's download, 0 to 1, while it runs. */
+  const [fetching, setFetching] = useState<number | null>(null);
+  const reinstall = () => {
+    setFetching(0);
+    car
+      ?.reinstall(setFetching)
+      .catch(() => toast(t.car.reinstallFailed, "error"))
+      .finally(() => setFetching(null));
+  };
   useEffect(() => {
     const read = () => void car?.info().then(setInfo).catch(() => {});
     read();
@@ -397,6 +406,25 @@ function CarSection() {
         >
           {t.car.allow}
         </button>
+      </div>
+      <div className="flex flex-col gap-2 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium">{t.car.screen}</span>
+          <span className={cn("shrink-0 text-xs font-medium", info.screenSupported && info.screenListed ? "text-accent" : "text-fg-3")}>
+            {!info.screenSupported ? t.car.screenOld : info.screenListed ? t.car.screenReady : t.car.screenNotListed}
+          </span>
+        </div>
+        <p className="text-xs text-fg-2">{t.car.screenBody}</p>
+        {info.screenSupported && !info.screenListed && (
+          <button
+            type="button"
+            disabled={fetching !== null}
+            onClick={reinstall}
+            className="flex h-9 items-center self-start rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3 disabled:opacity-60"
+          >
+            {fetching === null ? t.car.reinstall : t.car.reinstalling(Math.round(fetching * 100))}
+          </button>
+        )}
       </div>
       <div className="flex items-center justify-between gap-3 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
         <span className="flex min-w-0 flex-col">

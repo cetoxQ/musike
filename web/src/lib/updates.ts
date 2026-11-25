@@ -22,8 +22,8 @@ export interface Release extends Update {
   url: string;
 }
 
-/** The latest published release, when it's newer than this app and has a file matching `asset`. */
-export async function latestRelease(asset: RegExp, fetcher: typeof fetch = fetch): Promise<Release | null> {
+/** The latest published release, when it's newer than this app (or `any`) and has a file matching `asset`. */
+export async function latestRelease(asset: RegExp, fetcher: typeof fetch = fetch, any = false): Promise<Release | null> {
   const res = await fetcher(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
     headers: { accept: "application/vnd.github+json" },
   });
@@ -34,7 +34,7 @@ export async function latestRelease(asset: RegExp, fetcher: typeof fetch = fetch
     assets?: { name: string; browser_download_url: string }[];
   };
   const version = release.tag_name?.replace(/^v/, "") ?? "";
-  if (!version || !isNewer(version, __APP_VERSION__)) return null;
+  if (!version || (!any && !isNewer(version, __APP_VERSION__))) return null;
   const file = release.assets?.find((a) => asset.test(a.name));
   if (!file) return null;
   return { version, page: release.html_url ?? `https://github.com/${UPDATE_REPO}/releases/latest`, url: file.browser_download_url };

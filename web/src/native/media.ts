@@ -21,7 +21,7 @@ interface PlaybackPlugin {
   addListener(event: "browse", fn: (e: { request: string; parent: string }) => void): Promise<PluginListenerHandle>;
   /** The car's own requests, kept until heard (the car may ask before the page starts): "open", "playItem", "search". */
   addListener(event: "car", fn: (e: { action: string; value?: string }) => void): Promise<PluginListenerHandle>;
-  carInfo(): Promise<{ background: boolean; xiaomi: boolean; log: string[] }>;
+  carInfo(): Promise<{ background: boolean; xiaomi: boolean; screenSupported: boolean; screenListed: boolean; log: string[] }>;
   openBackgroundSettings(): Promise<void>;
   browseResult(options: {
     request: string;
@@ -36,7 +36,7 @@ export const Playback = registerPlugin<PlaybackPlugin>("MusikePlayback", {
     update: noop,
     addListener: async () => ({ remove: noop }),
     browseResult: noop,
-    carInfo: async () => ({ background: false, xiaomi: false, log: [] }),
+    carInfo: async () => ({ background: false, xiaomi: false, screenSupported: false, screenListed: false, log: [] }),
     openBackgroundSettings: noop,
   }),
 });

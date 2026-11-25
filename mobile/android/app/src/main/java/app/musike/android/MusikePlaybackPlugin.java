@@ -2,6 +2,7 @@ package app.musike.android;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -58,10 +59,25 @@ public class MusikePlaybackPlugin extends Plugin {
         JSObject info = new JSObject();
         info.put("background", PlaybackService.canStartInBackground(getContext()));
         info.put("xiaomi", "xiaomi".equalsIgnoreCase(Build.MANUFACTURER));
+        // The app on the car's screen, parked: Android 15 or newer, and recorded as installed by Play Store.
+        info.put("screenSupported", Build.VERSION.SDK_INT >= 35);
+        info.put("screenListed", MusikeDevicePlugin.PLAY_STORE.equals(installer(getContext())));
         JSArray log = new JSArray();
         for (String line : PlaybackService.journal()) log.put(line);
         info.put("log", log);
         call.resolve(info);
+    }
+
+    /** The app that installed this one, as Android recorded it. */
+    @SuppressWarnings("deprecation")
+    private static String installer(Context context) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            if (Build.VERSION.SDK_INT >= 30) return pm.getInstallSourceInfo(context.getPackageName()).getInstallingPackageName();
+            return pm.getInstallerPackageName(context.getPackageName());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** Where Android lets the app open from the background: Xiaomi's own permissions, otherwise "display over apps". */

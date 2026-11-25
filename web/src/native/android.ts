@@ -21,24 +21,33 @@ const APK = /-Android\.apk$/;
  * confirm (and, the first time, to allow Musike to install apps). It installs over this one only when signed with
  * the same key, as every release of this fork is.
  */
-export const androidUpdater: Updater | null =
+async function download(release: Release, progress: (fraction: number) => void) {
+  const sub = await Device.addListener("updateProgress", (e) => progress(e.fraction));
+  try {
+    await Device.installUpdate({ url: release.url });
+  } finally {
+    void sub.remove();
+  }
+}
+
+export const androidUpdater: (Updater & { reinstall(progress: (fraction: number) => void): Promise<void> }) | null =
   Capacitor.getPlatform() === "android"
     ? (() => {
         let found: Release | null = null;
         return {
+          /** The latest release again, newer or not (Settings > Android Auto, to be listed on the car's screen). */
+          async reinstall(progress: (fraction: number) => void) {
+            const release = await latestRelease(APK, fetch, true);
+            if (!release) throw new Error("no release");
+            await download(release, progress);
+          },
           async check() {
             found = await latestRelease(APK);
             return found;
           },
           async install(progress) {
             const release = found ?? (await latestRelease(APK));
-            if (!release) return;
-            const sub = await Device.addListener("updateProgress", (e) => progress(e.fraction));
-            try {
-              await Device.installUpdate({ url: release.url });
-            } finally {
-              void sub.remove();
-            }
+            if (release) await download(release, progress);
           },
         };
       })()

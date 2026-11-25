@@ -723,6 +723,15 @@ export const it: Messages = {
     logBody: (n) =>
       n ? `${n} eventi recenti. Se qualcosa non funziona in auto, invialo.` : "Ancora vuoto: si riempie quando l'auto si collega.",
     sendLog: "Invia",
+    screen: "Video sullo schermo dell'auto",
+    screenBody:
+      "Da fermi, Android Auto può mostrare Musike stessa sullo schermo dell'auto, video compresi: cercala tra le app dell'auto, accanto al lettore musicale. Lo fa solo con Android 15 o successivo, e solo per le app installate dal Play Store, che Reinstalla chiede ad Android di registrare.",
+    screenReady: "In elenco",
+    screenNotListed: "Non in elenco",
+    screenOld: "Serve Android 15",
+    reinstall: "Reinstalla",
+    reinstalling: (pct: number) => `Download ${pct}%`,
+    reinstallFailed: "Impossibile scaricare di nuovo Musike",
     songs: (n) => (n === 1 ? "1 brano" : `${n} brani`),
   },
 
