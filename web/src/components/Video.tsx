@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { create } from "zustand";
 import { MD, useMediaQuery } from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
-import { appFullscreen } from "../lib/api";
+import { appFullscreen, capabilities } from "../lib/api";
 import { cn } from "../lib/format";
 import { selectCurrent, usePlayer, useStatusText, videoBox, videoEl } from "../player/player";
 import { useUi } from "../stores/ui";
@@ -351,7 +351,8 @@ export function Theater() {
                 </div>
                 <Transport />
                 <div className="flex items-center justify-end gap-2">
-                  <QualityButton compact={false} />
+                  {/* The phone's own picture has one quality (see pictureSource). */}
+                  {capabilities.video && <QualityButton compact={false} />}
                   <Volume className="max-md:hidden" />
                 </div>
               </div>

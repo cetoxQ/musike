@@ -51,6 +51,34 @@ export async function fetchRemoteClients(key: "clients" | "ios" = "clients"): Pr
 
 const finite = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
+/**
+ * A video's picture alone (YouTube serves no sound and picture together to these clients): H.264, which every phone
+ * decodes, as tall as `maxHeight` at most. The app plays it muted, in step with the sound (see the player's picture).
+ */
+export async function directVideo(id: string, clients: string[], maxHeight: number, lang?: Lang): Promise<{ url: string; expiresAt: number }> {
+  let reason = "";
+  for (const client of clients) {
+    try {
+      const info: any = await withClient((yt) => yt.getBasicInfo(id, { client: client as never }), lang);
+      const formats: any[] = (info.streaming_data?.adaptive_formats ?? []).filter(
+        (f: any) => f.has_video && !f.has_audio && typeof f.url === "string" && /^video\/mp4; codecs="avc1/.test(f.mime_type ?? ""),
+      );
+      // The tallest within the limit; a video only taller than it, its smallest.
+      const fits = formats.filter((f) => (f.height ?? 0) <= maxHeight).sort((a, b) => (b.height ?? 0) - (a.height ?? 0));
+      const best = fits[0] ?? formats.sort((a, b) => (a.height ?? 0) - (b.height ?? 0))[0];
+      if (!best) {
+        reason = text(info.playability_status?.reason) || reason;
+        continue;
+      }
+      const expire = Number(new URL(best.url).searchParams.get("expire")) * 1000;
+      return { url: best.url, expiresAt: expire || Date.now() + 3 * 3600_000 };
+    } catch (e) {
+      reason = (e as Error).message || reason;
+    }
+  }
+  throw new Error(reason);
+}
+
 /** Tries each client in turn. Throws with YouTube's reason (or an empty message) when none of them has audio. */
 export async function directAudio(id: string, clients: string[], lang?: Lang): Promise<DirectAudio> {
   let reason = "";

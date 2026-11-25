@@ -30,7 +30,7 @@ import { downloads as kept } from "./downloads";
 import { media, Playback } from "./media";
 import { offlineCapable } from "./offline";
 import { nativeStorage } from "./storage";
-import { forgetUrl, resolveAudio } from "./streams";
+import { forgetUrl, resolveAudio, resolvePicture } from "./streams";
 
 // The Android backend: the Musike server's own code (search, genres, artists, albums, library), running on the
 // phone instead of behind HTTP. The build swaps lib/api.ts for this module (see vite.config.ts).
@@ -279,6 +279,13 @@ export const streamSource = async (id: string, kind: "audio" | "video" = "audio"
     ? offline.streamSource(id, () => server.streamUrl(id, kind, height), () => phoneStream(id))
     : phoneStream(id);
 };
+
+/**
+ * On the phone on its own a video plays as its sound, which goes on with the screen off and in the car, and its
+ * picture comes along, muted, in step with it (see the player's picture). Connected to a server, the server streams
+ * the video whole.
+ */
+export const pictureSource: ((id: string) => Promise<string>) | null = (id) => resolvePicture(id);
 
 export async function explainStreamError(url: string, error?: MediaError | null): Promise<{ message: string }> {
   // A downloaded file that won't play (deleted, or cut short): forgotten, so the retry streams the track.

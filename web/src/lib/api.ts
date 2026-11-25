@@ -16,6 +16,9 @@ export const api: MusikeApi = http.api;
 export const streamSource = (id: string, kind: "audio" | "video", height: number): string | Promise<string> =>
   http.streamPath(id, kind, height);
 
+/** A video's picture alone, to show along with its sound: only the Android app, where the server's video can't come. */
+export const pictureSource: ((id: string) => Promise<string>) | null = null;
+
 /** Saves a text file the way this platform does it: a browser download (the desktop app shows "Save as"). */
 export async function saveFile(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));

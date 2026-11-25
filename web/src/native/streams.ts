@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { DEFAULT_CLIENTS, directAudio, fetchRemoteClients, validClients, type DirectAudio } from "../../../server/src/directAudio";
+import { DEFAULT_CLIENTS, directAudio, directVideo, fetchRemoteClients, validClients, type DirectAudio } from "../../../server/src/directAudio";
 import { msg, tr } from "../../../server/src/i18n";
 import { getLang } from "../i18n";
 import { ApiError } from "../lib/apiTypes";
@@ -93,4 +93,20 @@ export function resolveAudio(id: string): Promise<DirectAudio> {
 /** Forgets the stream behind a URL that stopped working, so the next try resolves a fresh one. */
 export function forgetUrl(url: string) {
   for (const [id, r] of cache) if (r.url === url) cache.delete(id);
+}
+
+/** How tall a video's picture plays on the phone: sharp on its screen, light on mobile data. */
+const PICTURE_HEIGHT = 720;
+const pictures = new Map<string, Promise<{ url: string; expiresAt: number }>>();
+
+/** A video's picture (no sound) for the phone to show while its sound plays: see the player's picture. */
+export async function resolvePicture(id: string): Promise<string> {
+  let job = pictures.get(id);
+  const hit = job && (await job.catch(() => null));
+  if (!hit || hit.expiresAt - Date.now() < 60_000) {
+    job = directVideo(id, clients, PICTURE_HEIGHT, getLang());
+    pictures.set(id, job);
+    job.catch(() => pictures.get(id) === job && pictures.delete(id));
+  }
+  return (await job!).url;
 }

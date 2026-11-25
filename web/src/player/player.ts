@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getT, useT } from "../i18n";
-import { api, capabilities, explainStreamError, link, streamSource, systemMedia, type ApiError, type ErrorCode } from "../lib/api";
+import { api, capabilities, explainStreamError, link, pictureSource, streamSource, systemMedia, type ApiError, type ErrorCode } from "../lib/api";
 import { createAudio } from "../lib/audio";
 import { shuffled } from "../lib/format";
 import type { Track } from "../lib/types";
@@ -337,11 +337,11 @@ export const usePlayer = create<PlayerState>((set, get) => {
   /** Where an action goes instead of this device's player: the device being controlled, if any. */
   const elsewhere = () => (!localOnly && get().remote ? remoteControl : null);
 
+  // A video plays as one wherever video can play; Video mode is for songs, which then play their music video.
   const kindFor = (track: Track): Kind =>
     capabilities.video &&
-    get().preferVideo &&
     Date.now() > videoBlockedUntil &&
-    (track.kind === "video" || !!clipFor.get(track.id))
+    (track.kind === "video" || (get().preferVideo && !!clipFor.get(track.id)))
       ? "video"
       : "audio";
   /** The YouTube id to stream: the song itself, or its music video in Video mode. */
@@ -383,6 +383,57 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (err.name === "AbortError") return; // src changed mid-start
       if (err.name === "NotAllowedError") set({ status: "paused", blocked: true }); // autoplay blocked: needs a click here
     });
+  }
+
+  /**
+   * The picture of a video playing as audio (the Android app on its own, see pictureSource): YouTube's picture-only
+   * stream in the <video>, muted, following the sound. The sound leads, so it goes on with the screen off, where the
+   * picture stops, and in the car; the picture catches up when it's seen again. One that can't come leaves the sound.
+   */
+  let picture: { id: string } | null = null;
+  /** When the picture was last moved to the sound: moving it again too soon would keep it buffering. */
+  let pictureMoved = 0;
+  const pictureOn = () => !!picture && loaded?.kind === "audio" && loaded.id === picture.id && !!videoEl.getAttribute("src");
+
+  function showPicture(track: Track) {
+    picture = null;
+    if (!pictureSource || track.kind !== "video") return;
+    const mine = (picture = { id: track.id });
+    pictureSource(track.id).then(
+      (src) => {
+        if (picture !== mine || loaded?.id !== mine.id || loaded.kind !== "audio") return;
+        videoEl.muted = true;
+        videoEl.src = src;
+        set({ mediaKind: "video" });
+        followSound(true);
+      },
+      () => {}, // no picture: the sound plays on its own, as before
+    );
+  }
+
+  function dropPicture() {
+    picture = null;
+    videoEl.pause();
+    videoEl.removeAttribute("src");
+    videoEl.load();
+    if (loaded?.kind === "audio") set({ mediaKind: "audio" });
+  }
+
+  /** Keeps the picture where the sound is: moved there when it drifts (or `now`), playing and pausing with it. */
+  function followSound(now = false) {
+    if (!pictureOn() || document.hidden) return;
+    const drift = Math.abs(videoEl.currentTime - audio.currentTime);
+    if (audio.paused) {
+      videoEl.pause();
+      if (now || drift > 0.1) videoEl.currentTime = audio.currentTime;
+      return;
+    }
+    if ((now || (drift > 0.4 && Date.now() - pictureMoved > 3000)) && !videoEl.seeking) {
+      pictureMoved = Date.now();
+      // A little ahead: the picture takes a moment to get going from where it's put.
+      videoEl.currentTime = audio.currentTime + (videoEl.readyState >= 3 ? 0 : 0.2);
+    }
+    if (videoEl.paused) videoEl.play().catch(() => {});
   }
 
   /** The server work for the track loading (its quality's download): given up when another track loads. */
@@ -512,6 +563,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
           if (hdPending === job) hdPending = null;
         });
     } else begin(height);
+    if (kind === "audio") showPicture(track);
+    else picture = null;
     setMetadata(track);
     if (kind === "video") fitToScreen();
   }
@@ -747,9 +800,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
     warmWork = new AbortController();
     const s = get();
     const next = s.queue.slice(s.index + 1, s.index + 1 + AHEAD);
-    const video = s.preferVideo && capabilities.video && Date.now() > videoBlockedUntil;
+    const video = capabilities.video && Date.now() > videoBlockedUntil;
     next.forEach((track, k) => {
-      if (!video) return warmAudio(track);
+      if (!video || (track.kind !== "video" && !s.preferVideo)) return warmAudio(track);
       void lookupClip(track).then((clip) => {
         if (!clip) return warmAudio(track); // no music video: it will play as audio
         if (k === 0) warmVideo(track, clip);
@@ -860,7 +913,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
   function botCheck(message: string) {
     const t = getT();
     const s = get();
-    if (s.mediaKind === "video") {
+    if (loaded?.kind === "video") {
       videoBlockedUntil = Date.now() + 10 * 60_000;
       toast(t.player.videoBotCheck);
       return load(s.index, { startAt: s.position, autoplay: true });
@@ -949,6 +1002,15 @@ export const usePlayer = create<PlayerState>((set, get) => {
   }
   wire(audio);
   for (const v of videos) wire(v);
+  for (const event of ["playing", "pause", "seeked"]) audio.addEventListener(event, () => followSound(true));
+  audio.addEventListener("timeupdate", () => followSound());
+  document.addEventListener("visibilitychange", () => followSound(true));
+  for (const v of videos) {
+    v.addEventListener("error", () => v === videoEl && pictureOn() && dropPicture());
+    v.addEventListener("loadedmetadata", () => {
+      if (v === videoEl && pictureOn() && v.videoWidth && v.videoHeight) set({ videoAspect: v.videoWidth / v.videoHeight });
+    });
+  }
 
   // A stream that stops arriving (the network gone, a server that stopped answering) doesn't always end in an
   // error: the player would wait forever, looking alive. No progress for a while is treated as one, so it's tried

@@ -616,21 +616,84 @@ export function ytPlaylistOf(id: string, list: any, all?: any[]): YtPlaylistPage
   };
 }
 
-const ytPlaylistPage = cached(30 * MINUTE, async (key): Promise<YtPlaylistPage> => {
-  const { lang, id } = parseKey(key);
-  const list = await withClient((yt) => yt.music.getPlaylist(id), lang).catch(() => {
-    throw new HttpError(502, msg("ytPlaylistUnavailable"));
-  });
-  // YouTube gives the first 100 tracks; the rest come a page at a time. A page that fails ends the list there.
+/** YouTube gives a playlist's first 100 items; the rest come a page at a time. A page that fails ends the list there. */
+async function allItems(first: any, itemsOf: (page: any) => any[]): Promise<any[]> {
   const items: any[] = [];
-  let page: any = list;
+  let page: any = first;
   for (;;) {
-    items.push(...(page.items ?? page.contents ?? []).filter((i: any) => i?.type !== "ContinuationItem"));
+    items.push(...itemsOf(page).filter((i: any) => i?.type !== "ContinuationItem"));
     if (items.length >= MAX_PLAYLIST_TRACKS || !page.has_continuation) break;
     page = await page.getContinuation().catch(() => null);
     if (!page) break;
   }
-  return ytPlaylistOf(id, list, items);
+  return items;
+}
+
+/** A video of a plain YouTube playlist: a LockupView (the current layout) or a PlaylistVideo (the older one). */
+export function playlistVideoTrack(v: any): Track | null {
+  if (v?.type !== "LockupView") return toTrack(v, "video");
+  const id = v.content_id;
+  if (v.content_type !== "VIDEO" || typeof id !== "string" || !VIDEO_ID.test(id)) return null;
+  const title = text(v.metadata?.title);
+  // Private and deleted videos stay listed, as "[Private video]" in the session's language: they can't play.
+  if (!title || /^\[.*\]$/.test(title)) return null;
+  const rows: any[] = v.metadata?.metadata?.metadata_rows ?? [];
+  const badges: string[] = (v.content_image?.overlays ?? []).flatMap((o: any) => o?.badges ?? []).map((b: any) => text(b?.text));
+  const length = badges.find((b) => /^\d+(:\d\d)+$/.test(b));
+  return {
+    id,
+    title,
+    artist: text(rows[0]?.metadata_parts?.[0]?.text),
+    duration: length ? length.split(":").reduce((s, n) => s * 60 + Number(n), 0) : 0,
+    ...videoThumbs(id),
+    kind: "video",
+  };
+}
+
+/**
+ * The playlist as plain YouTube lists it. YouTube Music lists videos that aren't music (a channel's series, a talk)
+ * without their id, so a playlist of them came up empty; YouTube has them all. The tracks YouTube Music knew keep its
+ * names (artist, album, cover).
+ */
+async function plainPlaylist(id: string, lang: Lang, known: Track[]): Promise<{ list: any; tracks: Track[] }> {
+  const list: any = await withClient((yt) => yt.getPlaylist(id.replace(/^VL/, "")), lang);
+  const items = await allItems(list, (page) => page.videos ?? page.items ?? []);
+  const music = new Map(known.map((t) => [t.id, t]));
+  return { list, tracks: items.map(playlistVideoTrack).map((t) => (t && music.get(t.id)) ?? t).filter((t): t is Track => !!t) };
+}
+
+const ytPlaylistPage = cached(30 * MINUTE, async (key): Promise<YtPlaylistPage> => {
+  const { lang, id } = parseKey(key);
+  const list = await withClient((yt) => yt.music.getPlaylist(id), lang).catch(() => null);
+  const items = list ? await allItems(list, (page) => page.items ?? page.contents ?? []) : [];
+  let page: YtPlaylistPage | null = null;
+  try {
+    if (list) page = ytPlaylistOf(id, list, items);
+  } catch {
+    // nothing YouTube Music could show: plain YouTube's list below
+  }
+  // Every item a track: a music playlist, as YouTube Music has it. Otherwise (videos it can't name, or a playlist it
+  // can't open at all) plain YouTube's list.
+  const tracks = page?.tracks ?? [];
+  if (page && items.length && items.every((i) => toTrack(i, "song"))) return page;
+  try {
+    const plain = await plainPlaylist(id, lang, tracks);
+    if (plain.tracks.length <= tracks.length && page) return page;
+    const info = plain.list.info ?? {};
+    return {
+      id,
+      title: page?.title || text(info.title),
+      // YouTube Music names no author for a playlist it can't read ("N/A"): YouTube's channel.
+      author: (page?.author !== "N/A" && page?.author) || text(info.author?.name),
+      info: page?.info || [info.total_items, info.views].map(text).filter(Boolean).join(" • "),
+      description: page?.description || text(info.description),
+      ...(page?.art ? { thumb: page.thumb, art: page.art } : imagesOf({ thumbnails: info.thumbnails })),
+      tracks: uniqueTracks(plain.tracks),
+    };
+  } catch {
+    if (page) return page;
+    throw new HttpError(502, msg("ytPlaylistUnavailable"));
+  }
 });
 
 export const ytPlaylist = (id: string, lang: Lang) => ytPlaylistPage(keyOf(lang, id));

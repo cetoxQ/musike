@@ -466,7 +466,7 @@ export const en = {
     fallbackName: "Playlist",
     openFailed: "Couldn't open this playlist",
     noTracks: "No playable tracks",
-    noTracksBody: "YouTube Music doesn't offer this playlist's tracks here.",
+    noTracksBody: "YouTube doesn't offer this playlist's videos here.",
     saveCopy: "Save a copy",
   },
 
