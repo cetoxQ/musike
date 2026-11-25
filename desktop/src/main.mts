@@ -455,8 +455,14 @@ ipcMain.handle("musike:update-install", async (event) => {
     if (total) event.sender.send("musike:update-progress", done / total);
   }
   await new Promise<void>((resolve, reject) => out.end((err?: Error | null) => (err ? reject(err) : resolve())));
-  // /S: silent, into the same folder; --updated --force-run: electron-builder's installer opens Musike afterwards.
-  spawn(file, ["/S", "--updated", "--force-run"], { detached: true, stdio: "ignore" }).unref();
+  // /S: silent, into the same folder. This installer (not one-click) doesn't open Musike afterwards on its own, so
+  // cmd waits for it and then starts Musike again, from where it is now.
+  spawn("cmd.exe", ["/d", "/s", "/c", `"start "" /wait "${file}" /S --updated & start "" "${process.execPath}""`], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+    windowsVerbatimArguments: true,
+  }).unref();
   app.quit();
 });
 
