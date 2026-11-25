@@ -45,6 +45,7 @@ import { keepChannel, presentJob, startJob, systemInfo, type Channel } from "./s
 import { refreshTools, type Tools } from "./tools.js";
 import { HttpError, VIDEO_ID } from "./types.js";
 import { cacheAudio, cachedAudio } from "./audioCache.js";
+import { addDownloads, downloadsInfo, keptAudio, removeDownloads } from "./downloads.js";
 import { downloadVideo, heightOfFile, loudnessOf, pruneCache, resolveStreams, videoQualities } from "./ytdlp.js";
 
 declare module "fastify" {
@@ -619,10 +620,10 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     return reply.code(202).send({ queued: true });
   });
 
-  /** From the cache when it was fetched ahead, else from YouTube through this server. */
+  /** Kept on this computer, or in the cache when it was fetched ahead, else from YouTube through this server. */
   app.get("/api/stream/:id/audio", (req, reply) => {
     const id = videoId(req.params);
-    const cached = cachedAudio(id);
+    const cached = (config.downloads && keptAudio(id)) || cachedAudio(id);
     return cached ? serveFile(req, reply, cached.file, cached.mime) : proxyStream(req, reply, id, "audio");
   });
 
@@ -636,6 +637,20 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
     }
     return serveFile(req, reply, await downloadVideo(id, height || 360, gone(reply)), "video/mp4");
   });
+
+  // Downloads: the desktop app's tracks kept on this computer (see downloads.ts).
+  if (config.downloads) {
+    app.get("/api/downloads", () => downloadsInfo());
+    app.post("/api/downloads", async (req) => {
+      const { tracks } = (req.body ?? {}) as { tracks?: unknown };
+      if (!Array.isArray(tracks)) throw new HttpError(400, msg("tracksRequired"));
+      return addDownloads(tracks.slice(0, 2000).map(library.sanitizeTrack));
+    });
+    app.post("/api/downloads/remove", async (req) => {
+      const { ids } = (req.body ?? {}) as { ids?: unknown };
+      return removeDownloads(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string" && VIDEO_ID.test(x)) : undefined);
+    });
+  }
 
   // Library
 

@@ -139,7 +139,7 @@ const TrackRow = memo(function TrackRow({
           {download?.status === "done" && (
             <ArrowCircleDownIcon size={13} weight="fill" className="shrink-0 text-accent-text" aria-label={t.downloads.downloaded} />
           )}
-          {download?.status === "downloading" && (
+          {download?.status === "downloading" && download.progress > 0 && (
             <span className="shrink-0 font-mono text-[11px] text-accent-text tabular-nums">{Math.round(download.progress * 100)}%</span>
           )}
           {/* On phones the whole row plays; there the artist is one tap away in the row's menu. */}

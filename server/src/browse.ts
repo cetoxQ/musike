@@ -118,7 +118,8 @@ const MAX_ARTISTS = 600;
 const PLAYLISTS_PER_ROUND = 4;
 const MAX_GENRE_TRACKS = 150;
 const MAX_HITS = 50;
-const MAX_PLAYLIST_TRACKS = 200;
+/** A YouTube playlist's tracks, read 100 at a time (YouTube's page size) up to this many. */
+const MAX_PLAYLIST_TRACKS = 1000;
 
 /** Time-boxed memo: these pages change slowly, and going back and forth between them should be instant. */
 function cached<T>(ttl: number, load: (key: string) => Promise<T>): (key: string) => Promise<T> {
@@ -598,9 +599,9 @@ export async function searchPlaylists(query: string, lang: Lang): Promise<Playli
 }
 
 /** A playlist's header and tracks, as YouTube Music lists them (songs and videos alike). */
-export function ytPlaylistOf(id: string, list: any): YtPlaylistPage {
+export function ytPlaylistOf(id: string, list: any, all?: any[]): YtPlaylistPage {
   const header = list?.header;
-  const items: any[] = (list?.items ?? list?.contents ?? []).slice(0, MAX_PLAYLIST_TRACKS);
+  const items: any[] = (all ?? list?.items ?? list?.contents ?? []).slice(0, MAX_PLAYLIST_TRACKS);
   const tracks = uniqueTracks(items.map((i) => toTrack(i, i?.item_type === "video" ? "video" : "song")));
   const title = text(header?.title);
   if (!title && !tracks.length) throw new HttpError(404, msg("playlistNotFound"));
@@ -620,7 +621,16 @@ const ytPlaylistPage = cached(30 * MINUTE, async (key): Promise<YtPlaylistPage> 
   const list = await withClient((yt) => yt.music.getPlaylist(id), lang).catch(() => {
     throw new HttpError(502, msg("ytPlaylistUnavailable"));
   });
-  return ytPlaylistOf(id, list);
+  // YouTube gives the first 100 tracks; the rest come a page at a time. A page that fails ends the list there.
+  const items: any[] = [];
+  let page: any = list;
+  for (;;) {
+    items.push(...(page.items ?? page.contents ?? []).filter((i: any) => i?.type !== "ContinuationItem"));
+    if (items.length >= MAX_PLAYLIST_TRACKS || !page.has_continuation) break;
+    page = await page.getContinuation().catch(() => null);
+    if (!page) break;
+  }
+  return ytPlaylistOf(id, list, items);
 });
 
 export const ytPlaylist = (id: string, lang: Lang) => ytPlaylistPage(keyOf(lang, id));

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createWriteStream, readFileSync, writeFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, shell, Tray } from "electron";
@@ -25,6 +25,8 @@ process.env.MUSIKE_CACHE_DIR = path.join(userData, "cache");
 process.env.MUSIKE_BIN_DIR = path.join(userData, "bin");
 // The desktop app keeps library.json (one user; the update backups below copy that file).
 process.env.MUSIKE_LIBRARY = "json";
+// Tracks kept on this computer to play without YouTube (Download, in the app): in userData/data/downloads.
+process.env.MUSIKE_DOWNLOADS = "on";
 process.env.MUSIKE_WEB_DIST = app.isPackaged ? path.join(process.resourcesPath, "web") : path.resolve(here, "..", "..", "web", "dist");
 
 // A copy of the library from before each update, in userData/backups (the installer makes one too).
@@ -440,7 +442,11 @@ ipcMain.handle("musike:update-install", async (event) => {
   const res = await fetch(update.url, { headers: { "user-agent": "Musike" } });
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
   const total = Number(res.headers.get("content-length")) || 0;
-  const file = path.join(app.getPath("temp"), `Musike-Setup-${update.version}.exe`);
+  // Not the temp folder: Windows may give it as a short name (C:\Users\ADMINI~1\...), and the installer quits when
+  // it runs from a path with "~" in it.
+  const dir = path.join(userData, "updates");
+  mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `Musike-Setup-${update.version}.exe`);
   const out = createWriteStream(file);
   let done = 0;
   for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {

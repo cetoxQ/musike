@@ -749,13 +749,13 @@ export const en = {
 
   downloads: {
     settings: "Downloads",
-    settingsBody: "Downloaded tracks play from the phone: they start at once and play without a connection, in Android Auto too.",
+    settingsBody: "Downloaded tracks play from this device: they start at once and play without a connection (on the phone, in Android Auto too).",
     summary: (n: number, mb: number) => (n ? `${n === 1 ? "1 track" : `${n} tracks`} · ${mb} MB` : "Nothing downloaded yet"),
     pending: (n: number) => (n === 1 ? "1 track on its way" : `${n} tracks on their way`),
     playAll: "Play all",
     removeAll: "Delete all",
     removeAllTitle: "Delete every download?",
-    removeBody: (n: number) => (n === 1 ? "The downloaded file is deleted from the phone. The track stays in your library and streams again." : `${n} downloaded files are deleted from the phone. The tracks stay in your library and stream again.`),
+    removeBody: (n: number) => (n === 1 ? "The downloaded file is deleted from this device. The track stays in your library and streams again." : `${n} downloaded files are deleted from this device. The tracks stay in your library and stream again.`),
     remove: "Delete",
     removeTitle: "Delete these downloads?",
     downloaded: "Downloaded",
@@ -768,7 +768,7 @@ export const en = {
     downloadOne: "Download",
     retryOne: "Download again",
     removeOne: "Delete download",
-    cancelOne: (progress: number) => `Downloading ${Math.round(progress * 100)}%: cancel`,
+    cancelOne: (progress: number) => (progress > 0 ? `Downloading ${Math.round(progress * 100)}%: cancel` : "Downloading: cancel"),
     finished: (done: number, failed: number) =>
       failed ? `${done} downloaded, ${failed} failed (try them again from the track's menu)` : done === 1 ? "1 track downloaded" : `${done} tracks downloaded`,
     failed: "Download failed",

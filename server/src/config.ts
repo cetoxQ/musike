@@ -40,6 +40,8 @@ export const config = {
   /** Where the library lives: "sqlite" (data/musike.db) or "json" (data/library.json). Unset: SQLite when Node has it. */
   library: (["sqlite", "json"].includes(process.env.MUSIKE_LIBRARY ?? "") ? process.env.MUSIKE_LIBRARY : "auto") as "sqlite" | "json" | "auto",
   cacheDir: process.env.MUSIKE_CACHE_DIR ?? path.join(root, "cache"),
+  /** Tracks kept for good in <data>/downloads (GET/POST/DELETE /api/downloads): the desktop app turns it on. */
+  downloads: process.env.MUSIKE_DOWNLOADS === "on",
   /** HD video cache limit; least recently played videos are evicted first. */
   cacheMaxBytes: Number(process.env.MUSIKE_CACHE_MAX_MB ?? 2048) * 1024 * 1024,
   /**

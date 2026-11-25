@@ -1,6 +1,7 @@
 import { getT } from "../i18n";
 import { ApiError, type CarSettings, type Connection, type Downloads, type Updater, type MusikeApi, type ServerLink, type SystemMedia } from "./apiTypes";
 import { desktop } from "./desktop";
+import { desktopDownloads } from "./desktopDownloads";
 import { httpBackend } from "./httpApi";
 
 // The HTTP backend: the Musike server this page came from (web app, desktop app). The Android build swaps this module
@@ -137,8 +138,12 @@ export const car: CarSettings | null = null;
 /** Updates from GitHub: the Windows app through its shell; the browser has none (the server updates on its own). */
 export const updater: Updater | null = desktop?.update ?? null;
 
-/** Tracks kept on the device to play without the network: only the Android app (native/downloads.ts). */
-export const downloads: Downloads | null = null;
+/**
+ * Tracks kept on the device to play without the network: the Android app (native/downloads.ts), and the desktop app
+ * with this computer's own library (its server keeps them). Not a Musike server's page: those files would be the
+ * server's, not this computer's.
+ */
+export const downloads: Downloads | null = desktop?.update && !desktop.server ? desktopDownloads() : null;
 
 /**
  * The cinema view's full screen, done by the Android app itself (native/api.ts): its web view doesn't keep a page in

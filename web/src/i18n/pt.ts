@@ -740,13 +740,13 @@ export const pt: Messages = {
 
   downloads: {
     settings: "Downloads",
-    settingsBody: "As faixas baixadas tocam do celular: começam na hora e tocam sem conexão, no Android Auto também.",
+    settingsBody: "As faixas baixadas tocam deste dispositivo: começam na hora e tocam sem conexão (no celular, no Android Auto também).",
     summary: (n: number, mb: number) => (n ? `${n === 1 ? "1 faixa" : `${n} faixas`} · ${mb} MB` : "Nada baixado ainda"),
     pending: (n: number) => (n === 1 ? "1 faixa a caminho" : `${n} faixas a caminho`),
     playAll: "Tocar todas",
     removeAll: "Apagar todas",
     removeAllTitle: "Apagar todos os downloads?",
-    removeBody: (n: number) => (n === 1 ? "O arquivo baixado é apagado do celular. A faixa continua na biblioteca e volta a tocar por streaming." : `${n} arquivos baixados são apagados do celular. As faixas continuam na biblioteca e voltam a tocar por streaming.`),
+    removeBody: (n: number) => (n === 1 ? "O arquivo baixado é apagado deste dispositivo. A faixa continua na biblioteca e volta a tocar por streaming." : `${n} arquivos baixados são apagados deste dispositivo. As faixas continuam na biblioteca e voltam a tocar por streaming.`),
     remove: "Apagar",
     removeTitle: "Apagar estes downloads?",
     downloaded: "Baixada",
@@ -759,7 +759,7 @@ export const pt: Messages = {
     downloadOne: "Baixar",
     retryOne: "Baixar de novo",
     removeOne: "Apagar download",
-    cancelOne: (progress: number) => `Baixando ${Math.round(progress * 100)}%: cancelar`,
+    cancelOne: (progress: number) => (progress > 0 ? `Baixando ${Math.round(progress * 100)}%: cancelar` : "Baixando: cancelar"),
     finished: (done: number, failed: number) =>
       failed ? `${done} baixadas, ${failed} falharam (tente de novo pelo menu da faixa)` : done === 1 ? "1 faixa baixada" : `${done} faixas baixadas`,
     failed: "O download falhou",

@@ -742,13 +742,13 @@ export const it: Messages = {
 
   downloads: {
     settings: "Download",
-    settingsBody: "I brani scaricati suonano dal telefono: partono subito e funzionano senza connessione, anche in Android Auto.",
+    settingsBody: "I brani scaricati suonano da questo dispositivo: partono subito e funzionano senza connessione (sul telefono, anche in Android Auto).",
     summary: (n: number, mb: number) => (n ? `${n === 1 ? "1 brano" : `${n} brani`} · ${mb} MB` : "Ancora nessun download"),
     pending: (n: number) => (n === 1 ? "1 brano in arrivo" : `${n} brani in arrivo`),
     playAll: "Riproduci tutti",
     removeAll: "Elimina tutti",
     removeAllTitle: "Eliminare tutti i download?",
-    removeBody: (n: number) => (n === 1 ? "Il file scaricato viene eliminato dal telefono. Il brano resta nella libreria e torna in streaming." : `${n} file scaricati vengono eliminati dal telefono. I brani restano nella libreria e tornano in streaming.`),
+    removeBody: (n: number) => (n === 1 ? "Il file scaricato viene eliminato da questo dispositivo. Il brano resta nella libreria e torna in streaming." : `${n} file scaricati vengono eliminati da questo dispositivo. I brani restano nella libreria e tornano in streaming.`),
     remove: "Elimina",
     removeTitle: "Eliminare questi download?",
     downloaded: "Scaricato",
@@ -761,7 +761,7 @@ export const it: Messages = {
     downloadOne: "Scarica",
     retryOne: "Scarica di nuovo",
     removeOne: "Elimina download",
-    cancelOne: (progress: number) => `Download ${Math.round(progress * 100)}%: annulla`,
+    cancelOne: (progress: number) => (progress > 0 ? `Download ${Math.round(progress * 100)}%: annulla` : "Download in corso: annulla"),
     finished: (done: number, failed: number) =>
       failed ? `${done} scaricati, ${failed} non riusciti (riprova dal menu del brano)` : done === 1 ? "1 brano scaricato" : `${done} brani scaricati`,
     failed: "Download non riuscito",
