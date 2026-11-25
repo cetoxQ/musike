@@ -226,6 +226,8 @@ export interface SystemMedia {
   setTrack(track: { title: string; artist: string; album: string; artwork: string; duration?: number }): void;
   setState(state: { playing: boolean; position: number; duration: number }): void;
   onAction(handler: (action: "play" | "pause" | "next" | "previous" | "seek", position?: number) => void): void;
+  /** The playing video's picture-only stream, for Android Auto's Musike Video screen (Android only). */
+  setVideo?(url: string): void;
 }
 
 /**

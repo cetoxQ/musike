@@ -7,4 +7,12 @@
     <string name="playback_previous">Precedente</string>
     <string name="car_open_app">Apri Musike sul telefono</string>
     <string name="car_open_app_hint">Si apre da solo se lo consenti in Impostazioni, Android Auto</string>
+    <string name="car_video_label">Musike Video</string>
+    <string name="car_video_none">Avvia un video in Musike: la sua immagine appare qui ad auto ferma.</string>
+    <string name="car_video_failed">Il video non si carica qui. L'audio continua.</string>
+    <string name="car_video_permission">Consenti a Musike di leggere la velocità dell'auto (richiesto sul telefono): il video appare solo ad auto ferma.</string>
+    <string name="car_video_reading">Lettura della velocità dell'auto…</string>
+    <string name="car_video_no_speed">Quest'auto non comunica la velocità, quindi il video non può apparire qui. L'audio continua.</string>
+    <string name="car_video_soon">Auto ferma: il video appare tra pochi secondi.</string>
+    <string name="car_video_parked_only">Il video appare solo ad auto parcheggiata. L'audio continua.</string>
 </resources>

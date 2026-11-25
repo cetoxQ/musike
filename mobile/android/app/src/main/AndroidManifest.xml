@@ -17,6 +17,11 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Updates: the APK of a newer release, downloaded by the app, goes to Android's installer (MusikeDevicePlugin). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Musike Video in Android Auto (CarVideoService): a screen drawn as a map, shown only while the car stands
+         still, which it learns from the car's speed. -->
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <uses-permission android:name="com.google.android.gms.permission.CAR_SPEED" />
 
     <!-- appCategory/isGame: Android Auto (phone on Android 15 or newer) opens only games on the car's screen, and only
          while parked: that's how videos can be watched in the car. Android Auto covers the app as soon as the car moves;
@@ -105,6 +110,19 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Musike Video: the playing video's picture on the car's screen, parked (Android 14 and older too). -->
+        <service
+            android:name=".CarVideoService"
+            android:label="@string/car_video_label"
+            android:icon="@mipmap/ic_launcher"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+        <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="1" />
 
         <!-- Android Auto lists Musike among the car's media apps. -->
         <meta-data

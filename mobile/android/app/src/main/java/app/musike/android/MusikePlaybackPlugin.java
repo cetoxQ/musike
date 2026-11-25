@@ -128,6 +128,7 @@ public class MusikePlaybackPlugin extends Plugin {
         Boolean playing = call.getBoolean("playing");
         Double position = call.getDouble("position");
         Double duration = call.getDouble("duration");
+        String video = call.getString("video");
         main.post(() -> {
             PlaybackService.NowPlaying state = PlaybackService.state;
             long now = SystemClock.elapsedRealtime();
@@ -138,6 +139,9 @@ public class MusikePlaybackPlugin extends Plugin {
             }
             state.positionAt = now;
             if (title != null) state.title = title;
+            // A new track has no picture until the app finds one.
+            if (video != null) state.video = video;
+            else if (title != null) state.video = "";
             if (artist != null) state.artist = artist;
             if (album != null) state.album = album;
             if (artwork != null) state.artwork = artwork;

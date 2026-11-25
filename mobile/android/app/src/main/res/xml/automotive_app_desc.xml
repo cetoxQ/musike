@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android Auto: Musike is a media app (see PlaybackService). -->
+<!-- Android Auto: Musike is a media app (see PlaybackService), and Musike Video a templated one (CarVideoService). -->
 <automotiveApp>
     <uses name="media" />
+    <uses name="template" />
 </automotiveApp>

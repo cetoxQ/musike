@@ -406,6 +406,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
         videoEl.src = src;
         set({ mediaKind: "video" });
         followSound(true);
+        // Android Auto's Musike Video shows it too, on the car's screen while parked.
+        systemMedia?.setVideo?.(src);
       },
       () => {}, // no picture: the sound plays on its own, as before
     );

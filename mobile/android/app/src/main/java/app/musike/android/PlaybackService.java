@@ -111,6 +111,8 @@ public class PlaybackService extends MediaBrowserService {
         /** When positionMs was measured (elapsedRealtime), so the system can keep the clock moving on its own. */
         long positionAt = SystemClock.elapsedRealtime();
         long durationMs;
+        /** The video's picture-only stream, for the car's screen (CarVideoScreen); empty for a song. */
+        String video = "";
 
         long currentPositionMs() {
             return playing ? positionMs + (SystemClock.elapsedRealtime() - positionAt) : positionMs;
@@ -243,6 +245,14 @@ public class PlaybackService extends MediaBrowserService {
     private static void toCar(String action, String value) {
         if (car != null) car.onCar(action, value);
         else waiting.add(new String[] { action, value });
+    }
+
+    /** Musike Video's play and pause button in the car: as if pressed in the media app. */
+    static void control(boolean play) {
+        PlaybackService service = instance;
+        if (service == null || service.session == null) return;
+        if (play) service.session.getController().getTransportControls().play();
+        else service.session.getController().getTransportControls().pause();
     }
 
     static synchronized void log(String line) {

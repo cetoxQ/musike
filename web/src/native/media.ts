@@ -14,6 +14,8 @@ interface PlaybackPlugin {
     playing?: boolean;
     position?: number;
     duration?: number;
+    /** The video's picture-only stream, for the car's screen (CarVideoScreen.java); a new track clears it. */
+    video?: string;
   }): Promise<void>;
   /** Buttons pressed outside the app; and from Android Auto, "playItem" (value: the item's id) and "search". */
   addListener(event: "action", fn: (e: { action: string; position?: number; value?: string }) => void): Promise<PluginListenerHandle>;
@@ -82,6 +84,9 @@ const androidMedia: SystemMedia = {
   },
   onAction(handler) {
     void Playback.addListener("action", (e) => handler(e.action as Parameters<typeof handler>[0], e.position));
+  },
+  setVideo(url) {
+    void Playback.update({ video: url });
   },
 };
 
