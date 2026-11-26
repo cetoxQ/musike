@@ -59,10 +59,13 @@ jobs:
       - name: Summary
         run: |
           apk=$(ls release/*-Android.apk)
-          { echo "### Android"; echo "- $(basename "$apk")"; echo "- app ID: $MUSIKE_APP_ID"; echo "- commit: ${GITHUB_SHA::7}"; } >> "$GITHUB_STEP_SUMMARY"
+          video=$(ls release/*-AndroidAuto.apk)
+          { echo "### Android"; echo "- $(basename "$apk")"; echo "- $(basename "$video")"; echo "- app ID: $MUSIKE_APP_ID"; echo "- commit: ${GITHUB_SHA::7}"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: musike-android-${{ github.ref_name }}-${{ github.run_number }}
-          path: release/*-Android.apk
+          path: |
+            release/*-Android.apk
+            release/*-AndroidAuto.apk
           if-no-files-found: error
           retention-days: 14

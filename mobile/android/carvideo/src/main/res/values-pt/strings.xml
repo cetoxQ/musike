@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="car_video_label">Musike Video</string>
+    <string name="car_video_none">Toque um vídeo no Musike: a imagem aparece aqui com o carro parado.</string>
+    <string name="car_video_failed">O vídeo não carregou aqui. O som continua.</string>
+    <string name="car_video_permission">Permita que o Musike leia a velocidade do carro (pedido no celular): o vídeo só aparece com o carro parado.</string>
+    <string name="car_video_reading">Lendo a velocidade do carro…</string>
+    <string name="car_video_no_speed">Este carro não informa a velocidade, então o vídeo não pode aparecer aqui. O som continua.</string>
+    <string name="car_video_soon">Carro parado: o vídeo aparece em alguns segundos.</string>
+    <string name="car_video_parked_only">O vídeo só aparece com o carro estacionado. O som continua.</string>
+    <string name="car_video_no_musike">O Musike Video não alcança o Musike. Instale ou atualize o Musike no celular.</string>
+    <string name="video_app_ready">O Musike Video está pronto. No Android Auto, abra-o entre os apps do carro: o vídeo tocando no Musike aparece lá com o carro estacionado.</string>
+</resources>

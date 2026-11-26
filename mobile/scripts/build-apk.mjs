@@ -1,5 +1,5 @@
-// Builds the release APK and copies it to release/Musike-Setup-<version>-Android.apk at the repository root,
-// next to the desktop downloads.
+// Builds the release APKs and copies them to release/ at the repository root, next to the desktop downloads:
+// Musike-Setup-<version>-Android.apk, and Musike Video (android/carvideo) as Musike-Video-<version>-AndroidAuto.apk.
 // Needs JDK 17+ (JAVA_HOME) and the Android SDK (ANDROID_HOME or android/local.properties).
 // Signed when android/keystore.properties or the MUSIKE_KEYSTORE* variables are set; unsigned otherwise.
 import { spawnSync } from "node:child_process";
@@ -20,10 +20,15 @@ const gradle = win
     spawnSync("sh", [join(android, "gradlew"), ...task.split(" ")], { cwd: android, stdio: "inherit" });
 if (gradle.status !== 0) process.exit(gradle.status ?? 1);
 
-const outputs = join(android, "app", "build", "outputs", "apk", "release");
-const signed = join(outputs, "app-release.apk");
-const apk = existsSync(signed) ? signed : join(outputs, "app-release-unsigned.apk");
-const target = join(root, "..", "release", `Musike-Setup-${version}-Android${apk === signed ? "" : "-unsigned"}.apk`);
-mkdirSync(dirname(target), { recursive: true });
-copyFileSync(apk, target);
-console.log(`\n${target}`);
+/** Copies a module's release APK to release/<name>-<version>-<suffix>.apk. */
+function copyOut(module, name, suffix) {
+  const outputs = join(android, module, "build", "outputs", "apk", "release");
+  const signed = join(outputs, `${module}-release.apk`);
+  const apk = existsSync(signed) ? signed : join(outputs, `${module}-release-unsigned.apk`);
+  const target = join(root, "..", "release", `${name}-${version}-${suffix}${apk === signed ? "" : "-unsigned"}.apk`);
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(apk, target);
+  console.log(`\n${target}`);
+}
+copyOut("app", "Musike-Setup", "Android");
+copyOut("carvideo", "Musike-Video", "AndroidAuto");

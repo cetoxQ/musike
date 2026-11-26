@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="car_video_label">Musike Video</string>
     <string name="car_video_none">Musike\'de bir video başlatın: araç park halindeyken görüntüsü burada çıkar.</string>
@@ -8,4 +8,6 @@
     <string name="car_video_no_speed">Bu araç hızını bildirmiyor, bu yüzden video burada gösterilemiyor. Ses çalmaya devam ediyor.</string>
     <string name="car_video_soon">Araç durdu: video birkaç saniye içinde görünecek.</string>
     <string name="car_video_parked_only">Video sadece araç park halindeyken görünür. Ses çalmaya devam ediyor.</string>
+    <string name="car_video_no_musike">Musike Video, Musike\'ye ulaşamıyor. Telefonda Musike\'yi kurun ya da güncelleyin.</string>
+    <string name="video_app_ready">Musike Video hazır. Android Auto\'da aracın uygulamaları arasından açın: Musike\'de çalan video, araç park halindeyken orada görünür.</string>
 </resources>

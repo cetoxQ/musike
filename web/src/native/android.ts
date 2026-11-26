@@ -15,6 +15,8 @@ const Device = registerPlugin<{
 });
 
 const APK = /-Android\.apk$/;
+/** Musike Video (mobile/android/carvideo), released next to the app. */
+const VIDEO_APK = /-AndroidAuto\.apk$/;
 
 /**
  * Updates from GitHub: the APK is downloaded by the app itself and handed to Android's installer, which asks to
@@ -30,7 +32,9 @@ async function download(release: Release, progress: (fraction: number) => void) 
   }
 }
 
-export const androidUpdater: (Updater & { reinstall(progress: (fraction: number) => void): Promise<void> }) | null =
+export const androidUpdater:
+  | (Updater & { reinstall(progress: (fraction: number) => void): Promise<void>; installVideo(progress: (fraction: number) => void): Promise<void> })
+  | null =
   Capacitor.getPlatform() === "android"
     ? (() => {
         let found: Release | null = null;
@@ -38,6 +42,12 @@ export const androidUpdater: (Updater & { reinstall(progress: (fraction: number)
           /** The latest release again, newer or not (Settings > Android Auto, to be listed on the car's screen). */
           async reinstall(progress: (fraction: number) => void) {
             const release = await latestRelease(APK, fetch, true);
+            if (!release) throw new Error("no release");
+            await download(release, progress);
+          },
+          /** Musike Video, from the latest release (Settings > Android Auto). */
+          async installVideo(progress: (fraction: number) => void) {
+            const release = await latestRelease(VIDEO_APK, fetch, true);
             if (!release) throw new Error("no release");
             await download(release, progress);
           },

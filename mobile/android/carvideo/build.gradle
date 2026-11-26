@@ -1,0 +1,61 @@
+apply plugin: 'com.android.application'
+
+// Musike Video: the picture of the video playing in Musike, on the car's screen while parked (Android Auto). An app of
+// its own because Android Auto lists only one of an app's car experiences, and Musike's is the media player. It asks
+// Musike what's playing (NowPlayingProvider), so it is signed with Musike's key and its ID is Musike's plus ".video".
+
+def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def versionParts = appVersion.tokenize('.').collect { it.find(/\d+/).toInteger() }
+def musikeId = System.getenv("MUSIKE_APP_ID") ?: "app.musike.android"
+
+// The same key as Musike (app/build.gradle): the permission to ask it is only granted to apps signed like it.
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) keystoreFile.withInputStream { keystoreProps.load(it) }
+def signingValue = { String prop, String env -> keystoreProps.getProperty(prop) ?: System.getenv(env) }
+def releaseStore = signingValue('storeFile', 'MUSIKE_KEYSTORE')
+
+android {
+    namespace = "app.musike.carvideo"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId musikeId + ".video"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+        versionName appVersion
+        manifestPlaceholders = [musikeId: musikeId]
+        buildConfigField "String", "MUSIKE_ID", "\"${musikeId}\""
+    }
+    buildFeatures {
+        buildConfig true
+    }
+    signingConfigs {
+        if (releaseStore) {
+            release {
+                storeFile rootProject.file(releaseStore)
+                storePassword signingValue('storePassword', 'MUSIKE_KEYSTORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'MUSIKE_KEY_ALIAS')
+                keyPassword signingValue('keyPassword', 'MUSIKE_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (releaseStore) signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    // The car's screen and the car's speed, and the video player.
+    implementation "androidx.car.app:app:1.4.0"
+    implementation "androidx.car.app:app-projected:1.4.0"
+    implementation "androidx.media3:media3-exoplayer:1.5.1"
+    implementation "androidx.core:core:$androidxCoreVersion"
+}

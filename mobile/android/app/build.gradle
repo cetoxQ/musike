@@ -60,10 +60,6 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
-    // Musike Video in Android Auto (CarVideoService): the car's screen, the car's speed, and the video player.
-    implementation "androidx.car.app:app:1.4.0"
-    implementation "androidx.car.app:app-projected:1.4.0"
-    implementation "androidx.media3:media3-exoplayer:1.5.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

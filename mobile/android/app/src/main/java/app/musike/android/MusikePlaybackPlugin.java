@@ -62,10 +62,22 @@ public class MusikePlaybackPlugin extends Plugin {
         // The app on the car's screen, parked: Android 15 or newer, and recorded as installed by Play Store.
         info.put("screenSupported", Build.VERSION.SDK_INT >= 35);
         info.put("screenListed", MusikeDevicePlugin.PLAY_STORE.equals(installer(getContext())));
+        // Musike Video, the separate app for the video's picture on the car's screen: its version, when installed.
+        String video = videoApp(getContext());
+        if (video != null) info.put("videoApp", video);
         JSArray log = new JSArray();
         for (String line : PlaybackService.journal()) log.put(line);
         info.put("log", log);
         call.resolve(info);
+    }
+
+    /** Musike Video's version, or null when it isn't installed. */
+    private static String videoApp(Context context) {
+        try {
+            return context.getPackageManager().getPackageInfo(context.getPackageName() + ".video", 0).versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            return null;
+        }
     }
 
     /** The app that installed this one, as Android recorded it. */

@@ -1,6 +1,7 @@
 # Builds the Windows installer and the Android APK for a release tag (v1.6.0) and publishes them as a GitHub release.
 # The apps update themselves from the latest release (web/src/lib/updates.ts): the files keep their names
-# (*-Windows.exe, *-Android.apk), and the version in the tag must be the one in the package.json files.
+# (*-Windows.exe, *-Android.apk, and *-AndroidAuto.apk for Musike Video in the car), and the version in the tag must
+# be the one in the package.json files.
 #
 # The APK is signed with the key in these repository secrets (Settings → Secrets and variables → Actions):
 #   MUSIKE_KEYSTORE_BASE64    the .jks file, base64-encoded
@@ -78,6 +79,8 @@ jobs:
           { echo "### Android"; ls release | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
           found=$(ls release/*-Android.apk 2>/dev/null | wc -l)
           [ "$found" -eq 1 ] || { echo "::error::Expected 1 file(s) matching *-Android.apk, found $found"; ls -l release; exit 1; }
+          found=$(ls release/*-AndroidAuto.apk 2>/dev/null | wc -l)
+          [ "$found" -eq 1 ] || { echo "::error::Expected 1 file(s) matching *-AndroidAuto.apk, found $found"; ls -l release; exit 1; }
       - uses: actions/upload-artifact@v7
         with:
           name: android

@@ -20,6 +20,7 @@ import { useShare } from "../lib/share";
 import { saveAccountSettings, useAccountSettings } from "../lib/accountSettings";
 import { DEFAULT_PERIODS, periodName, type PeriodId } from "../lib/periods";
 import { car, updater } from "../lib/api";
+import { isNewer } from "../lib/updates";
 import { useAppUpdate } from "../stores/appUpdate";
 import { useDownloads } from "../hooks/useDownloads";
 import { usePlayer } from "../player/player";
@@ -375,6 +376,15 @@ function CarSection() {
       .catch(() => toast(t.car.reinstallFailed, "error"))
       .finally(() => setFetching(null));
   };
+  /** Musike Video's download, 0 to 1, while it runs. */
+  const [fetchingVideo, setFetchingVideo] = useState<number | null>(null);
+  const installVideo = () => {
+    setFetchingVideo(0);
+    car
+      ?.installVideo(setFetchingVideo)
+      .catch(() => toast(t.car.videoFailed, "error"))
+      .finally(() => setFetchingVideo(null));
+  };
   useEffect(() => {
     const read = () => void car?.info().then(setInfo).catch(() => {});
     read();
@@ -409,23 +419,49 @@ function CarSection() {
       </div>
       <div className="flex flex-col gap-2 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-medium">{t.car.screen}</span>
-          <span className={cn("shrink-0 text-xs font-medium", info.screenSupported && info.screenListed ? "text-accent" : "text-fg-3")}>
-            {!info.screenSupported ? t.car.screenOld : info.screenListed ? t.car.screenReady : t.car.screenNotListed}
+          <span className="text-sm font-medium">{t.car.video}</span>
+          <span className={cn("shrink-0 text-xs font-medium", info.videoApp ? "text-accent" : "text-fg-3")}>
+            {info.videoApp ? t.car.videoInstalled(info.videoApp) : t.car.videoMissing}
           </span>
         </div>
-        <p className="text-xs text-fg-2">{t.car.screenBody}</p>
-        {info.screenSupported && !info.screenListed && (
+        <p className="text-xs text-fg-2">{t.car.videoBody}</p>
+        {(!info.videoApp || isNewer(__APP_VERSION__, info.videoApp)) && (
           <button
             type="button"
-            disabled={fetching !== null}
-            onClick={reinstall}
+            disabled={fetchingVideo !== null}
+            onClick={installVideo}
             className="flex h-9 items-center self-start rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3 disabled:opacity-60"
           >
-            {fetching === null ? t.car.reinstall : t.car.reinstalling(Math.round(fetching * 100))}
+            {fetchingVideo !== null
+              ? t.car.videoInstalling(Math.round(fetchingVideo * 100))
+              : info.videoApp
+                ? t.car.videoUpdate
+                : t.car.videoInstall}
           </button>
         )}
       </div>
+      {/* Musike itself on the car's screen, parked: Android Auto allows it from Android 15 on. */}
+      {info.screenSupported && (
+        <div className="flex flex-col gap-2 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">{t.car.screen}</span>
+            <span className={cn("shrink-0 text-xs font-medium", info.screenListed ? "text-accent" : "text-fg-3")}>
+              {info.screenListed ? t.car.screenReady : t.car.screenNotListed}
+            </span>
+          </div>
+          <p className="text-xs text-fg-2">{t.car.screenBody}</p>
+          {!info.screenListed && (
+            <button
+              type="button"
+              disabled={fetching !== null}
+              onClick={reinstall}
+              className="flex h-9 items-center self-start rounded-full bg-surface-2 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3 disabled:opacity-60"
+            >
+              {fetching === null ? t.car.reinstall : t.car.reinstalling(Math.round(fetching * 100))}
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
         <span className="flex min-w-0 flex-col">
           <span className="text-sm font-medium">{t.car.log}</span>

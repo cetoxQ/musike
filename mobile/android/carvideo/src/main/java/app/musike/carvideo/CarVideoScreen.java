@@ -1,4 +1,4 @@
-package app.musike.android;
+package app.musike.carvideo;
 
 import android.app.Presentation;
 import android.content.Context;
@@ -45,8 +45,8 @@ import java.util.Collections;
 
 /**
  * The car's screen as Musike Video: the picture of the video playing in Musike (YouTube's picture-only stream, which
- * the app resolves and reports, see PlaybackService.NowPlaying.video), in step with its sound, which plays as always
- * through the media app. Muted: the sound is the app's.
+ * Musike resolves and reports, see Musike.State.video), in step with its sound, which plays as always through Musike's
+ * media app. Muted: the sound is Musike's.
  *
  * Android Auto keeps a map on screen while driving, so the parked rule is this screen's own: the picture shows only
  * once the car has reported standing still for a while, and goes away the moment it moves. A car that doesn't report
@@ -87,6 +87,8 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
     private String failed;
     private long lastSeek;
     private boolean shownPlaying;
+    /** Whether Musike answered the last time it was asked. */
+    private boolean reached = true;
 
     private final OnCarDataAvailableListener<Speed> onSpeed = (speed) -> {
         CarValue<Float> value = speed.getRawSpeedMetersPerSecond();
@@ -125,7 +127,7 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
 
                 @Override
                 public void onPlayerError(@NonNull PlaybackException error) {
-                    PlaybackService.log("car video: " + error.getErrorCodeName());
+                    Musike.log(context, "player error " + error.getErrorCodeName());
                     failed = loaded;
                     loaded = null;
                     tick();
@@ -138,6 +140,7 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
 
     @Override
     public void onCreate(@NonNull LifecycleOwner owner) {
+        Musike.log(getCarContext(), "opened, car API level " + getCarContext().getCarAppApiLevel());
         listenToSpeed();
         main.post(ticker);
     }
@@ -175,7 +178,7 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
             carInfo = context.getCarService(CarHardwareManager.class).getCarInfo();
             carInfo.addSpeedListener(ContextCompat.getMainExecutor(context), onSpeed);
         } catch (Exception e) {
-            PlaybackService.log("car video: no speed, " + e.getClass().getSimpleName());
+            Musike.log(context, "no speed, " + e.getClass().getSimpleName());
             carInfo = null;
         }
     }
@@ -185,7 +188,9 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
     }
 
     private void tick() {
-        PlaybackService.NowPlaying state = PlaybackService.state;
+        Musike.State state = Musike.state(getCarContext());
+        reached = state != null;
+        if (state == null) state = new Musike.State();
         String url = state.video;
         boolean hasVideo = url != null && !url.isEmpty() && !url.equals(failed);
         boolean show = hasVideo && parked();
@@ -201,11 +206,11 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
                 loaded = url;
                 player.setMediaItem(MediaItem.fromUri(url));
                 player.prepare();
-                player.seekTo(state.currentPositionMs());
+                player.seekTo(state.positionMs);
                 lastSeek = now;
             }
             player.setPlayWhenReady(state.playing);
-            long target = state.currentPositionMs();
+            long target = state.positionMs;
             boolean ready = player.getPlaybackState() == Player.STATE_READY;
             if (ready && Math.abs(player.getCurrentPosition() - target) > DRIFT_MS && now - lastSeek > SEEK_EVERY_MS) {
                 lastSeek = now;
@@ -230,6 +235,7 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
     /** Why there's no picture now. */
     private String message(boolean hasVideo, String url) {
         Context context = getCarContext();
+        if (!reached) return context.getString(R.string.car_video_no_musike);
         if (!hasVideo) {
             if (url != null && !url.isEmpty()) return context.getString(R.string.car_video_failed);
             return context.getString(R.string.car_video_none);
@@ -246,14 +252,14 @@ public class CarVideoScreen extends Screen implements SurfaceCallback, DefaultLi
     @NonNull
     @Override
     public Template onGetTemplate() {
-        boolean playing = PlaybackService.state.playing;
+        boolean playing = shownPlaying;
         Action toggle = new Action.Builder()
             .setIcon(
                 new CarIcon.Builder(
                     IconCompat.createWithResource(getCarContext(), playing ? R.drawable.ic_media_pause : R.drawable.ic_media_play)
                 ).build()
             )
-            .setOnClickListener(() -> PlaybackService.control(!PlaybackService.state.playing))
+            .setOnClickListener(() -> Musike.control(getCarContext(), !shownPlaying))
             .build();
         return new NavigationTemplate.Builder().setActionStrip(new ActionStrip.Builder().addAction(toggle).build()).build();
     }

@@ -1,4 +1,4 @@
-package app.musike.android;
+package app.musike.carvideo;
 
 import android.content.Intent;
 import androidx.annotation.NonNull;
@@ -10,7 +10,7 @@ import androidx.car.app.validation.HostValidator;
 /**
  * "Musike Video" in Android Auto: the video playing in Musike, on the car's screen, while the car stands still (see
  * CarVideoScreen). Android Auto lets an app draw on the car's screen only as a map, so this is declared as a
- * navigation app; the music itself stays with the media app (PlaybackService).
+ * navigation app; the music itself stays with Musike's media app.
  */
 public class CarVideoService extends CarAppService {
 

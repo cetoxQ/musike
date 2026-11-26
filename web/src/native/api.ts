@@ -371,6 +371,10 @@ export const car: CarSettings | null = {
     if (!androidUpdater) throw new Error("not on Android");
     await androidUpdater.reinstall(progress);
   },
+  installVideo: async (progress) => {
+    if (!androidUpdater) throw new Error("not on Android");
+    await androidUpdater.installVideo(progress);
+  },
   shareLog: async (text) => {
     await Share.share({ title: "Musike Android Auto", text, dialogTitle: "Musike Android Auto" }).catch(() => {});
   },

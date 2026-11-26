@@ -14,7 +14,7 @@ interface PlaybackPlugin {
     playing?: boolean;
     position?: number;
     duration?: number;
-    /** The video's picture-only stream, for the car's screen (CarVideoScreen.java); a new track clears it. */
+    /** The video's picture-only stream, for Musike Video on the car's screen (NowPlayingProvider.java); a new track clears it. */
     video?: string;
   }): Promise<void>;
   /** Buttons pressed outside the app; and from Android Auto, "playItem" (value: the item's id) and "search". */
@@ -23,7 +23,7 @@ interface PlaybackPlugin {
   addListener(event: "browse", fn: (e: { request: string; parent: string }) => void): Promise<PluginListenerHandle>;
   /** The car's own requests, kept until heard (the car may ask before the page starts): "open", "playItem", "search". */
   addListener(event: "car", fn: (e: { action: string; value?: string }) => void): Promise<PluginListenerHandle>;
-  carInfo(): Promise<{ background: boolean; xiaomi: boolean; screenSupported: boolean; screenListed: boolean; log: string[] }>;
+  carInfo(): Promise<{ background: boolean; xiaomi: boolean; screenSupported: boolean; screenListed: boolean; videoApp?: string; log: string[] }>;
   openBackgroundSettings(): Promise<void>;
   browseResult(options: {
     request: string;

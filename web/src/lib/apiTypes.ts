@@ -94,11 +94,14 @@ export type TopRange = "3m" | "all" | { since: number };
 export interface CarSettings {
   /**
    * Whether the app may open itself from the car, whether it can show on the car's screen while parked (Android 15 or
-   * newer; listed only when recorded as installed by Play Store), and what happened with the car lately.
+   * newer; listed only when recorded as installed by Play Store), Musike Video's version when it's installed, and what
+   * happened with the car lately.
    */
-  info(): Promise<{ background: boolean; xiaomi: boolean; screenSupported: boolean; screenListed: boolean; log: string[] }>;
+  info(): Promise<{ background: boolean; xiaomi: boolean; screenSupported: boolean; screenListed: boolean; videoApp?: string; log: string[] }>;
   /** Installs this version again, recorded as installed by Play Store, so the car's screen lists the app. */
   reinstall(progress: (fraction: number) => void): Promise<void>;
+  /** Installs Musike Video, the separate app for the video's picture on the car's screen, from the latest release. */
+  installVideo(progress: (fraction: number) => void): Promise<void>;
   /** The system page where that's allowed. */
   openBackgroundSettings(): Promise<void>;
   /** Sends the car's log through the share sheet. */

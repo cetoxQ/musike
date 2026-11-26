@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The car's screen, drawn as a map, shown only while the car stands still, which it learns from the car's speed. -->
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <uses-permission android:name="com.google.android.gms.permission.CAR_SPEED" />
+
+    <!-- Asking Musike what's playing (its NowPlayingProvider). Declared here too, so it's granted whichever of the two
+         apps is installed first; only apps signed with the same key get it. -->
+    <permission android:name="${musikeId}.permission.NOW_PLAYING" android:protectionLevel="signature" />
+    <uses-permission android:name="${musikeId}.permission.NOW_PLAYING" />
+    <queries>
+        <package android:name="${musikeId}" />
+    </queries>
+
+    <application
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/car_video_label"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+
+        <!-- On the phone: whether it can reach Musike, and where to find it in the car. -->
+        <activity
+            android:name=".MainActivity"
+            android:theme="@android:style/Theme.DeviceDefault"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".CarVideoService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+        <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="1" />
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+    </application>
+
+</manifest>
